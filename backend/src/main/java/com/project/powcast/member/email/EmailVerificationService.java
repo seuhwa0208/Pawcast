@@ -22,8 +22,8 @@ public class EmailVerificationService {
     private final PasswordEncoder passwordEncoder;
     private final MemberRepository memberRepository;
 
-    //이메일 인증 발송
-    //버튼을 누르면 이메일서비스가 이메일을 보내기전 코드를 저장하고, 이메일을 보냄
+    // 이메일 인증 발송
+    // 버튼을 누르면 이메일서비스가 이메일을 보내기전 코드를 저장하고, 이메일을 보냄
     // 이후 저장한 코드와 보낸 코드가 일치하면 인증 시간을 기록함
     // 만료시간은 보낸 시간 값 + 5분? 10분?
 

@@ -6,7 +6,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class MemberRequest {
+public class SignUpRequest {
 
     @NotBlank(message = "아이디를 입력해주세요.")
     @Size(min = 6, max = 20, message = "아이디는 6~20자로 입력해주세요.")
