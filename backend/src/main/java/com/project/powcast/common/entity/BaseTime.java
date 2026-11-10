@@ -22,4 +22,5 @@ public abstract class BaseTime {
     @LastModifiedDate
     @Column(nullable = false, name = "updated_at")
     private LocalDateTime updatedAt;
+
 }
