@@ -1,5 +1,6 @@
 package com.project.powcast.auth.controller;
 
+import com.project.powcast.auth.dto.SignUpRequest;
 import com.project.powcast.member.service.MemberService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class AuthController {
     private final JwtEncoder jwtEncoder;
 
     @PostMapping("/signup")
-    public ResponseEntity<Void> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<Void> signup(@Valid @RequestBody SignUpRequest request) {
 
         authService.signup(request);
 

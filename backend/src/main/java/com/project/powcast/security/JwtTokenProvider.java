@@ -1,8 +1,11 @@
-package com.project.powcast.common.config;
+package com.project.powcast.security;
 
 
+import com.project.powcast.common.config.PetmallProperties;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 
 import javax.crypto.SecretKey;
 
@@ -30,18 +33,42 @@ public class JwtTokenProvider {
     private static final String TYPE_REFRESH = "refresh";
     private final SecretKey key;
     private final PetmallProperties.Jwt config;
+
     public JwtTokenProvider(PetmallProperties properties) {
         this.config = properties.jwt();
         byte[] secret = config.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
-// HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
-// 첫 로그인에서야 터지므로, 기동 시점에 막는다.
+        // HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
+        // 첫 로그인에서야 터지므로, 기동 시점에 막는다.
             throw new IllegalStateException(
                     "petmall.jwt.secret 은 32바이트(256비트) 이상이어야 합니다. 현재 "
                             + secret.length + "바이트");
         }
         this.key = Keys.hmacShaKeyFor(secret);
     }
+
     public String createAccessToken(Long memberId, String email, String role) {
         return create(memberId, email, role, TYPE_ACCESS, config.accessTokenValiditySeconds());
     }
+
+    public String createRefreshToken(Long memberId, String email, String role) {
+        return create(memberId, email, role, TYPE_REFRESH, config.refreshTokenValiditySeconds());
+    }
+
+    private String create(Long memberId, String email, String role, String type, long validitySeconds) {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + validitySeconds * 1000);
+        return Jwts.builder()
+                .subject(String.valueOf(memberId))
+                .issuer(config.issuer())
+                .claim(CLAIM_EMAIL, email)
+                .claim(CLAIM_ROLE, role)
+                .claim(CLAIM_TYPE, type)
+                .issuedAt(now)
+                .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    public long accessTokenValiditySeconds() {return config.accessTokenValiditySeconds();}
+}

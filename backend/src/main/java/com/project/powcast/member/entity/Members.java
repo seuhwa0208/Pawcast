@@ -4,6 +4,8 @@ import com.project.powcast.common.entity.BaseTime;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -53,4 +55,7 @@ public class Members extends BaseTime {
 
     @Column(nullable = false, name = "is_agreed_marketing")
     private boolean isAgreedMarketing;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 }

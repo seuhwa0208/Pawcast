@@ -34,6 +34,7 @@ public record PetmallProperties(
             boolean fallbackEnabled,
             CircuitBreaker circuitBreaker
     ) { public record CircuitBreaker(int failureThreshold, int openDurationSeconds) {}}
+
     public record Order(
             long freeShippingThreshold,
             long defaultShippingFee,
@@ -41,6 +42,7 @@ public record PetmallProperties(
             int pendingExpireHours,
             int reviewWritableDays
     ) {}
+
     public record Ui(boolean tailwindCdn) {}
     public record Upload(
             String baseDir,
