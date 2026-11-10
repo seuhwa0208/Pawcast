@@ -1,4 +1,4 @@
-package com.project.powcast.member.dto;
+package com.project.powcast.auth.dto;
 
 import jakarta.validation.constraints.*;
 import lombok.Getter;
@@ -38,7 +38,7 @@ public class SignUpRequest {
     @AssertTrue(message = "개인정보이용에 동의해야 합니다.")
     private boolean isAgreedPrivacy;
 
-    @AssertTrue(message = "전가금융거래에 동의해야 합니다.")
+    @AssertTrue(message = "전자금융거래에 동의해야 합니다.")
     private boolean isAgreedEfinance;
 
     private boolean isAgreedMarketing;
