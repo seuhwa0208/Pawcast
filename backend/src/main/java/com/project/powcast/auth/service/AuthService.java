@@ -1,8 +1,12 @@
 package com.project.powcast.auth.service;
 
 
+import com.nimbusds.oauth2.sdk.token.RefreshToken;
 import com.project.powcast.auth.dto.LoginRequest;
 import com.project.powcast.auth.dto.LoginResponse;
+import com.project.powcast.auth.dto.TokenResponse;
+import com.project.powcast.auth.entity.RefreshTokens;
+import com.project.powcast.auth.repository.RefreshTokenRepository;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.EmailSendException;
 import com.project.powcast.common.exception.ErrorCode;
@@ -14,6 +18,8 @@ import com.project.powcast.member.entity.MemberRole;
 import com.project.powcast.member.entity.MemberStatus;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.security.JwtTokenProvider;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,6 +34,8 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider tokenProvider;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     //아이디 중복 검사
     public boolean checkUserId(String userId){
@@ -71,18 +79,18 @@ public class AuthService {
         Members member = new Members();
 
         // 아이디 중복 검사
-        if (checkUserId(request.getUserId())){throw new BusinessException(ErrorCode.DUPLICATE_USERID);}
+        if (checkUserId(request.userId())){throw new BusinessException(ErrorCode.DUPLICATE_USERID);}
 
         // 이메일 검증이 유효한지
         // 적혀있는 이메일 인증 완료됫는지 검사 및 방금 전 이메일과 일치하는가?
-        EmailVerification emailVerification = checkVerificationEmail(request.getEmail());  // 이메일 검증 정보 확인(유무 확인)
+        EmailVerification emailVerification = checkVerificationEmail(request.email());  // 이메일 검증 정보 확인(유무 확인)
         // 이메일이 인증 되었는지
         if(emailVerification.getVerifiedAt() == null){throw new BusinessException(ErrorCode.NOT_VERIFIED_EMAIL);}
         // 이미 가입된 이메일인지(중복검사)
-        if (memberRepository.existsByEmail(request.getEmail())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
+        if (memberRepository.existsByEmail(request.email())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
 
         // 비밀번호 일치 확인
-        if(!request.getPasswordHash().equals(request.getCheckPasswordHash())) {throw new BusinessException(ErrorCode.CHECK_PASSWORD_ERROR);}
+        if(!request.passwordHash().equals(request.checkPasswordHash())) {throw new BusinessException(ErrorCode.CHECK_PASSWORD_ERROR);}
 
         // 이용 약관 검사
         if(!request.isAgreedTerms()) {throw new BusinessException(ErrorCode.REQUIRED_TERMS_AGREEMENT);}
@@ -94,15 +102,15 @@ public class AuthService {
         if(!request.isAgreedEfinance()) {throw new BusinessException(ErrorCode.REQUIRED_EFINANCE_AGREEMENT);}
 
         // 아이디 저장
-        member.setUserId(request.getUserId());
+        member.setUserId(request.userId());
         //비밀번호 암호화 및 저장
-        member.setPasswordHash(passwordEncoder.encode(request.getPasswordHash()));
+        member.setPasswordHash(passwordEncoder.encode(request.passwordHash()));
         //이름 저장
-        member.setUsername(request.getUsername());
+        member.setUsername(request.username());
         //이메일 저장
-        member.setEmail(request.getEmail());
+        member.setEmail(request.email());
         //전화번호 저장
-        member.setTel(request.getTel());
+        member.setTel(request.tel());
         //ROLE 값의 기본값 지정
         member.setRole(MemberRole.USER);
         //상태 값의 기본값 지정
@@ -116,6 +124,8 @@ public class AuthService {
         return MemberResponse.from(memberRepository.save(member));
     }
 
+
+
     // 로그인 인증
 
     public LoginResponse login(LoginRequest request){
@@ -127,4 +137,41 @@ public class AuthService {
         
         //역할에 맞는 인증정보 발급
     }
+
+
+
+    // 로그아웃
+    
+    //비밀번호 재설정
+
+    //새 리프레시 토큰을 발급하고 기존 것을 폐기
+    public TokenResponse refresh(String refreshTokenValue, HttpServletRequest httpRequest) {
+        var claims = tokenProvider.parse(refreshTokenValue);
+        if (!tokenProvider.isRefreshToken(claims)) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
+        RefreshTokens stored = refreshTokenRepository.findByToken(refreshTokenValue).orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID));
+        if (!stored.isUsable()) {
+        // 이미 폐기된 토큰의 재사용 — 탈취 의심. 전부 끊는다.
+            log.warn("폐기된 refresh 토큰 재사용 시도: memberId={}", stored.getMember().getId());
+            refreshTokenRepository.revokeAllByMember(stored.getMember().getId());
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
+
+        Members member = stored.getMember();
+        if (member.getStatus() == Members.Status.WITHDRAWN) {
+            throw new BusinessException(ErrorCode.MEMBER_WITHDRAWN);
+        }
+
+        stored.revoke();
+        String accessToken = tokenProvider.createAccessToken(
+                member.getId(), member.getEmail(), member.getRole().name());
+        String newRefresh = tokenProvider.createRefreshToken(
+                member.getId(), member.getEmail(), member.getRole().name());
+        refreshTokenRepository.save(RefreshToken.builder()
+                .member(member)
+                .token(newRefresh)
+                .userAgent(header(httpRequest, "User-Agent"))
+                .ipAddress(clientIp(httpRequest))
+        )
 }

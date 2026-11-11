@@ -2,6 +2,11 @@ package com.project.powcast.security;
 
 
 import com.project.powcast.common.config.PetmallProperties;
+import com.project.powcast.common.exception.BusinessException;
+import com.project.powcast.common.exception.ErrorCode;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -38,8 +43,8 @@ public class JwtTokenProvider {
         this.config = properties.jwt();
         byte[] secret = config.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
-        // HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
-        // 첫 로그인에서야 터지므로, 기동 시점에 막는다.
+            // HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
+            // 첫 로그인에서야 터지므로, 기동 시점에 막는다.
             throw new IllegalStateException(
                     "petmall.jwt.secret 은 32바이트(256비트) 이상이어야 합니다. 현재 "
                             + secret.length + "바이트");
@@ -70,5 +75,51 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public long accessTokenValiditySeconds() {return config.accessTokenValiditySeconds();}
+    public long accessTokenValiditySeconds() {
+        return config.accessTokenValiditySeconds();
+    }
+
+    public Claims parse(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(key)
+                    .requireIssuer(config.issuer())
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (ExpiredJwtException exception) {
+            throw new BusinessException(ErrorCode.TOKEN_EXPIRED);
+        } catch (JwtException | IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
+    }
+
+    /**
+     * 필터에서 쓰는 조용한 검증: 실패를 예외가 아니라 null 로 돌려준다.
+     */
+    public Claims parseQuietly(String token) {
+        try {
+            return parse(token);
+        } catch (BusinessException exception) {
+            log.debug("토큰 검증 실패: {}", exception.getErrorCode());
+            return null;
+        }
+    }
+
+    public boolean isRefreshToken(Claims claims) {
+        return "REFRESH".equals(claims.get("CLAIM_TYPE", String.class));
+    }
+
+    public Long memberId(Claims claims) {
+        return Long.valueOf(claims.getSubject());
+    }
+
+    public String email(Claims claims) {
+        return claims.get(CLAIM_EMAIL,String.class);
+    }
+
+    public String role(Claims claims) {
+        return claims.get(CLAIM_ROLE,String.class);
+    }
 }
+
