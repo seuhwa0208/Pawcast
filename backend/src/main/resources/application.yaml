@@ -3,7 +3,7 @@ spring:
     name: powcast
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost5432/powcast
+    url: jdbc:postgresql://localhost:5432/powcast
     username: postgres
     password: 1004
   jpa:
