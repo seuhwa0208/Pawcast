@@ -17,7 +17,10 @@ public enum ErrorCode {
     VERIFICATION_COMPLETED_EMAIL(HttpStatus.CONFLICT, "이미 인증된 이메일 입니다."),
     REQUIRED_PRIVACY_AGREEMENT(HttpStatus.BAD_REQUEST,"개인정보 이용약관에 동의해주세요."),
     REQUIRED_TERMS_AGREEMENT(HttpStatus.BAD_REQUEST,"서비스 이용약관에 동의해주세요."),
+    TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED,"토큰이 만료되었습니다."),
+    TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "토큰이 유효하지 않습니다."),
     REQUIRED_EFINANCE_AGREEMENT(HttpStatus.BAD_REQUEST,"전자금융거래 이용약관에 동의해주세요."),
+
 
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
 

@@ -2,11 +2,10 @@ package com.project.powcast.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-public class LoginRequest {
+public record LoginRequest(
+        @NotBlank
+        String userId,
 
-    @NotBlank
-    private String userId;
-
-    @NotBlank
-    private String passwordHash;
-}
+        @NotBlank
+        String passwordHash
+        ) {}
