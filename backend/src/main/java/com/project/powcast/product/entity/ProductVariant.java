@@ -37,16 +37,16 @@ public class ProductVariant extends BaseTime {
     private String color;
 
     @Column(name = "weight_g")
-    private BigDecimal weightG;
+    private int weightG;
 
     @Column(name = "volume_ml")
-    private BigDecimal volumeMl;
+    private int volumeMl;
 
     @Column(name = "capacity_ml")
-    private BigDecimal capacityMl;
+    private int capacityMl;
 
     @Column(name = "height_cm")
-    private BigDecimal heightCm;
+    private int heightCm;
 
     @Column(nullable = false)
     private BigDecimal price;
@@ -65,6 +65,9 @@ public class ProductVariant extends BaseTime {
     @Column(name = "product_variant_status", nullable = false)
     private ProductVariantStatus productVariantStatus;
 
+    @Column(name = "sales_count", nullable = false)
+    @Builder.Default
+    private long salesCount = 0L;
 
     public BigDecimal getSalePrice() {
         return price.multiply(BigDecimal.ONE.subtract(

@@ -17,14 +17,15 @@ public class Product extends BaseTime {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long categoryId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    private Category category;
 
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "pet_type", nullable = false)
-    private PetType petType;
+    @Column(length = 100)
+    private String brand;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "product_type", nullable = false)
@@ -32,4 +33,18 @@ public class Product extends BaseTime {
 
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @Column(name = "sales_count", nullable = false)
+    @Builder.Default
+    private long salesCount = 0L;
+
+    @Column(name = "wish_count", nullable = false)
+    @Builder.Default
+    private long wishCount = 0L;
+
+    @Column(name = "review_count", nullable = false)
+    private long reviewCount;
+
+    @Column(name = "rating_sum", nullable = false)
+    private long ratingSum;
 }
