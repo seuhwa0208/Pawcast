@@ -1,6 +1,7 @@
 package com.project.powcast.auth.repository;
 
 import com.project.powcast.auth.entity.RefreshTokens;
+import com.project.powcast.member.entity.Members;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -25,5 +26,6 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshTokens, Lon
     int deleteExpired(@Param("threshold") OffsetDateTime threshold);
 
     long countByMemberIdAndRevokedFalse(Long memberId);
+
 
 }

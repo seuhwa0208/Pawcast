@@ -19,6 +19,14 @@ public enum ErrorCode {
     REQUIRED_TERMS_AGREEMENT(HttpStatus.BAD_REQUEST,"서비스 이용약관에 동의해주세요."),
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED,"토큰이 만료되었습니다."),
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "토큰이 유효하지 않습니다."),
+    MEMBER_DELETED(HttpStatus.FORBIDDEN,"탈퇴한 회원입니다."),
+    MEMBER_INACTIVE(HttpStatus.FORBIDDEN,"비활성화된 회원입니다."),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND,"존재하지 않은 회원입니다."),
+    LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 일치하지 않습니다."),
+    PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
+    NEW_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "새 비밀번호를 입력해주세요."),
+    NEW_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "새 비밀번호 확인과 일치하지 않습니다."),
+    SAME_PASSWORD(HttpStatus.BAD_REQUEST, "기존 비밀번호와 동일한 비밀번호는 사용할 수 없습니다."),
     REQUIRED_EFINANCE_AGREEMENT(HttpStatus.BAD_REQUEST,"전자금융거래 이용약관에 동의해주세요."),
 
 

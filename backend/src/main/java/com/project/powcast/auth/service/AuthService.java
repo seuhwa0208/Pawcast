@@ -1,17 +1,12 @@
 package com.project.powcast.auth.service;
 
-
-import com.nimbusds.oauth2.sdk.token.RefreshToken;
-import com.project.powcast.auth.dto.LoginRequest;
-import com.project.powcast.auth.dto.LoginResponse;
-import com.project.powcast.auth.dto.TokenResponse;
+import com.project.powcast.auth.dto.*;
 import com.project.powcast.auth.entity.RefreshTokens;
 import com.project.powcast.auth.repository.RefreshTokenRepository;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.EmailSendException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.dto.MemberResponse;
-import com.project.powcast.auth.dto.SignUpRequest;
 import com.project.powcast.member.email.EmailVerification;
 import com.project.powcast.member.email.EmailVerificationRepository;
 import com.project.powcast.member.entity.MemberRole;
@@ -24,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 
@@ -36,6 +33,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     //아이디 중복 검사
     public boolean checkUserId(String userId){
@@ -59,7 +57,7 @@ public class AuthService {
         EmailVerification emailVerification = checkVerificationEmail(email);
 
         // 인증 완료된 이메일인지 확인
-        if(checkVerificationEmail(email).getVerifiedAt() != null) {throw new BusinessException(ErrorCode.VERIFICATION_COMPLETED_EMAIL);}
+        if(emailVerification.getVerifiedAt() != null) {throw new BusinessException(ErrorCode.VERIFICATION_COMPLETED_EMAIL);}
 
         // 이메일 코드 날짜 만료 확인
         if (!LocalDateTime.now().isBefore(emailVerification.getExpiresAt())) { throw new BusinessException(ErrorCode.EXPIRED_EMAIL_CODE);}
@@ -106,7 +104,7 @@ public class AuthService {
         //비밀번호 암호화 및 저장
         member.setPasswordHash(passwordEncoder.encode(request.passwordHash()));
         //이름 저장
-        member.setUsername(request.username());
+        member.setName(request.username());
         //이메일 저장
         member.setEmail(request.email());
         //전화번호 저장
@@ -125,31 +123,99 @@ public class AuthService {
     }
 
 
-
-    // 로그인 인증
-
-    public LoginResponse login(LoginRequest request){
+    // 일반 로그인 인증
+    @Transactional
+    public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest){
         // 계정조회
-        
+        Members member = memberRepository.findByUserId(request.userId()).orElseThrow(()-> new BusinessException(ErrorCode.LOGIN_FAILED));
+        // 비활성화 및 탈퇴한 회원 여부 조회
+        if (member.getMemberStatus() == MemberStatus.INACTIVE){throw new BusinessException(ErrorCode.MEMBER_INACTIVE);}
+        if (member.getMemberStatus() == MemberStatus.DELETED){throw new BusinessException(ErrorCode.MEMBER_DELETED);}
         // 비밀번호 확인
-        
-        //계정 활성화 상태 확인
-        
+        if(!passwordEncoder.matches(request.passwordHash(), member.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.LOGIN_FAILED);
+        }
         //역할에 맞는 인증정보 발급
+        String accessToken = tokenProvider.createAccessToken(member.getId(),member.getEmail(),member.getRole().name());
+        String newRefreshToken = tokenProvider.createRefreshToken(member.getId(),member.getEmail(),member.getRole().name());
+        
+
+        //기존 토큰 조회 및 폐기
+        refreshTokenRepository.revokeAllByMember(member.getId());
+        //토큰 발급했으니 DB에 저장
+        RefreshTokens refreshTokens = RefreshTokens.builder()
+                .member(member)
+                .token(newRefreshToken)
+                .expiresAt(LocalDateTime.now().plusSeconds(tokenProvider.refreshTokenValiditySeconds()))
+                .revoked(false)
+                .userAgent(header(httpRequest,"User-Agent"))
+                .ipAddress(clientIp(httpRequest))
+                .build();
+        refreshTokenRepository.save(refreshTokens);
+
+        return new LoginResponse(accessToken,newRefreshToken,member.getId(),member.getUserId(),member.getName(),member.getRole());
     }
 
-
-
     // 로그아웃
-    
+    // 로그아웃시 토큰이 제거되어야하는데
+    // 제거 실패했다고 로그아웃이 안되면 안되니깐
+    // 시도는 유효성, 검증, DB조회(전부다잖아?)
+    // 리프레시 토큰이 아니다? - DB제거 필요 없음 - return으로 끝냄
+    // 마무리로는 프론트에서 토큰 제거하면 모든 토큰 없음
+    @Transactional
+    public void logout(String refreshTokenValue) {
+        try {
+            // JWT 자체의 유효성 검증
+            var claims = tokenProvider.parse(refreshTokenValue);
+            // Refresh Token 인지 검증
+            if (!tokenProvider.isRefreshToken(claims)) {return;}
+            // DB에서 토큰 조회 - 토큰 유효하면 - 취소시킴
+            refreshTokenRepository.findByToken(refreshTokenValue).filter(RefreshTokens::isUsable).ifPresent(RefreshTokens::revoke);
+        } catch (BusinessException e) {
+            if (e.getErrorCode() != ErrorCode.TOKEN_EXPIRED && e.getErrorCode() != ErrorCode.TOKEN_INVALID) {throw e;}
+        }
+    }
+
     //비밀번호 재설정
+    // 재설정 하고 나면 로그아웃 및 재 로그인
+    // 본인 확인 - 변경 - 저장 - 로그아웃 - 재로그인
+    @Transactional
+    public void changePassword(Long memberId, ChangePasswordRequest request){
+        // 회원 조회
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
+        // 현재 입력한 비밀번호가 현재 비밀번호와 일치하는지 확인
+        if(!passwordEncoder.matches(request.password(), (member.getPasswordHash()))) {
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        // 새 비밀번호 입력
+        if(request.newPassword() == null || request.newPassword().isBlank()) {
+            throw new BusinessException(ErrorCode.NEW_PASSWORD_REQUIRED);
+        }
+
+        // 비밀번호 확인과 일치하는지 확인
+        if(!request.newPassword().equals(request.newPasswordCheck())) {
+            throw new BusinessException(ErrorCode.NEW_PASSWORD_MISMATCH);
+        }
+
+        // 기존 비밀번호와 새 비밀번호가 같은지 확인
+        if (passwordEncoder.matches(request.newPassword(), member.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.SAME_PASSWORD);
+        }
+        // DB 에 적용
+        member.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+
+        // 비밀번호 변경했으니 토큰 폐기
+        refreshTokenRepository.revokeAllByMember(memberId);
+    }
 
     //새 리프레시 토큰을 발급하고 기존 것을 폐기
+    @Transactional
     public TokenResponse refresh(String refreshTokenValue, HttpServletRequest httpRequest) {
         var claims = tokenProvider.parse(refreshTokenValue);
-        if (!tokenProvider.isRefreshToken(claims)) {
-            throw new BusinessException(ErrorCode.TOKEN_INVALID);
-        }
+        if (!tokenProvider.isRefreshToken(claims)) {throw new BusinessException(ErrorCode.TOKEN_INVALID);}
+
         RefreshTokens stored = refreshTokenRepository.findByToken(refreshTokenValue).orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID));
         if (!stored.isUsable()) {
         // 이미 폐기된 토큰의 재사용 — 탈취 의심. 전부 끊는다.
@@ -159,19 +225,28 @@ public class AuthService {
         }
 
         Members member = stored.getMember();
-        if (member.getStatus() == Members.Status.WITHDRAWN) {
-            throw new BusinessException(ErrorCode.MEMBER_WITHDRAWN);
-        }
+        if (member.getMemberStatus() == MemberStatus.DELETED) {throw new BusinessException(ErrorCode.MEMBER_DELETED);}
 
         stored.revoke();
-        String accessToken = tokenProvider.createAccessToken(
-                member.getId(), member.getEmail(), member.getRole().name());
-        String newRefresh = tokenProvider.createRefreshToken(
-                member.getId(), member.getEmail(), member.getRole().name());
-        refreshTokenRepository.save(RefreshToken.builder()
+        String accessToken = tokenProvider.createAccessToken(member.getId(), member.getEmail(), member.getRole().name());
+        String newRefresh = tokenProvider.createRefreshToken(member.getId(), member.getEmail(), member.getRole().name());
+        refreshTokenRepository.save(RefreshTokens.builder()
                 .member(member)
                 .token(newRefresh)
+                .expiresAt(LocalDateTime.now().plusSeconds(tokenProvider.refreshTokenValiditySeconds()))
                 .userAgent(header(httpRequest, "User-Agent"))
                 .ipAddress(clientIp(httpRequest))
-        )
+                .build()
+        );
+        return new TokenResponse(accessToken);
+    }//refresh
+
+    private String clientIp(HttpServletRequest request) {
+        return request.getRemoteAddr();
+    }
+
+    private String header(HttpServletRequest request, String name) {
+        return request.getHeader(name);
+    }
+
 }

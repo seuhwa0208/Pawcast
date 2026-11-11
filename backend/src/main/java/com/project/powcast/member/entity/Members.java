@@ -23,7 +23,7 @@ public class Members extends BaseTime {
     private String userId;
 
     @Column(nullable = false, length = 50)
-    private String username;
+    private String name;
 
     @Column(nullable = false, unique = true, length = 200)
     private String email;

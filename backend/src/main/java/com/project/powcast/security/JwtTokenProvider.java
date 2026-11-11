@@ -79,6 +79,11 @@ public class JwtTokenProvider {
         return config.accessTokenValiditySeconds();
     }
 
+    public long refreshTokenValiditySeconds(){
+        return config.refreshTokenValiditySeconds();
+    }
+
+    //JWT의 서명과 유효성을 검증하면서 Claims를 추출하는 메서드
     public Claims parse(String token) {
         try {
             return Jwts.parser()
