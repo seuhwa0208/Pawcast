@@ -25,7 +25,7 @@ public class AuthController {
         return authService.checkUserId(userid);
     }
 
-    // 이메일 (인증 발송)(버튼)
+    // 이메일 인증 (이메일 발송)(버튼)
     @PostMapping("/email-verify")
     public void sendVerifyEmail(@RequestParam String email){
         emailVerificationService.sendVerifyEmail(email);
@@ -53,8 +53,17 @@ public class AuthController {
     // 소셜 로그인
 
     // 로그아웃
+    @PostMapping("/logout")
+    public void logout (@RequestParam String refreshTokenValue){
+        // 버튼 누름
+        // 토큰 비활성화? - 프론트에서도 제거
+        authService.logout(refreshTokenValue);
+    }
 
-    // 비밀번호 재설정
+    // 비밀번호 재설정 - 버튼 누르면 임시 비밀번호 이메일 발송
+    // 비밀번호 찾기 -> 찾기폼 -> 이메일 넣고 찾기 클릭 -> 임시 비밀번호 이메일 발송
+    @PostMapping("/reset-password")
+    public
 
     //
 

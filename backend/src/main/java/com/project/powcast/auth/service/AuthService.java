@@ -7,6 +7,7 @@ import com.project.powcast.common.email.EmailService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.EmailSendException;
 import com.project.powcast.common.exception.ErrorCode;
+import com.project.powcast.common.util.PasswordGenerator;
 import com.project.powcast.member.dto.MemberResponse;
 import com.project.powcast.auth.entity.EmailVerification;
 import com.project.powcast.auth.repository.EmailVerificationRepository;
@@ -43,8 +44,14 @@ public class AuthService {
     public boolean checkUserId(String userId){
         return memberRepository.existsByUserId(userId);
     }
+    
+    // 이메일로 회원 정보 불러오기
+    public Members findByEmailMember(String email){
+        return memberRepository.findByEmail(email).orElseThrow(()-> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+    }
 
-    // findByEmail - 이메일로 이메일 검증 정보 확인
+
+    // 이메일로 이메일 검증 정보 확인
     public EmailVerification checkVerificationEmail(String email){
         return emailVerificationRepository.findByEmail(email).orElseThrow(()-> new EmailSendException(ErrorCode.NOT_FOUND_EMAIL_VERIFICATION));
     }
@@ -187,11 +194,11 @@ public class AuthService {
     public void resetPassword(String email){
         String tempPassword = tempPasswordCreate();
         emailService.sendEmail(email,"임시 비밀번호 발급","임시 비밀버호는 : "+ tempPassword + "입니다.");
-        memberRepository.save()
+        Members member = findByEmailMember(email);
+        member.setPasswordHash(passwordEncoder.encode(tempPassword));
     }
 
-    private String tempPasswordCreate() {
-    }
+    private String tempPasswordCreate() {return PasswordGenerator.createTempPassword();}
 
 
     //새 리프레시 토큰을 발급하고 기존 것을 폐기
