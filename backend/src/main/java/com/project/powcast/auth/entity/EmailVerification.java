@@ -1,4 +1,4 @@
-package com.project.powcast.member.email;
+package com.project.powcast.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

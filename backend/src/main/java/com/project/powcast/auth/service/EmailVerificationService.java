@@ -1,5 +1,7 @@
-package com.project.powcast.member.email;
+package com.project.powcast.auth.service;
 
+import com.project.powcast.auth.entity.EmailVerification;
+import com.project.powcast.auth.repository.EmailVerificationRepository;
 import com.project.powcast.common.email.EmailService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
@@ -28,7 +30,7 @@ public class EmailVerificationService {
     // 만료시간은 보낸 시간 값 + 5분? 10분?
 
     @Transactional
-    public void sendVerifiedEmail(String email){
+    public void sendVerifyEmail(String email){
         
         //이메일 보내기전 이미 이 이메일로 가입된 회원이 있는지 검사
         if(memberRepository.existsByEmail(email)){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}

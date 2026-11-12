@@ -1,5 +1,6 @@
-package com.project.powcast.member.email;
+package com.project.powcast.auth.repository;
 
+import com.project.powcast.auth.entity.EmailVerification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

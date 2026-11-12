@@ -3,12 +3,13 @@ package com.project.powcast.auth.service;
 import com.project.powcast.auth.dto.*;
 import com.project.powcast.auth.entity.RefreshTokens;
 import com.project.powcast.auth.repository.RefreshTokenRepository;
+import com.project.powcast.common.email.EmailService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.EmailSendException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.dto.MemberResponse;
-import com.project.powcast.member.email.EmailVerification;
-import com.project.powcast.member.email.EmailVerificationRepository;
+import com.project.powcast.auth.entity.EmailVerification;
+import com.project.powcast.auth.repository.EmailVerificationRepository;
 import com.project.powcast.member.entity.MemberRole;
 import com.project.powcast.member.entity.MemberStatus;
 import com.project.powcast.member.entity.Members;
@@ -22,7 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Random;
 
 @Service
 @Transactional(readOnly = true)
@@ -33,6 +36,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final EmailService emailService;
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     //아이디 중복 검사
@@ -104,7 +108,7 @@ public class AuthService {
         //비밀번호 암호화 및 저장
         member.setPasswordHash(passwordEncoder.encode(request.passwordHash()));
         //이름 저장
-        member.setName(request.username());
+        member.setName(request.name());
         //이메일 저장
         member.setEmail(request.email());
         //전화번호 저장
@@ -176,39 +180,19 @@ public class AuthService {
         }
     }
 
-    //비밀번호 재설정
-    // 재설정 하고 나면 로그아웃 및 재 로그인
-    // 본인 확인 - 변경 - 저장 - 로그아웃 - 재로그인
+    // 비밀번호 재설정 안내(버튼)
+    // 비밀번호 찾기 - 이메일 발송 - 숫자 6자리 복호화해서 전달
+    // DB에서 비밀번호 변경하고 - 로그인 하고 - 비밀번호 변경 권장
     @Transactional
-    public void changePassword(Long memberId, ChangePasswordRequest request){
-        // 회원 조회
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
-
-        // 현재 입력한 비밀번호가 현재 비밀번호와 일치하는지 확인
-        if(!passwordEncoder.matches(request.password(), (member.getPasswordHash()))) {
-            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
-        }
-
-        // 새 비밀번호 입력
-        if(request.newPassword() == null || request.newPassword().isBlank()) {
-            throw new BusinessException(ErrorCode.NEW_PASSWORD_REQUIRED);
-        }
-
-        // 비밀번호 확인과 일치하는지 확인
-        if(!request.newPassword().equals(request.newPasswordCheck())) {
-            throw new BusinessException(ErrorCode.NEW_PASSWORD_MISMATCH);
-        }
-
-        // 기존 비밀번호와 새 비밀번호가 같은지 확인
-        if (passwordEncoder.matches(request.newPassword(), member.getPasswordHash())) {
-            throw new BusinessException(ErrorCode.SAME_PASSWORD);
-        }
-        // DB 에 적용
-        member.setPasswordHash(passwordEncoder.encode(request.newPassword()));
-
-        // 비밀번호 변경했으니 토큰 폐기
-        refreshTokenRepository.revokeAllByMember(memberId);
+    public void resetPassword(String email){
+        String tempPassword = tempPasswordCreate();
+        emailService.sendEmail(email,"임시 비밀번호 발급","임시 비밀버호는 : "+ tempPassword + "입니다.");
+        memberRepository.save()
     }
+
+    private String tempPasswordCreate() {
+    }
+
 
     //새 리프레시 토큰을 발급하고 기존 것을 폐기
     @Transactional

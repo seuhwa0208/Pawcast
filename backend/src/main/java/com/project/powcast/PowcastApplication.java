@@ -7,7 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class PowcastApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(PowcastApplication.class, args);
+        SpringApplication.run(PowcastApplication.class, args);
 	}
 
 }
