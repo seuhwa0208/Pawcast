@@ -1,9 +1,6 @@
 package com.project.powcast.auth.controller;
 
-import com.project.powcast.auth.dto.LoginRequest;
-import com.project.powcast.auth.dto.LoginResponse;
-import com.project.powcast.auth.dto.SignUpRequest;
-import com.project.powcast.auth.dto.SignupResponse;
+import com.project.powcast.auth.dto.*;
 import com.project.powcast.auth.service.AuthService;
 import com.project.powcast.auth.service.EmailVerificationService;
 import com.project.powcast.member.entity.Members;
@@ -56,10 +53,10 @@ public class AuthController {
 
     // 로그아웃
     @PostMapping("/logout")
-    public void logout (@RequestParam String refreshTokenValue){
+    public void logout (@RequestBody LogoutRequest request){
         // 버튼 누름
         // 토큰 비활성화? - 프론트에서도 제거
-        authService.logout(refreshTokenValue);
+        authService.logout(request.refreshTokenValue());
     }
     
     // 비밀번호 재설정 - 버튼 누르면 임시 비밀번호 이메일 발송

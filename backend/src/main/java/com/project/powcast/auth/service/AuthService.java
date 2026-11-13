@@ -11,8 +11,6 @@ import com.project.powcast.common.util.PasswordGenerator;
 import com.project.powcast.member.dto.MemberResponse;
 import com.project.powcast.auth.entity.EmailVerification;
 import com.project.powcast.auth.repository.EmailVerificationRepository;
-import com.project.powcast.member.entity.MemberRole;
-import com.project.powcast.member.entity.MemberStatus;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MemberRepository;
 import com.project.powcast.security.JwtTokenProvider;
@@ -24,9 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 @Transactional(readOnly = true)
@@ -121,9 +117,9 @@ public class AuthService {
         //전화번호 저장
         member.setTel(request.tel());
         //ROLE 값의 기본값 지정
-        member.setRole(MemberRole.USER);
+        member.setRole(Members.Role.USER);
         //상태 값의 기본값 지정
-        member.setMemberStatus(MemberStatus.ACTIVE);
+        member.setStatus(Members.Status.ACTIVE);
 
         member.setAgreedTerms(request.isAgreedTerms());
         member.setAgreedPrivacy(request.isAgreedPrivacy());
@@ -140,8 +136,8 @@ public class AuthService {
         // 계정조회
         Members member = memberRepository.findByUserId(request.userId()).orElseThrow(()-> new BusinessException(ErrorCode.LOGIN_FAILED));
         // 비활성화 및 탈퇴한 회원 여부 조회
-        if (member.getMemberStatus() == MemberStatus.INACTIVE){throw new BusinessException(ErrorCode.MEMBER_INACTIVE);}
-        if (member.getMemberStatus() == MemberStatus.DELETED){throw new BusinessException(ErrorCode.MEMBER_DELETED);}
+        if (member.getStatus() == Members.Status.INACTIVE){throw new BusinessException(ErrorCode.MEMBER_INACTIVE);}
+        if (member.getStatus() == Members.Status.DELETED){throw new BusinessException(ErrorCode.MEMBER_DELETED);}
         // 비밀번호 확인
         if(!passwordEncoder.matches(request.passwordHash(), member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
@@ -167,7 +163,7 @@ public class AuthService {
         return new LoginResponse(accessToken,newRefreshToken,member.getId(),member.getUserId(),member.getName(),member.getRole());
     }
 
-    // 로그아웃
+    // 로그아웃 - request가 필요할수도 - 리프레시 토큰 전다
     // 로그아웃시 토큰이 제거되어야하는데
     // 제거 실패했다고 로그아웃이 안되면 안되니깐
     // 시도는 유효성, 검증, DB조회(전부다잖아?)
@@ -217,7 +213,7 @@ public class AuthService {
         }
 
         Members member = stored.getMember();
-        if (member.getMemberStatus() == MemberStatus.DELETED) {throw new BusinessException(ErrorCode.MEMBER_DELETED);}
+        if (member.getStatus() == Members.Status.DELETED) {throw new BusinessException(ErrorCode.MEMBER_DELETED);}
 
         stored.revoke();
         String accessToken = tokenProvider.createAccessToken(member.getId(), member.getEmail(), member.getRole().name());

@@ -1,4 +1,4 @@
 package com.project.powcast.auth.dto;
 
-public record LogoutRequest() {
+public record LogoutRequest(String refreshTokenValue) {
 }

@@ -18,7 +18,7 @@ public class Addresses {
     private Long id;
 
     @ManyToOne
-    @Column(nullable = false, name = "member_id")
+    @JoinColumn(nullable = false, name = "member_id")
     private Members member;
 
     @Column(nullable = false, length = 50)
