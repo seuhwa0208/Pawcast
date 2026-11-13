@@ -1,6 +1,6 @@
 package com.project.powcast.auth.dto;
 
-import com.project.powcast.member.entity.MemberRole;
+import com.project.powcast.member.entity.Members;
 
 public record LoginResponse(
         String accessToken,
@@ -8,6 +8,6 @@ public record LoginResponse(
         Long memberId,
         String userId,
         String name,
-        MemberRole role
+        Members.Role role
 ) {
 }

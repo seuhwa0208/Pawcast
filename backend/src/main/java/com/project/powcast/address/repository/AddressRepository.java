@@ -9,5 +9,5 @@ import java.util.List;
 
 @Repository
 public interface AddressRepository extends JpaRepository<Addresses, Long> {
-    List<Addresses>findAllByMember(Members member);
+    List<Addresses>findAllByMember_Id(Long memberId);
 }

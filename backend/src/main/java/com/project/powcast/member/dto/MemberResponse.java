@@ -1,7 +1,5 @@
 package com.project.powcast.member.dto;
 
-import com.project.powcast.member.entity.MemberRole;
-import com.project.powcast.member.entity.MemberStatus;
 import com.project.powcast.member.entity.Members;
 import java.time.LocalDateTime;
 
@@ -11,8 +9,8 @@ public record MemberResponse(
         String name,
         String email,
         String tel,
-        MemberRole role,
-        MemberStatus memberStatus,
+        Members.Role role,
+        Members.Status status,
         boolean isAgreedTerms,
         boolean isAgreedEfinance,
         boolean isAgreedPrivacy,
@@ -28,7 +26,7 @@ public record MemberResponse(
                 member.getEmail(),
                 member.getTel(),
                 member.getRole(),
-                member.getMemberStatus(),
+                member.getStatus(),
                 member.isAgreedTerms(),
                 member.isAgreedEfinance(),
                 member.isAgreedPrivacy(),

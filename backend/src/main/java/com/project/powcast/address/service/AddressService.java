@@ -7,6 +7,8 @@ import com.project.powcast.address.repository.AddressRepository;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
+import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,19 +21,23 @@ import java.util.List;
 public class AddressService {
 
     private final AddressRepository addressRepository;
+    private final MemberRepository memberRepository;
 
-    //단순 배송지 아이디로 배송지 조회
+    //단순 배송지_아이디로 배송지 조회
     public Addresses findById(Long id){
         return addressRepository.findById(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ADDRESS));
     }
 
     // 배송지 조회
-    public List<AddressResponse> listAddresses(Members member){
-       return addressRepository.findAllByMember(member).stream().map(AddressResponse::from).toList();
+    public List<AddressResponse> listAddresses(Long memberId){
+       return addressRepository.findAllByMember_Id(memberId).stream().map(AddressResponse::from).toList();
     }
     // 배송지 등록
-    public AddressResponse createAddress(AddressRequest request){
+    public AddressResponse createAddress(Long memberId, AddressRequest request){
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+
         Addresses address = new Addresses().builder()
+                .member(member)
                 .label(request.label())
                 .recipient(request.recipient())
                 .tel(request.tel())
@@ -58,5 +64,7 @@ public class AddressService {
     }
     
     // 배송지 삭제
-    public void deleteAddress(Long id,)
+    public void deleteAddress(Long id){
+        addressRepository.deleteById(id);
+    }
 }

@@ -37,12 +37,12 @@ public class Members extends BaseTime {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private MemberRole role = MemberRole.USER;
+    private Role role = Role.USER;
 
-    @Column(nullable = false, name = "member_status")
+    @Column(nullable = false)
     @Builder.Default
     @Enumerated(EnumType.STRING)
-    private MemberStatus memberStatus = MemberStatus.ACTIVE;
+    private Status status = Status.ACTIVE;
 
     @Column(nullable = false, name = "is_agreed_terms")
     private boolean isAgreedTerms;
@@ -58,4 +58,17 @@ public class Members extends BaseTime {
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
+
+    public enum Status {
+        ACTIVE,
+        INACTIVE,
+        DELETED;
+    }
+
+    public enum Role {
+        GUEST,
+        USER,
+        OPERATOR,
+        ADMIN
+    }
 }
