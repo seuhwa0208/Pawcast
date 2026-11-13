@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public record MemberResponse(
         Long id,
         String userId,
-        String username,
+        String name,
         String email,
         String tel,
         MemberRole role,
@@ -24,7 +24,7 @@ public record MemberResponse(
         return new MemberResponse(
                 member.getId(),
                 member.getUserId(),
-                member.getUsername(),
+                member.getName(),
                 member.getEmail(),
                 member.getTel(),
                 member.getRole(),
