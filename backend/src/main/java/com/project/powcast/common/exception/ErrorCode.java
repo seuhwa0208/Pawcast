@@ -27,6 +27,7 @@ public enum ErrorCode {
     NEW_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "새 비밀번호를 입력해주세요."),
     NEW_PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "새 비밀번호 확인과 일치하지 않습니다."),
     SAME_PASSWORD(HttpStatus.BAD_REQUEST, "기존 비밀번호와 동일한 비밀번호는 사용할 수 없습니다."),
+    NOT_FOUND_ADDRESS(HttpStatus.NOT_FOUND,"존재하지 않은 배송지 입니다."),
     REQUIRED_EFINANCE_AGREEMENT(HttpStatus.BAD_REQUEST,"전자금융거래 이용약관에 동의해주세요."),
 
 

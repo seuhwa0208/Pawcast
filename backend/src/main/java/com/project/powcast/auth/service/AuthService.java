@@ -193,11 +193,12 @@ public class AuthService {
     @Transactional
     public void resetPassword(String email){
         String tempPassword = tempPasswordCreate();
-        emailService.sendEmail(email,"임시 비밀번호 발급","임시 비밀버호는 : "+ tempPassword + "입니다.");
         Members member = findByEmailMember(email);
+        emailService.sendEmail(email,"임시 비밀번호 발급","임시 비밀버호는 : "+ tempPassword + "입니다.");
         member.setPasswordHash(passwordEncoder.encode(tempPassword));
     }
 
+    // 임시 비밀번호 생성
     private String tempPasswordCreate() {return PasswordGenerator.createTempPassword();}
 
 

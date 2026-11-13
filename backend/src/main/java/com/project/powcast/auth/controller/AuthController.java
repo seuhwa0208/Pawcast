@@ -6,6 +6,7 @@ import com.project.powcast.auth.dto.SignUpRequest;
 import com.project.powcast.auth.dto.SignupResponse;
 import com.project.powcast.auth.service.AuthService;
 import com.project.powcast.auth.service.EmailVerificationService;
+import com.project.powcast.member.entity.Members;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -50,7 +51,8 @@ public class AuthController {
         return authService.login(request,httpRequest);
     }
 
-    // 소셜 로그인
+    // 소셜 로그인 -
+
 
     // 로그아웃
     @PostMapping("/logout")
@@ -59,14 +61,18 @@ public class AuthController {
         // 토큰 비활성화? - 프론트에서도 제거
         authService.logout(refreshTokenValue);
     }
-
+    
     // 비밀번호 재설정 - 버튼 누르면 임시 비밀번호 이메일 발송
     // 비밀번호 찾기 -> 찾기폼 -> 이메일 넣고 찾기 클릭 -> 임시 비밀번호 이메일 발송
     @PostMapping("/reset-password")
-    public
+    public void resetPassword(@RequestParam String email){
+        authService.resetPassword(email);
+    }
 
-    //
-
-
+    // 토큰 재발급
+    @PostMapping("/token/refresh")
+    public void refreshToken(@RequestParam String refreshTokenValue, HttpServletRequest request){
+        authService.refresh(refreshTokenValue, request);
+    }
 
 }
