@@ -26,7 +26,7 @@ public class MemberService {
 
     // 기본 findById
     public Members findById(Long id){
-        return memberRepository.findById(id).orElseThrow(()-> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        return memberRepository.findById(id).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
     }
 
     //비밀번호 재설정

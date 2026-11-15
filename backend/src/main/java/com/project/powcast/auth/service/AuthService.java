@@ -43,7 +43,7 @@ public class AuthService {
     
     // 이메일로 회원 정보 불러오기
     public Members findByEmailMember(String email){
-        return memberRepository.findByEmail(email).orElseThrow(()-> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
+        return memberRepository.findByEmail(email).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
     }
 
 

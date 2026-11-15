@@ -68,7 +68,7 @@ public class Members extends BaseTime {
     public enum Role {
         GUEST,
         USER,
-        OPERATOR,
+        MANAGER,
         ADMIN
     }
 }
