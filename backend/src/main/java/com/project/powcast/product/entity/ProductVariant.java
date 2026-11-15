@@ -37,16 +37,16 @@ public class ProductVariant extends BaseTime {
     private String color;
 
     @Column(name = "weight_g")
-    private int weightG;
+    private Integer weightG;
 
     @Column(name = "volume_ml")
-    private int volumeMl;
+    private Integer volumeMl;
 
     @Column(name = "capacity_ml")
-    private int capacityMl;
+    private Integer capacityMl;
 
     @Column(name = "height_cm")
-    private int heightCm;
+    private Integer heightCm;
 
     @Column(nullable = false)
     private BigDecimal price;
