@@ -8,7 +8,6 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MemberRepository;
-import com.project.powcast.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,20 +22,23 @@ public class AddressService {
     private final AddressRepository addressRepository;
     private final MemberRepository memberRepository;
 
-    //단순 배송지_아이디로 배송지 조회
-    public Addresses findById(Long id){
-        return addressRepository.findById(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ADDRESS));
+    //단순 배송지_ID와 멤버_ID로 배송지 조회
+    public Addresses findByIdAndMemberId(Long addressId, Long memberId){
+        return addressRepository.findByIdAndMemberId(addressId, memberId)
+                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ADDRESS));
     }
 
     // 배송지 조회
     public List<AddressResponse> listAddresses(Long memberId){
        return addressRepository.findAllByMember_Id(memberId).stream().map(AddressResponse::from).toList();
     }
-    // 배송지 등록
-    public AddressResponse createAddress(Long memberId, AddressRequest request){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.MEMBER_NOT_FOUND));
 
-        Addresses address = new Addresses().builder()
+    // 배송지 등록
+    @Transactional
+    public AddressResponse createAddress(Long memberId, AddressRequest request){
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+        Addresses address = Addresses.builder()
                 .member(member)
                 .label(request.label())
                 .recipient(request.recipient())
@@ -50,8 +52,12 @@ public class AddressService {
     }
     
     // 배송지 수정
-    public AddressResponse updateAddress(Long id, AddressRequest request){
-        Addresses addresses = findById(id);
+    // 본인 확인 -
+    @Transactional
+    public AddressResponse updateAddress(Long addressId, Long memberId, AddressRequest request){
+
+        Addresses addresses = findByIdAndMemberId(addressId, memberId);
+
         addresses.setLabel(request.label());
         addresses.setRecipient(request.recipient());
         addresses.setTel(request.tel());
@@ -60,11 +66,14 @@ public class AddressService {
         addresses.setAddress2(request.address2());
         addresses.setDefault(request.isDefault());
 
-        return AddressResponse.from(addressRepository.save(addresses));
+        return AddressResponse.from(addresses);
     }
     
     // 배송지 삭제
-    public void deleteAddress(Long id){
-        addressRepository.deleteById(id);
+    // 본인 확인
+    @Transactional
+    public void deleteAddress(Long addressId, Long memberId){
+        Addresses addresses = findByIdAndMemberId(addressId, memberId);
+        addressRepository.delete(addresses);
     }
 }
