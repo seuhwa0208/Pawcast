@@ -15,6 +15,8 @@ import java.util.Optional;
 public interface ProductRepository
         extends JpaRepository<Product, Long> {
 
+    List<Product> findAllByOrderByIdAsc();
+
     String SEARCH_BASE = """
         -- 선택 카테고리에 하위 카테고리도 같이 검색되게 하는 기능
         WITH RECURSIVE category_scope AS (
