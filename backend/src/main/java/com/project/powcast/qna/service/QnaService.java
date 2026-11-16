@@ -4,20 +4,24 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MemberRepository;
-import com.project.powcast.notice.dto.NoticeRequest;
-import com.project.powcast.notice.dto.NoticeResponse;
-import com.project.powcast.notice.entity.Notice;
+import com.project.powcast.product.entity.Product;
+import com.project.powcast.product.repository.ProductRepository;
+import com.project.powcast.qnaanswer.dto.QnaAnswerRequest;
+import com.project.powcast.qnaanswer.dto.QnaAnswerResponse;
 import com.project.powcast.qna.dto.QnaRequest;
 import com.project.powcast.qna.dto.QnaResponse;
 import com.project.powcast.qna.entity.Qna;
+import com.project.powcast.qnaanswer.entity.QnaAnswer;
 import com.project.powcast.qna.entity.QnaSearchType;
 import com.project.powcast.qna.entity.QnaType;
+import com.project.powcast.qnaanswer.repository.QnaAnswerRepository;
 import com.project.powcast.qna.repository.QnaRepository;
+import com.project.powcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -27,6 +31,9 @@ public class QnaService {
 
     private final QnaRepository qnaRepository;
     private final MemberRepository memberRepository;
+    private final ProductRepository productRepository;
+    private final AuthorizationValidator validator;
+
 
     // 단순 조회
     public Qna findById(Long id){
@@ -34,7 +41,7 @@ public class QnaService {
     }
     
     //목록 조회
-    // 비공개 여부는 프론트에서
+    // 비공개 여부는 프론트에서 / 전체목록을 보여주고 isPrivate가 Ture인 글만 "비공개된 글입니다." 같은 방식의 처리
     // 검색 가능
     public List<QnaResponse> getListQna(QnaSearchType type, String keyword){
         QnaType qnaType;
@@ -43,24 +50,46 @@ public class QnaService {
         return qnaRepository.searchQnas(qnaType, keyword).stream().map(QnaResponse::from).toList();
     }
     
-    // 조회
+    // 단건 조회
     // 다만 삭제 처리한 글(deleted_at)은 URL로 접근 못하게
+    // 이게 목록에서 비공개글을 클릭했을때 검사하는 기능도 있어야함
     public QnaResponse detailQna(Long id){
-        return QnaResponse.from(qnaRepository.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA)));
+        Qna qna =  qnaRepository.findByIdAndDeletedAtIsNull(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
+        if (qna.isPrivate()) {throw new BusinessException(ErrorCode.FORBIDDEN);}
+
+        return QnaResponse.from(qna);
+    }
+    
+    // 로그인한 회원의 문의 목록
+    public List<QnaResponse> myQnaList(Long memberId){
+        return qnaRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(QnaResponse::from).toList();
+    }
+
+    // 본인 문의 상세 조회
+    public QnaResponse myQna(Long qnaId, Long memberId) {
+        Qna qna = qnaRepository.findByIdAndMember_Id(qnaId,memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
+        return QnaResponse.from(qna);
     }
     
     // 등록
     // 회원만 , 비회원은 안됨
     @Transactional
     public QnaResponse createQna(Long memberId, QnaRequest request){
+        //회원 조회
         Members member =  memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        // 상품 조회 및 질문 타입 변경
+        QnaType type = QnaType.GENERAL;
+        Product product =null;
+        if(request.productId() != null){ product = productRepository.findById(request.productId())
+                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
+                type = QnaType.PRODUCT;}
 
         Qna qna = Qna.builder()
                 .member(member)
-                .product(request.)
+                .product(product)
                 .title(request.title())
                 .content(request.content())
+                .type(type)
                 .isPrivate(request.isPrivate())
                 .build();
 
@@ -68,24 +97,53 @@ public class QnaService {
     }
     
     // 수정
+    // 마찬가지로 회원만 가능
     @Transactional
-    public QnaResponse updateQna(Long noticeId, Long memberId, QnaRequest request){
+    public QnaResponse updateQna(Long qnaId, Long memberId, QnaRequest request){
         Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 작성한 사람과 수정하는 사람이 일치하는지 검사
+        Qna qna = findById(qnaId);
+        if (!qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
+        QnaType type = QnaType.GENERAL;
+        Product product = null;
+        if (request.productId() != null) {
+            product = productRepository.findById(request.productId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
+            type = QnaType.PRODUCT;}
 
+        qna.setTitle(request.title());
+        qna.setContent(request.content());
+        qna.setProduct(product);
+        qna.setType(type);
+        qna.setPrivate(request.isPrivate());
 
-        Notice notice = findById(noticeId);
-
-        notice.setMember(member);
-        notice.setNoticeType(request.noticeType());
-        notice.setTitle(request.title());
-        notice.setContent(request.content());
-        notice.setPinned(request.isPinned());
-
-        return NoticeResponse.from(notice);
+        return QnaResponse.from(qna);
     }
     
     // 삭제
+    // 삭제는 회원과 관리자만??
+    // 삭제는 소프트로
+    @Transactional
+    public void deleteQna(Long qnaId, Long memberId){
+        Qna qna = findById(qnaId);
+        // 똑같은 사람인지 검사
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        if (!"ADMIN".equals(member.getRole()) && !qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
+        qna.setDeletedAt(LocalDateTime.now());
+    }
 
-    //답변하기
+    // 매니저*관리자 전체 문의 목록
+    // 소프트삭제 된것 제외
+    public List<QnaResponse> getListQnaAdminAndManager(Long memberId){
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+        return qnaRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc().stream().map(QnaResponse::from).toList();
+    }
+
+    // 매니저 관리자 상세 조회
+    public QnaResponse detailQnaAdminAndManager(Long qnaId, Long memberId){
+        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+        return QnaResponse.from(findById(qnaId));
+    }
 }

@@ -1,7 +1,8 @@
-package com.project.powcast.qna.entity;
+package com.project.powcast.qnaanswer.entity;
 
 import com.project.powcast.common.entity.BaseTime;
 import com.project.powcast.member.entity.Members;
+import com.project.powcast.qna.entity.Qna;
 import jakarta.persistence.*;
 import lombok.*;
 

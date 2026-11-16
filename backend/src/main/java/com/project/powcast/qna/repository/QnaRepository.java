@@ -15,7 +15,10 @@ import java.util.Optional;
 @Repository
 public interface QnaRepository extends JpaRepository<Qna, Long> {
     //List<Qna> findAllByIsPrivateFalseOrderByCreatedAtDesc();
-    Optional<Qna> findByIdAndDeletedAtIsNull(Long id);
+    List<Qna> findAllByMember_IdOrderByCreatedAtDesc(Long memberId);
+    Optional<Qna> findByIdAndMember_Id(Long qnaId, Long memberId);
+    Optional<Qna> findByIdAndDeletedAtIsNull(Long qnaId);
+    List<Qna> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
     @Query("""
     SELECT q FROM Qnas q WHERE q.deletedAt IS NULL
       AND (:type IS NULL OR q.qnaType = :type)
@@ -25,6 +28,5 @@ public interface QnaRepository extends JpaRepository<Qna, Long> {
           OR LOWER(q.content) LIKE LOWER(CONCAT('%', :keyword, '%'))
           ) ORDER BY q.createdAt DESC
     """)
-    List<Qna> searchQnas(@Param("type") QnaType type, @Param("keyword") String keyword
-    );
+    List<Qna> searchQnas(@Param("type") QnaType type, @Param("keyword") String keyword);
 }

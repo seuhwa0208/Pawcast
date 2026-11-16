@@ -5,11 +5,12 @@ import com.project.powcast.notice.dto.NoticeResponse;
 import com.project.powcast.notice.entity.Notice;
 import com.project.powcast.product.entity.Product;
 import com.project.powcast.qna.entity.Qna;
+import com.project.powcast.qna.entity.QnaType;
 
 public record QnaResponse(
         Members member,
         Product product,
-        Qna.QnaType type,
+        QnaType type,
         String title,
         String content,
         boolean isPrivate

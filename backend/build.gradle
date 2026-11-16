@@ -33,6 +33,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'
     implementation "com.querydsl:querydsl-jpa:${querydslVersion}:jakarta"
+    implementation 'com.google.api-client:google-api-client:2.7.2'
     annotationProcessor "com.querydsl:querydsl-apt:${querydslVersion}:jakarta"
     implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
     runtimeOnly "io.jsonwebtoken:jjwt-impl:${jjwtVersion}"
