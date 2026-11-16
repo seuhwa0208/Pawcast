@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- Vite가 Vue 애플리케이션을 주입하는 단일 HTML 진입점입니다. -->
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" href="/favicon-192.png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/favicon-192.png" />
+    <title>POWCAST</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <!-- 별도 앱 키 없이 Kakao 우편번호 검색 팝업을 전역에서 사용할 수 있게 합니다. -->
+    <script src="//t1.kakaocdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

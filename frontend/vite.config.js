@@ -1,0 +1,9 @@
+// Vue 플러그인을 활성화하고 `@`를 src 절대 별칭처럼 사용할 수 있게 하는 Vite 설정입니다.
+import { fileURLToPath, URL } from "node:url";
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
+
+export default defineConfig({
+  plugins: [vue()],
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
+});
