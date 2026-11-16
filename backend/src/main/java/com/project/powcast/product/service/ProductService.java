@@ -41,6 +41,7 @@ public class ProductService {
     private final AuthorizationValidator authorizationValidator;
     private final Validator validator;
 
+    // 관리자 검색
     public Product findById(Long id) {
         return productRepository.findManagementProductById(id)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
