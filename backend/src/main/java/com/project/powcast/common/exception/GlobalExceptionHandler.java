@@ -19,4 +19,14 @@ public class GlobalExceptionHandler {
                 .status(e.getErrorCode().getStatus())
                 .body(Map.of("message", e.getMessage()));
     }
+
+    @ExceptionHandler({
+            org.springframework.web.bind.MethodArgumentNotValidException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class
+    })
+    public ResponseEntity<Map<String, String>> handleInvalidRequest(Exception exception) {
+        ErrorCode code = ErrorCode.INVALID_REQUEST;
+        return ResponseEntity.status(code.getStatus()).body(Map.of("message", code.getMessage()));
+    }
 }

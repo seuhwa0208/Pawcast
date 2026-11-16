@@ -24,6 +24,9 @@ public class ProductManagementController {
     @PatchMapping("/products/{productId}/variants/{variantId}") public ProductDetailResponse updateVariant(@AuthenticationPrincipal LoginMember member, @PathVariable Long productId, @PathVariable Long variantId, @Valid @RequestBody VariantUpdateRequest request) { return productService.updateVariant(id(member),productId,variantId,request); }
     @DeleteMapping("/products/{productId}") @ResponseStatus(org.springframework.http.HttpStatus.NO_CONTENT)
     public void discontinue(@AuthenticationPrincipal LoginMember member, @PathVariable Long productId) { productService.discontinue(id(member),productId); }
-    @PostMapping("/variants/{variantId}/stock-adjustments") public StockAdjustmentResponse adjust(@AuthenticationPrincipal LoginMember member, @PathVariable Long variantId, @Valid @RequestBody StockAdjustmentRequest request) { return productService.adjustStock(id(member),variantId,request); }
-    @GetMapping("/products/{productId}/stock-history") public List<StockAdjustmentResponse> history(@AuthenticationPrincipal LoginMember member, @PathVariable Long productId) { return productService.stockHistory(id(member),productId); }
+    @PatchMapping("/variants/{variantId}/stock")
+    public ProductDetailResponse adjustStock(@AuthenticationPrincipal LoginMember member,
+            @PathVariable Long variantId, @RequestParam int quantityChange) {
+        return productService.adjustStock(id(member), variantId, quantityChange);
+    }
 }

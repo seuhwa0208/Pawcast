@@ -1,4 +1,4 @@
-package com.project.powcast.product.repository;
+package com.project.powcast.review.repository;
 import java.time.LocalDateTime;
 public interface ProductReviewView {
     Long getId();

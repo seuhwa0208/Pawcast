@@ -7,6 +7,16 @@ import org.springframework.http.HttpStatus;
 @Getter
 @RequiredArgsConstructor
 public enum ErrorCode {
+    INVALID_REQUEST(HttpStatus.BAD_REQUEST, "요청값이 올바르지 않습니다."),
+    INVALID_PRODUCT_REQUEST(HttpStatus.BAD_REQUEST, "상품 요청값이 올바르지 않습니다."),
+    INVALID_PRODUCT_DETAIL(HttpStatus.BAD_REQUEST, "상품 종류와 상세 정보가 일치하지 않습니다."),
+    MULTIPLE_MAIN_IMAGES(HttpStatus.BAD_REQUEST, "대표 이미지는 최대 한 개만 지정할 수 있습니다."),
+    DUPLICATE_SKU(HttpStatus.CONFLICT, "이미 사용 중이거나 중복된 SKU 코드입니다."),
+    INVALID_VARIANT_FIELDS(HttpStatus.BAD_REQUEST, "상품 종류에 맞지 않는 옵션 규격입니다."),
+    INVALID_PRICE_RANGE(HttpStatus.BAD_REQUEST, "최소 가격은 최대 가격보다 클 수 없습니다."),
+    INVALID_STOCK_ADJUSTMENT(HttpStatus.BAD_REQUEST, "유효하지 않은 재고 조정 수량입니다."),
+    PRODUCT_DATA_CONFLICT(HttpStatus.CONFLICT, "상품 데이터가 다른 요청과 충돌합니다."),
+    NOT_FOUND_CATEGORY(HttpStatus.NOT_FOUND, "카테고리를 찾을 수 없습니다."),
     // 예외 상태, 메시지 추가
     DUPLICATE_USERID(HttpStatus.CONFLICT, "이미 사용 중인 아이디 입니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "이미 사용 중인 이메일 입니다."),

@@ -1,4 +1,4 @@
-package com.project.powcast.product.repository;
+package com.project.powcast.review.repository;
 import com.project.powcast.product.entity.Product;
 import org.springframework.data.repository.Repository;
 import org.springframework.data.jpa.repository.Query;
