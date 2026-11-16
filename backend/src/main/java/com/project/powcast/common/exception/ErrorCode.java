@@ -59,7 +59,10 @@ public enum ErrorCode {
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST,"재고가 충분하지 않습니다."),
     NOT_FOUND_PRODUCT_VARIANT(HttpStatus.NOT_FOUND,"상품 속성을 찾을 수 없습니다."),
     NOT_FOUND_REFUND(HttpStatus.NOT_FOUND,"환불 정보를 찾을 수 없습니다."),
-
+    NOT_FOUND_REVIEW(HttpStatus.NOT_FOUND, "리뷰를 찾을 수 없습니다."),
+    NOT_FOUND_ORDER_ITEM(HttpStatus.NOT_FOUND, "주문 항목을 찾을 수 없습니다."),
+    DUPLICATE_REVIEW(HttpStatus.CONFLICT, "이미 리뷰를 작성한 주문 항목입니다."),
+    REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST,"배송 완료된 주문만 리뷰를 작성할 수 있습니다."),
 
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
 
