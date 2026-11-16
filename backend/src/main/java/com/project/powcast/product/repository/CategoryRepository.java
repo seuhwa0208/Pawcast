@@ -1,5 +1,5 @@
-package com.project.powcast.category.repository;
-import com.project.powcast.category.entity.Category;
+package com.project.powcast.product.repository;
+import com.project.powcast.product.entity.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 public interface CategoryRepository extends JpaRepository<Category, Long> {

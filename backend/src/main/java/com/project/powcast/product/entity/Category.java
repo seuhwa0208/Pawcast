@@ -1,4 +1,4 @@
-package com.project.powcast.category.entity;
+package com.project.powcast.product.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

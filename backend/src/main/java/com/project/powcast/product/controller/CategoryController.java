@@ -1,7 +1,7 @@
-package com.project.powcast.category.controller;
+package com.project.powcast.product.controller;
 
-import com.project.powcast.category.dto.CategoryResponse;
-import com.project.powcast.category.service.CategoryService;
+import com.project.powcast.product.dto.CategoryResponse;
+import com.project.powcast.product.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

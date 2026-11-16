@@ -1,8 +1,8 @@
-package com.project.powcast.category.service;
+package com.project.powcast.product.service;
 
-import com.project.powcast.category.dto.CategoryResponse;
-import com.project.powcast.category.entity.Category;
-import com.project.powcast.category.repository.CategoryRepository;
+import com.project.powcast.product.dto.CategoryResponse;
+import com.project.powcast.product.entity.Category;
+import com.project.powcast.product.repository.CategoryRepository;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;

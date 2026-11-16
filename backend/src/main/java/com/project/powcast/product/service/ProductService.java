@@ -1,7 +1,7 @@
 package com.project.powcast.product.service;
 
-import com.project.powcast.category.entity.Category;
-import com.project.powcast.category.service.CategoryService;
+import com.project.powcast.product.entity.Category;
+import com.project.powcast.product.service.CategoryService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;

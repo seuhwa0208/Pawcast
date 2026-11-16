@@ -1,7 +1,7 @@
 package com.project.powcast.product.entity;
 
 import com.project.powcast.common.entity.BaseTime;
-import com.project.powcast.category.entity.Category;
+import com.project.powcast.product.entity.Category;
 import jakarta.persistence.*;
 import lombok.*;
 
