@@ -41,8 +41,10 @@ public class NoticeService {
     }
 
     // 단건 조회
+    // URL로 삭제처리된 글 접근 막기
     public NoticeResponse detailNotice(Long id){
-        return NoticeResponse.from(findById(id));
+        return NoticeResponse.from(noticeRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_NOTICE)));
     }
     
     // 여기부터는 권한 필요 - USER만 아니면 됨

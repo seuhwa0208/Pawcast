@@ -49,6 +49,7 @@ public enum ErrorCode {
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST,"재고가 충분하지 않습니다."),
     NOT_FOUND_PRODUCT_VARIANT(HttpStatus.NOT_FOUND,"상품 속성을 찾을 수 없습니다."),
     NOT_FOUND_REFUND(HttpStatus.NOT_FOUND,"환불 정보를 찾을 수 없습니다."),
+    NOT_FOUND_QNA(HttpStatus.NOT_FOUND,"질문글을 찾을 수 없습니다."),
 
 
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
