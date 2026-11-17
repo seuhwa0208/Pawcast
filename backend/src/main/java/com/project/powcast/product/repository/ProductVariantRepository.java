@@ -21,4 +21,15 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ProductVariant v SET v.stock = :stock, v.productVariantStatus = :status WHERE v.id = :id")
     int updateStock(@Param("id") Long id, @Param("stock") int stock, @Param("status") ProductVariantStatus status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+    SELECT v
+    FROM ProductVariant v
+    WHERE v.product.id = :productId
+    ORDER BY v.id
+    """)
+    List<ProductVariant> findAllByProductIdForUpdate(
+            @Param("productId") Long productId
+    );
 }

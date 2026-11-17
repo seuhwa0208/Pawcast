@@ -59,7 +59,10 @@ public class ReviewService {
                 );
 
         // 본인 주문인지 확인
-        if (!orderItem.getOrder().getMember().getId().equals(memberId)) {
+        Members orderMember = orderItem.getOrder().getMember();
+
+        if (orderMember == null
+                || !memberId.equals(orderMember.getId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
 
@@ -74,7 +77,7 @@ public class ReviewService {
         }
 
         ProductReview review = ProductReview.builder()
-                .member(orderItem.getOrder().getMember())
+                .member(orderMember)
                 .product(orderItem.getProductVariant().getProduct())
                 .orderItem(orderItem)
                 .rating(request.rating())

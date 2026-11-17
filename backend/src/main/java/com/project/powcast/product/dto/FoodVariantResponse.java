@@ -12,9 +12,7 @@ public record FoodVariantResponse(
         String optionLabel,
         Integer weightG,
         Integer volumeMl,
-        BigDecimal originalPrice,
-        BigDecimal discountRate,
-        BigDecimal salePrice,
+        BigDecimal price,
         int stock,
         ProductVariantStatus status
 ) {
@@ -27,8 +25,6 @@ public record FoodVariantResponse(
                 variant.getWeightG(),
                 variant.getVolumeMl(),
                 variant.getPrice(),
-                variant.getDiscountRate(),
-                variant.getSalePrice(),
                 variant.getStock(),
                 variant.getProductVariantStatus()
         );

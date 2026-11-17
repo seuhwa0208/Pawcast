@@ -15,6 +15,7 @@ import com.project.powcast.order.repository.OrderItemRepository;
 import com.project.powcast.order.repository.OrderRepository;
 import com.project.powcast.product.entity.Product;
 import com.project.powcast.product.entity.ProductVariant;
+import com.project.powcast.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,7 +67,8 @@ public class OrderService {
 
         List<OrderItem> orderItems = new ArrayList<>(); //
         BigDecimal totalAmount = BigDecimal.ZERO;   // 총액
-        BigDecimal discountAmount = BigDecimal.ZERO;// 할인 금액
+        // 현재 가격 정책에는 별도 주문 할인이 없습니다.
+        BigDecimal discountAmount = BigDecimal.ZERO;
 
             // request에 들은 아이템 만큼 orderItem이 반복
         for (OrderItemRequest item : request.items()) {
@@ -76,7 +78,7 @@ public class OrderService {
             // 재고 확인
             if (variant.getStock() < item.quantity()) {throw new BusinessException(ErrorCode.OUT_OF_STOCK);}
 
-            // 할인 적용된 판매 가격
+            // 상품 조회와 동일한 최종 판매가를 주문 시점 단가로 저장
             BigDecimal unitPrice = variant.getPrice();
 
             // 옵션별 상품 금액 / 가격 * 수량 = totalPrice
@@ -84,13 +86,6 @@ public class OrderService {
             
             // 모든 주문 금액 총액 계산
             totalAmount = totalAmount.add(itemTotal);
-
-            // 할인 금액 계산 / (원가 - 판매가)* 수량  
-            BigDecimal costPrice = variant.getCostPrice();
-            BigDecimal price = variant.getPrice();
-            BigDecimal itemDiscount = costPrice.subtract(price);
-            BigDecimal totalItemDiscount = itemDiscount.multiply(BigDecimal.valueOf(item.quantity()));
-            discountAmount = discountAmount.add(totalItemDiscount);
 
             // 주문 상품 생성 / OrderItem
             OrderItem orderItem = OrderItem.builder()

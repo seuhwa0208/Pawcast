@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 @Entity
 @Table(name = "product_variants")
@@ -54,10 +53,6 @@ public class ProductVariant extends BaseTime {
     @Column(name = "cost_price", nullable = false)
     private BigDecimal costPrice;
 
-    @Column(name = "discount_rate", nullable = false, precision = 5, scale = 2)
-    @Builder.Default
-    private BigDecimal discountRate = BigDecimal.ZERO;
-
     @Column(nullable = false)
     private int stock;
 
@@ -69,9 +64,4 @@ public class ProductVariant extends BaseTime {
     @Builder.Default
     private long salesCount = 0L;
 
-    public BigDecimal getSalePrice() {
-        return price.multiply(BigDecimal.ONE.subtract(
-                discountRate.movePointLeft(2)
-        )).setScale(0, RoundingMode.DOWN);
-    }
 }

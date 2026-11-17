@@ -42,7 +42,7 @@ public record ProductSearchRequest(
         Boolean inStockOnly,
 
         @Pattern(regexp = "POPULAR|WISH_DESC|LATEST|PRICE_ASC|PRICE_DESC"
-                + "|DISCOUNT_DESC|SALES_DESC|REVIEW_DESC|RATING_DESC",
+                + "|SALES_DESC|REVIEW_DESC|RATING_DESC",
                 message = "지원하지 않는 정렬 방식입니다.")
         String sortType
 

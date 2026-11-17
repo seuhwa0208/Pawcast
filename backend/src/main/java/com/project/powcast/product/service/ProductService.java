@@ -187,7 +187,6 @@ public class ProductService {
         variant.setHeightCm(request.heightCm());
         variant.setPrice(request.price());
         variant.setCostPrice(request.costPrice());
-        variant.setDiscountRate(request.discountRate());
         variant.setProductVariantStatus(request.status());
         try {
             variantRepository.flush();
@@ -199,14 +198,21 @@ public class ProductService {
 
     @Transactional
     public void discontinue(Long memberId, Long productId) {
+        // 관리자 권한 확인
         validateManager(memberId);
+
+        // 상품 존재 여부 확인
         findById(productId);
-        List<Long> variantIds = variantRepository.findAllByProductIdOrderByIdAsc(productId).stream()
-                .map(ProductVariant::getId)
-                .toList();
-        if (!variantIds.isEmpty()) {
-            variantRepository.findAllByIdForUpdate(variantIds)
-                    .forEach(variant -> variant.setProductVariantStatus(ProductVariantStatus.DISCONTINUED));
+
+        // 처음부터 옵션을 잠금 조회
+        List<ProductVariant> variants =
+                variantRepository.findAllByProductIdForUpdate(productId);
+
+        // 재고·가격은 유지하고 판매 상태만 변경
+        for (ProductVariant variant : variants) {
+            variant.setProductVariantStatus(
+                    ProductVariantStatus.DISCONTINUED
+            );
         }
     }
 
@@ -312,7 +318,6 @@ public class ProductService {
                 .heightCm(request.heightCm())
                 .price(request.price())
                 .costPrice(request.costPrice())
-                .discountRate(request.discountRate())
                 .stock(request.stock())
                 .productVariantStatus(request.stock() == 0
                         ? ProductVariantStatus.SOLD_OUT : ProductVariantStatus.ON_SALE)
@@ -367,7 +372,7 @@ public class ProductService {
     private ProductResponse managementResponse(Product product) {
         List<ProductVariant> variants = variantRepository.findAllByProductIdOrderByIdAsc(product.getId());
         ProductVariant variant = variants.stream()
-                .min(Comparator.comparing(ProductVariant::getSalePrice).thenComparing(ProductVariant::getId))
+                .min(Comparator.comparing(ProductVariant::getPrice).thenComparing(ProductVariant::getId))
                 .orElse(null);
         List<ProductImage> images = imageRepository.findAllByProductIdOrderBySortOrderAscIdAsc(product.getId());
         ProductImage mainImage = images.stream().filter(ProductImage::isMain).findFirst()
@@ -384,8 +389,6 @@ public class ProductService {
                 mainImage == null ? null : mainImage.getImagePath(),
                 variant == null ? null : variant.getId(),
                 variant == null ? null : variant.getPrice(),
-                variant == null ? null : variant.getSalePrice(),
-                variant == null ? null : variant.getDiscountRate(),
                 product.getSalesCount(), product.getWishCount(), product.getReviewCount(),
                 average, soldOut, null
         );

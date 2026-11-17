@@ -37,11 +37,6 @@ public interface ProductRepository
                 v.id,
                 v.product_id,
                 v.price,
-                v.discount_rate,
-
-                FLOOR(
-                    v.price * (1 - v.discount_rate / 100.0)
-                ) AS sale_price,
 
                 MAX(
                     CASE
@@ -57,9 +52,7 @@ public interface ProductRepository
                 ROW_NUMBER() OVER (
                     PARTITION BY v.product_id
                     ORDER BY
-                        FLOOR(
-                            v.price * (1 - v.discount_rate / 100.0)
-                        ) ASC,
+                        v.price ASC,
                         v.id ASC
                 ) AS rn
 
@@ -107,9 +100,7 @@ public interface ProductRepository
                 f.life_stage,
 
                 v.id AS variant_id,
-                v.price AS original_price,
-                v.sale_price,
-                v.discount_rate,
+                v.price,
                 (v.has_stock = 0) AS sold_out
 
             FROM products p
@@ -173,11 +164,11 @@ public interface ProductRepository
             )
             AND (
                 CAST(:minPrice AS numeric) IS NULL
-                OR pr.sale_price >= CAST(:minPrice AS numeric)
+                OR pr.price >= CAST(:minPrice AS numeric)
             )
             AND (
                 CAST(:maxPrice AS numeric) IS NULL
-                OR pr.sale_price <= CAST(:maxPrice AS numeric)
+                OR pr.price <= CAST(:maxPrice AS numeric)
             )
             AND (
                 CAST(:minRating AS numeric) IS NULL
@@ -195,9 +186,7 @@ public interface ProductRepository
                 fp.brand AS "brand",
                 fp.category_name AS "categoryName",
                 fp.variant_id AS "variantId",
-                fp.original_price AS "originalPrice",
-                fp.sale_price AS "salePrice",
-                fp.discount_rate AS "discountRate",
+                fp.price AS "price",
                 fp.sales_count AS "salesCount",
                 fp.wish_count AS "wishCount",
                 fp.review_count AS "reviewCount",
@@ -225,17 +214,12 @@ public interface ProductRepository
 
                 CASE
                     WHEN :sortType = 'PRICE_ASC'
-                    THEN fp.sale_price
+                    THEN fp.price
                 END ASC,
 
                 CASE
                     WHEN :sortType = 'PRICE_DESC'
-                    THEN fp.sale_price
-                END DESC,
-
-                CASE
-                    WHEN :sortType = 'DISCOUNT_DESC'
-                    THEN fp.discount_rate
+                    THEN fp.price
                 END DESC,
 
                 CASE

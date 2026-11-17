@@ -12,9 +12,7 @@ public record ProductResponse(
         String categoryName,
         String imagePath,
         Long variantId,
-        BigDecimal originalPrice,
-        BigDecimal salePrice,
-        BigDecimal discountRate,
+        BigDecimal price,
         Long salesCount,
         Long wishCount,
         Long reviewCount,
@@ -29,8 +27,8 @@ public record ProductResponse(
     public static ProductResponse from(ProductListView product, BestReviewResponse bestReview) {
         return new ProductResponse(
                 product.getId(), product.getName(), product.getBrand(), product.getCategoryName(),
-                product.getImagePath(), product.getVariantId(), product.getOriginalPrice(),
-                product.getSalePrice(), product.getDiscountRate(), product.getSalesCount(),
+                product.getImagePath(), product.getVariantId(), product.getPrice(),
+                product.getSalesCount(),
                 product.getWishCount(), product.getReviewCount(), product.getAverageRating(),
                 product.getSoldOut(), bestReview
         );
