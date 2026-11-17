@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/inquiries")
+@RequestMapping("/api/qna")
 public class QnaController {
 
     private QnaService qnaService;

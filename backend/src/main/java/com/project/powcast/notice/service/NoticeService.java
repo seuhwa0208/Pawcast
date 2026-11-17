@@ -3,7 +3,7 @@ package com.project.powcast.notice.service;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.notice.dto.NoticeRequest;
 import com.project.powcast.notice.dto.NoticeResponse;
 import com.project.powcast.notice.entity.Notice;
@@ -24,7 +24,7 @@ import java.util.List;
 public class NoticeService {
 
     private final NoticeRepository noticeRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
 
     // 단순 id 조회 - 범용
@@ -51,7 +51,7 @@ public class NoticeService {
     // 등록
     @Transactional
     public NoticeResponse createNotice(Long memberId, NoticeRequest request){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         //권한 검사 - 매니저 및 어드민
         authorizationValidator.validateManager(member);
 
@@ -69,7 +69,7 @@ public class NoticeService {
     // 수정
     @Transactional
     public NoticeResponse updateNotice(Long noticeId, Long memberId, NoticeRequest request){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 권한 검사 - 매니저 및 어드민
         authorizationValidator.validateManager(member);
 
@@ -87,7 +87,7 @@ public class NoticeService {
     // 삭제
     @Transactional
     public void deleteNotice(Long noticeId, Long memberId){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 권한 검사 - 매니저 및 어드민
         authorizationValidator.validateManager(member);
         Notice notice = findById(noticeId);

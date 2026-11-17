@@ -3,18 +3,14 @@ package com.project.powcast.qna.service;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.product.entity.Product;
 import com.project.powcast.product.repository.ProductRepository;
-import com.project.powcast.qnaanswer.dto.QnaAnswerRequest;
-import com.project.powcast.qnaanswer.dto.QnaAnswerResponse;
 import com.project.powcast.qna.dto.QnaRequest;
 import com.project.powcast.qna.dto.QnaResponse;
 import com.project.powcast.qna.entity.Qna;
-import com.project.powcast.qnaanswer.entity.QnaAnswer;
 import com.project.powcast.qna.entity.QnaSearchType;
 import com.project.powcast.qna.entity.QnaType;
-import com.project.powcast.qnaanswer.repository.QnaAnswerRepository;
 import com.project.powcast.qna.repository.QnaRepository;
 import com.project.powcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +26,7 @@ import java.util.List;
 public class QnaService {
 
     private final QnaRepository qnaRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final ProductRepository productRepository;
     private final AuthorizationValidator validator;
 
@@ -76,7 +72,7 @@ public class QnaService {
     @Transactional
     public QnaResponse createQna(Long memberId, QnaRequest request){
         //회원 조회
-        Members member =  memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member =  membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 상품 조회 및 질문 타입 변경
         QnaType type = QnaType.GENERAL;
         Product product =null;
@@ -100,7 +96,7 @@ public class QnaService {
     // 마찬가지로 회원만 가능
     @Transactional
     public QnaResponse updateQna(Long qnaId, Long memberId, QnaRequest request){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 작성한 사람과 수정하는 사람이 일치하는지 검사
         Qna qna = findById(qnaId);
         if (!qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
@@ -127,7 +123,7 @@ public class QnaService {
     public void deleteQna(Long qnaId, Long memberId){
         Qna qna = findById(qnaId);
         // 똑같은 사람인지 검사
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         if (!"ADMIN".equals(member.getRole()) && !qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
         qna.setDeletedAt(LocalDateTime.now());
     }
@@ -135,14 +131,14 @@ public class QnaService {
     // 매니저*관리자 전체 문의 목록
     // 소프트삭제 된것 제외
     public List<QnaResponse> getListQnaAdminAndManager(Long memberId){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
         return qnaRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc().stream().map(QnaResponse::from).toList();
     }
 
     // 매니저 관리자 상세 조회
     public QnaResponse detailQnaAdminAndManager(Long qnaId, Long memberId){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
         return QnaResponse.from(findById(qnaId));
     }

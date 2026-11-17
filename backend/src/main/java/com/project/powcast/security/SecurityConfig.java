@@ -26,6 +26,7 @@ public class SecurityConfig {
      * JWT REST API
      * 1) /api/**  : 무상태(STATELESS) + JWT + CSRF 끔 + JSON 401
      */
+    @Bean
     @Order(1)
     public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
         http
@@ -47,6 +48,7 @@ public class SecurityConfig {
                                 "/api/reviews/**", "/api/qna/**",
                                 "/api/banners/**", "/api/recommendations/popular",
                                 "/api/search/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/google").permitAll()   // 구글 소셜 로그인 관련 허용
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/logs/**").permitAll()
                         // 관리자
@@ -66,7 +68,7 @@ public class SecurityConfig {
 
         config.setAllowedOrigins(List.of("http://localhost:5173"));
 
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
 
         config.setAllowedHeaders(List.of("*"));
 

@@ -1,13 +1,22 @@
 package com.project.powcast.product.controller;
+
 import com.project.powcast.product.dto.CategoryResponse;
-import com.project.powcast.product.service.ProductService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import com.project.powcast.product.service.CategoryService;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import java.util.List;
+
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/categories")
 public class CategoryController {
-    private final ProductService productService;
-    @GetMapping("/api/categories") public List<CategoryResponse> categories() { return productService.categories(); }
-    @GetMapping("/api/brands") public List<String> brands() { return productService.brands(); }
+    private final CategoryService categoryService;
+
+    @GetMapping
+    public List<CategoryResponse> getCategories() {
+        return categoryService.getCategories();
+    }
 }

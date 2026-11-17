@@ -4,7 +4,7 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.common.util.OrderNumberGenerator;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.order.dto.OrderItemRequest;
 import com.project.powcast.order.dto.OrderRequest;
 import com.project.powcast.order.dto.OrderResponse;
@@ -13,14 +13,13 @@ import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.order.entity.OrderStatus;
 import com.project.powcast.order.repository.OrderItemRepository;
 import com.project.powcast.order.repository.OrderRepository;
-import com.project.powcast.product.entity.Product;
 import com.project.powcast.product.entity.ProductVariant;
+import com.project.powcast.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
 public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
 
     // 주문하기
@@ -44,7 +43,7 @@ public class OrderService {
         // 회원 조회 - 비회원이면 null로 처리
         Members member = null;
         if (memberId != null){
-            member = memberRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+            member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         }
 
         // 상품 옵션 조회 -> 재고 여부와 판매 가능한 상태, 재고가 주문수량 이상인지 검사
@@ -66,7 +65,8 @@ public class OrderService {
 
         List<OrderItem> orderItems = new ArrayList<>(); //
         BigDecimal totalAmount = BigDecimal.ZERO;   // 총액
-        BigDecimal discountAmount = BigDecimal.ZERO;// 할인 금액
+        // 현재 가격 정책에는 별도 주문 할인이 없습니다.
+        BigDecimal discountAmount = BigDecimal.ZERO;
 
             // request에 들은 아이템 만큼 orderItem이 반복
         for (OrderItemRequest item : request.items()) {
@@ -76,7 +76,7 @@ public class OrderService {
             // 재고 확인
             if (variant.getStock() < item.quantity()) {throw new BusinessException(ErrorCode.OUT_OF_STOCK);}
 
-            // 할인 적용된 판매 가격
+            // 상품 조회와 동일한 최종 판매가를 주문 시점 단가로 저장
             BigDecimal unitPrice = variant.getPrice();
 
             // 옵션별 상품 금액 / 가격 * 수량 = totalPrice
@@ -84,13 +84,6 @@ public class OrderService {
             
             // 모든 주문 금액 총액 계산
             totalAmount = totalAmount.add(itemTotal);
-
-            // 할인 금액 계산 / (원가 - 판매가)* 수량  
-            BigDecimal costPrice = variant.getCostPrice();
-            BigDecimal price = variant.getPrice();
-            BigDecimal itemDiscount = costPrice.subtract(price);
-            BigDecimal totalItemDiscount = itemDiscount.multiply(BigDecimal.valueOf(item.quantity()));
-            discountAmount = discountAmount.add(totalItemDiscount);
 
             // 주문 상품 생성 / OrderItem
             OrderItem orderItem = OrderItem.builder()

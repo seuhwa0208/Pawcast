@@ -13,9 +13,7 @@ public record DeviceVariantResponse(
         String color,
         Integer capacityMl,
         Integer heightCm,
-        BigDecimal originalPrice,
-        BigDecimal discountRate,
-        BigDecimal salePrice,
+        BigDecimal price,
         int stock,
         ProductVariantStatus status
 ) {
@@ -29,8 +27,6 @@ public record DeviceVariantResponse(
                 variant.getCapacityMl(),
                 variant.getHeightCm(),
                 variant.getPrice(),
-                variant.getDiscountRate(),
-                variant.getSalePrice(),
                 variant.getStock(),
                 variant.getProductVariantStatus()
         );

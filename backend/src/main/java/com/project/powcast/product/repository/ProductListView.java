@@ -18,11 +18,7 @@ public interface ProductListView {
 
     Long getVariantId();
 
-    BigDecimal getOriginalPrice();
-
-    BigDecimal getSalePrice();
-
-    BigDecimal getDiscountRate();
+    BigDecimal getPrice();
 
     Long getSalesCount();
 

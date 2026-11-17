@@ -5,7 +5,7 @@ import com.project.powcast.auth.repository.EmailVerificationRepository;
 import com.project.powcast.common.email.EmailService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -22,7 +22,7 @@ public class EmailVerificationService {
     private final EmailService emailService;
     private final SecureRandom secureRandom;
     private final PasswordEncoder passwordEncoder;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
 
     // 이메일 인증 발송
     // 버튼을 누르면 이메일서비스가 이메일을 보내기전 코드를 저장하고, 이메일을 보냄
@@ -33,7 +33,7 @@ public class EmailVerificationService {
     public void sendVerifyEmail(String email){
         
         //이메일 보내기전 이미 이 이메일로 가입된 회원이 있는지 검사
-        if(memberRepository.existsByEmail(email)){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
+        if(membersRepository.existsByEmail(email)){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
         emailVerificationRepo.deleteByEmail(email);
 
         //이메일 코드 발생 및 변환

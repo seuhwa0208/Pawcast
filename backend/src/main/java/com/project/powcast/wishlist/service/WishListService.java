@@ -3,9 +3,7 @@ package com.project.powcast.wishlist.service;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
-import com.project.powcast.pets.dto.PetsResponse;
-import com.project.powcast.pets.entity.Pets;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.product.entity.Product;
 import com.project.powcast.product.repository.ProductRepository;
 import com.project.powcast.wishlist.dto.WishListResponse;
@@ -23,7 +21,7 @@ import java.util.List;
 public class WishListService {
 
     private final WishListRepository wishListsRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final ProductRepository productRepository;
 
     //단순 찜_ID와 멤버_ID로 배송지 조회
@@ -40,7 +38,7 @@ public class WishListService {
     // 찜 추가
     @Transactional
     public WishListResponse createWishList(Long memberId, Long productId){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         Product product = productRepository.findById(productId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
 
         WishList wishList = WishList.builder()
