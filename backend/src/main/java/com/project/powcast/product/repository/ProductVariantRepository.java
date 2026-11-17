@@ -4,6 +4,8 @@ import com.project.powcast.product.entity.ProductVariantStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
 import java.util.*;
 public interface ProductVariantRepository extends JpaRepository<ProductVariant, Long> {
     List<ProductVariant> findAllByProductIdOrderByIdAsc(Long productId);
@@ -31,5 +33,37 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     """)
     List<ProductVariant> findAllByProductIdForUpdate(
             @Param("productId") Long productId
+    );
+
+    // 재고가 충분할 때만 차감
+    @Modifying(flushAutomatically = true)
+    @Query("""
+    UPDATE ProductVariant v
+    SET v.stock = v.stock - :quantity,
+        v.updatedAt = :updatedAt
+    WHERE v.id = :variantId
+      AND :quantity > 0
+      AND v.stock >= :quantity
+    """)
+    int decreaseStock(
+            @Param("variantId") Long variantId,
+            @Param("quantity") int quantity,
+            @Param("updatedAt") LocalDateTime updatedAt
+    );
+
+    // 취소한 수량 복구
+    @Modifying(flushAutomatically = true)
+    @Query("""
+    UPDATE ProductVariant v
+    SET v.stock = v.stock + :quantity,
+        v.updatedAt = :updatedAt
+    WHERE v.id = :variantId
+      AND :quantity > 0
+      AND v.stock <= 2147483647 - :quantity
+    """)
+    int increaseStock(
+            @Param("variantId") Long variantId,
+            @Param("quantity") int quantity,
+            @Param("updatedAt") LocalDateTime updatedAt
     );
 }
