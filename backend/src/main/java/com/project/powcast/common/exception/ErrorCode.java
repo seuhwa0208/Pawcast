@@ -63,6 +63,8 @@ public enum ErrorCode {
     NOT_FOUND_ORDER_ITEM(HttpStatus.NOT_FOUND, "주문 항목을 찾을 수 없습니다."),
     DUPLICATE_REVIEW(HttpStatus.CONFLICT, "이미 리뷰를 작성한 주문 항목입니다."),
     REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST,"배송 완료된 주문만 리뷰를 작성할 수 있습니다."),
+    PROFANITY_DETECTED(HttpStatus.BAD_REQUEST,"욕설이나 부적절한 표현이 포함되어 있습니다. 내용을 수정해주세요."),
+    MODERATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,"내용 검사를 완료하지 못했습니다. 잠시 후 다시 시도해주세요."),
 
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
 

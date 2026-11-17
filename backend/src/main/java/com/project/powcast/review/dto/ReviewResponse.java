@@ -2,6 +2,7 @@ package com.project.powcast.review.dto;
 
 import com.project.powcast.review.entity.ProductReview;
 import com.project.powcast.review.entity.ReviewImage;
+import com.project.powcast.review.entity.ReviewSentiment;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -15,13 +16,20 @@ public record ReviewResponse(
         String content,
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
-        List<ReviewImageResponse> images
-
+        List<ReviewImageResponse> images,
+        ReviewSentimentResponse sentiment
 ) {
 
     public static ReviewResponse from(
             ProductReview review,
             List<ReviewImage> images
+    ) {
+        return from(review, images, null);
+    }
+    public static ReviewResponse from(
+            ProductReview review,
+            List<ReviewImage> images,
+            ReviewSentiment sentiment
     ) {
         return new ReviewResponse(
                 review.getId(),
@@ -33,7 +41,10 @@ public record ReviewResponse(
                 review.getUpdatedAt(),
                 images.stream()
                         .map(ReviewImageResponse::from)
-                        .toList()
+                        .toList(),
+                sentiment == null
+                        ? null
+                        : ReviewSentimentResponse.from(sentiment)
         );
     }
 }

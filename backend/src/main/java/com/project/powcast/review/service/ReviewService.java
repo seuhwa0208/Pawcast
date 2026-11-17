@@ -4,6 +4,7 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.review.event.ReviewAnalysisRequested;
 import com.project.powcast.security.AuthorizationValidator;
 import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.order.entity.OrderStatus;
@@ -16,6 +17,7 @@ import com.project.powcast.review.repository.ProductReviewRepository;
 import com.project.powcast.review.repository.ReviewImageRepository;
 import com.project.powcast.review.repository.ReviewSentimentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ public class ReviewService {
     private final ProductRepository productRepository;
     private final MemberRepository memberRepository;
     private final AuthorizationValidator authorizationValidator;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 리뷰 등록
     @Transactional
@@ -91,6 +94,14 @@ public class ReviewService {
                 productRepository.addReviewStatistics(
                         review.getProduct().getId(),
                         review.getRating()
+                )
+        );
+
+        // 추가: 리뷰 분석 요청 이벤트 발행
+        eventPublisher.publishEvent(
+                new ReviewAnalysisRequested(
+                        response.id(),
+                        response.content()
                 )
         );
 
@@ -171,14 +182,20 @@ public class ReviewService {
         int oldRating = review.getRating();
         Long productId = review.getProduct().getId();
 
-        // 본문이 달라지면 기존 분석 결과 제거
-        if (!Objects.equals(review.getContent(), request.content())) {
+        // 1. 기존 본문과 비교
+        boolean contentChanged =
+                !Objects.equals(review.getContent(), request.content());
+
+        // 2. 바뀌었으면 기존 리뷰 삭제
+        if (contentChanged) {
             reviewSentimentRepository.deleteByReviewId(reviewId);
         }
 
+        // 3. 리뷰 내용 수정
         review.setRating(request.rating());
         review.setContent(request.content());
 
+        // 기존 이미지 처리 유지
         // null: 유지 / 빈 목록: 전체 삭제 / 목록: 전체 교체
         if (request.images() != null) {
             reviewImageRepository.deleteAllByReviewId(reviewId);
@@ -187,17 +204,28 @@ public class ReviewService {
             saveImages(review, request.images());
         }
 
-        // 변경 내용 및 updatedAt 반영
+        // 변경 내용과 updatedAt 반영
         reviewRepository.saveAndFlush(review);
 
         ReviewResponse response = toResponse(review);
 
+        // 기존 별점 통계 갱신 유지
         if (oldRating != request.rating()) {
             checkStatistics(
                     productRepository.updateReviewStatistics(
                             productId,
                             oldRating,
                             request.rating()
+                    )
+            );
+        }
+
+        // 4. 본문이 바뀐 경우만 재분석 이벤트를 발행
+        if (contentChanged) {
+            eventPublisher.publishEvent(
+                    new ReviewAnalysisRequested(
+                            response.id(),
+                            response.content()
                     )
             );
         }
@@ -282,9 +310,19 @@ public class ReviewService {
     // Entity → 응답 DTO
     private ReviewResponse toResponse(ProductReview review) {
         List<ReviewImage> images = reviewImageRepository
-                .findAllByReviewIdOrderBySortOrderAscIdAsc(review.getId());
+                .findAllByReviewIdOrderBySortOrderAscIdAsc(
+                        review.getId()
+                );
 
-        return ReviewResponse.from(review, images);
+        var sentiment = reviewSentimentRepository
+                .findByReviewId(review.getId())
+                .orElse(null);
+
+        return ReviewResponse.from(
+                review,
+                images,
+                sentiment
+        );
     }
 
     private void validateLogin(Long memberId) {

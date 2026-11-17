@@ -4,6 +4,7 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.review.dto.*;
 import com.project.powcast.review.service.ReviewService;
+import com.project.powcast.review.service.ReviewWriteService;
 import com.project.powcast.security.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final ReviewWriteService reviewWriteService;
 
     // 상품별 공개 리뷰 목록 조회
     @GetMapping("/products/{productId}/reviews")
@@ -39,7 +41,10 @@ public class ReviewController {
             @AuthenticationPrincipal LoginMember member,
             @Valid @RequestBody ReviewCreateRequest request
     ) {
-        return reviewService.createReview(memberId(member), request);
+        return reviewWriteService.createReview(
+                memberId(member),
+                request
+        );
     }
 
     // 리뷰 수정
@@ -49,7 +54,7 @@ public class ReviewController {
             @PathVariable Long reviewId,
             @Valid @RequestBody ReviewUpdateRequest request
     ) {
-        return reviewService.updateReview(
+        return reviewWriteService.updateReview(
                 reviewId,
                 memberId(member),
                 request
