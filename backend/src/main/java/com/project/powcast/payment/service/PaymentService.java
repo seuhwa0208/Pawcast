@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -96,7 +97,13 @@ public class PaymentService {
 
         // 재고 차감
         // order -> orderItem -> variantId
-        List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId());
+        List<OrderItem> items = orderItemRepository
+                .findAllByOrder_Id(order.getId())
+                .stream()
+                .sorted(Comparator.comparing(
+                        item -> item.getProductVariant().getId()
+                ))
+                .toList();
         for (OrderItem item : items){
             inventoryService.decreaseStock(item.getProductVariant().getId(), item.getQuantity());
         }
@@ -142,7 +149,13 @@ public class PaymentService {
         payment.setStatus(PaymentsStatus.CANCELLED);
         order.setStatus(OrderStatus.CANCELLED);
         // 재고 복구
-        List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId());
+        List<OrderItem> items = orderItemRepository
+                .findAllByOrder_Id(order.getId())
+                .stream()
+                .sorted(Comparator.comparing(
+                        item -> item.getProductVariant().getId()
+                ))
+                .toList();
         for (OrderItem item : items){
             inventoryService.increaseStock(item.getProductVariant().getId(), item.getQuantity());
         }
