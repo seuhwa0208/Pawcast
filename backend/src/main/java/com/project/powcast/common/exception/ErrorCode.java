@@ -66,6 +66,10 @@ public enum ErrorCode {
     PROFANITY_DETECTED(HttpStatus.BAD_REQUEST,"욕설이나 부적절한 표현이 포함되어 있습니다. 내용을 수정해주세요."),
     MODERATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,"내용 검사를 완료하지 못했습니다. 잠시 후 다시 시도해주세요."),
 
+    NOT_FOUND_CART_ITEM(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."),
+    INVALID_CART_QUANTITY(HttpStatus.BAD_REQUEST, "장바구니 수량은 1 이상이어야 합니다."),
+    PRODUCT_NOT_ON_SALE(HttpStatus.CONFLICT, "현재 판매 중인 상품 옵션이 아닙니다."),
+
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
 
 
