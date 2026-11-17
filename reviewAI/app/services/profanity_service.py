@@ -8,6 +8,21 @@ RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
 BAD_WORDS_FILE = RESOURCES_DIR / "bad_words.txt"
 ALLOWED_WORDS_FILE = RESOURCES_DIR / "allowed_words.txt"
 
+# 글자 사이에 특수문자·숫자·영문자를 끼워 넣은 명백한 우회 표현만 탐지합니다.
+# '씨*'처럼 욕설의 일부만 있는 표현은 정상 문맥일 수도 있어 차단하지 않습니다.
+_GAP = r"[\s._*@#!~\-0-9xX]+"
+OBFUSCATED_PROFANITY_PATTERNS = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        rf"[시씨씌]{_GAP}[발빨벌펄](?![가-힣])",
+        rf"[병빙]{_GAP}[신씬](?![가-힣])",
+        rf"지{_GAP}랄(?![가-힣])",
+        rf"[존졸]{_GAP}[나라](?![가-힣])",
+        rf"[좆좃좇]{_GAP}같(?![가-힣])",
+        rf"개{_GAP}[새세섀쉐셰]{_GAP}[끼기키히](?![가-힣])",
+    )
+)
+
 
 def normalize_for_profanity_check(text: str) -> str:
     """띄어쓰기·특수문자·반복 글자를 정리해 우회 표현을 비교합니다."""
@@ -60,6 +75,13 @@ def load_allowed_words() -> frozenset[str]:
 
 def contains_prohibited_word(text: str) -> bool:
     """허용 표현을 보호한 뒤 실제 금지어가 남아 있는지 검사합니다."""
+    if not text or not text.strip():
+        return False
+
+    # 완성된 욕설을 특수문자 등으로 분리한 경우만 별도 규칙으로 차단합니다.
+    if any(pattern.search(text) for pattern in OBFUSCATED_PROFANITY_PATTERNS):
+        return True
+
     normalized_text = normalize_for_profanity_check(text)
 
     # '시발점', '쓰레기통' 같은 정상 표현 때문에 부분 문자열이 오탐되지 않게 합니다.

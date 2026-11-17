@@ -7,3 +7,5 @@ pydantic
 pydantic-settings
 python-dotenv
 numpy
+pandas
+scikit-learn

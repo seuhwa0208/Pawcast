@@ -15,6 +15,7 @@ class SentimentAnalyzer:
     def __init__(self):
 
         self.model_path = Path(settings.MODEL_PATH)
+        self.model_name = settings.MODEL_NAME
 
         if not self.model_path.exists():
             raise FileNotFoundError(

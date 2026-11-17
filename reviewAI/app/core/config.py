@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     
     # 모델은 미리 내려받은 로컬 디렉터리에서만 불러옵니다.
     MODEL_PATH : str = "./models/sentiment_model"
+    MODEL_NAME: str = "WhitePeak/bert-base-cased-Korean-sentiment"
     
     # 텍스트 토큰화 시 처리할 최대 길이 지정
     MAX_LENGTH: int = 256
