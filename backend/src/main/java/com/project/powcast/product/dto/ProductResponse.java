@@ -1,6 +1,7 @@
 package com.project.powcast.product.dto;
 
 import com.project.powcast.product.repository.ProductListView;
+import com.project.powcast.review.dto.BestReviewResponse;
 
 import java.math.BigDecimal;
 
@@ -11,30 +12,25 @@ public record ProductResponse(
         String categoryName,
         String imagePath,
         Long variantId,
-        BigDecimal originalPrice,
-        BigDecimal salePrice,
-        BigDecimal discountRate,
+        BigDecimal price,
         Long salesCount,
         Long wishCount,
         Long reviewCount,
         BigDecimal averageRating,
-        Boolean soldOut
-) { public static ProductResponse from(ProductListView product) {
-    return new ProductResponse(
-            product.getId(),
-            product.getName(),
-            product.getBrand(),
-            product.getCategoryName(),
-            product.getImagePath(),
-            product.getVariantId(),
-            product.getOriginalPrice(),
-            product.getSalePrice(),
-            product.getDiscountRate(),
-            product.getSalesCount(),
-            product.getWishCount(),
-            product.getReviewCount(),
-            product.getAverageRating(),
-            product.getSoldOut()
-    );
-}
+        Boolean soldOut,
+        BestReviewResponse bestReview
+) {
+    public static ProductResponse from(ProductListView product) {
+        return from(product, null);
+    }
+
+    public static ProductResponse from(ProductListView product, BestReviewResponse bestReview) {
+        return new ProductResponse(
+                product.getId(), product.getName(), product.getBrand(), product.getCategoryName(),
+                product.getImagePath(), product.getVariantId(), product.getPrice(),
+                product.getSalesCount(),
+                product.getWishCount(), product.getReviewCount(), product.getAverageRating(),
+                product.getSoldOut(), bestReview
+        );
+    }
 }

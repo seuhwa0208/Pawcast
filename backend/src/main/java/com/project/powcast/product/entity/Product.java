@@ -1,11 +1,14 @@
 package com.project.powcast.product.entity;
 
 import com.project.powcast.common.entity.BaseTime;
+import com.project.powcast.product.entity.Category;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 @Entity
 @Table(name = "products")
+@DynamicUpdate
 @Getter
 @Setter
 @NoArgsConstructor

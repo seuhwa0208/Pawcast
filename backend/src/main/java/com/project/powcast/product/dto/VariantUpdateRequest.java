@@ -43,20 +43,12 @@ public record VariantUpdateRequest(
         @Digits(integer = 12, fraction = 0, message = "원가는 최대 12자리의 정수여야 합니다.")
         BigDecimal costPrice,
 
-        @DecimalMin(value = "0", message = "할인율은 0 이상이어야 합니다.")
-        @DecimalMax(value = "100", message = "할인율은 100 이하여야 합니다.")
-        @Digits(integer = 3, fraction = 2, message = "할인율은 소수점 둘째 자리까지 입력할 수 있습니다.")
-        BigDecimal discountRate,
-
         @NotNull com.project.powcast.product.entity.ProductVariantStatus status
 
 ) {
     public VariantUpdateRequest {
         if (skuCode != null) {
             skuCode = skuCode.strip();
-        }
-        if (discountRate == null) {
-            discountRate = BigDecimal.ZERO;
         }
     }
 }

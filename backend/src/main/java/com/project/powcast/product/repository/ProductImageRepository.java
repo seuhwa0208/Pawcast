@@ -5,4 +5,6 @@ import java.util.List;
 public interface ProductImageRepository extends JpaRepository<ProductImage, Long> {
     List<ProductImage> findAllByProductIdOrderBySortOrderAscIdAsc(Long productId);
     void deleteAllByProductId(Long productId);
+
+    List<ProductImage> findAllByProductIdInOrderByMainDescSortOrderAscIdAsc(List<Long> productIds);
 }
