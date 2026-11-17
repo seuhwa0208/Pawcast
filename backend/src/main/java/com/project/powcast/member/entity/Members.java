@@ -31,7 +31,7 @@ public class Members extends BaseTime {
     @Column(length = 50)
     private String tel;
 
-    @Column(nullable = false, length = 300)
+    @Column(length = 300)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)

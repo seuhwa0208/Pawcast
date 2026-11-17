@@ -9,7 +9,7 @@ import com.project.powcast.cart.repository.CartRepository;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.product.entity.ProductVariant;
 import com.project.powcast.product.entity.ProductVariantStatus;
@@ -30,7 +30,7 @@ import java.util.Map;
 public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository itemRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final ProductVariantRepository variantRepository;
     private final ProductImageRepository imageRepository;
 
@@ -90,7 +90,7 @@ public class CartService {
         if (memberId == null || purchasedItems == null || purchasedItems.isEmpty()) {
             return 0;
         }
-        memberRepository.findByIdForUpdate(memberId)
+        membersRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         List<Long> variantIds = purchasedItems.stream()
                 .map(item -> item.getProductVariant().getId()).distinct().sorted().toList();
@@ -109,7 +109,7 @@ public class CartService {
         if (memberId == null) {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
-        Members member = (lock ? memberRepository.findByIdForUpdate(memberId) : memberRepository.findById(memberId))
+        Members member = (lock ? membersRepository.findByIdForUpdate(memberId) : membersRepository.findById(memberId))
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         if (member.getStatus() != Members.Status.ACTIVE) {
             throw new BusinessException(ErrorCode.FORBIDDEN);

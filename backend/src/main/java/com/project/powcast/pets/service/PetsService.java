@@ -3,7 +3,7 @@ package com.project.powcast.pets.service;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.pets.dto.PetsRequest;
 import com.project.powcast.pets.dto.PetsResponse;
 import com.project.powcast.pets.entity.Pets;
@@ -19,7 +19,7 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class PetsService {
     private final PetsRepository petsRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
 
     //단순 펫_ID와 멤버_ID로 배송지 조회
     public Pets findByIdAndMemberId(Long petsId, Long memberId){
@@ -35,7 +35,7 @@ public class PetsService {
     // 등록
     @Transactional
     public PetsResponse createPets(Long memberId, PetsRequest request){
-        Members member = memberRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 
         Pets pets = Pets.builder()
                 .member(member)

@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/reviews/**", "/api/qna/**",
                                 "/api/banners/**", "/api/recommendations/popular",
                                 "/api/search/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/google").permitAll()   // 구글 소셜 로그인 관련 허용
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/logs/**").permitAll()
                         // 관리자

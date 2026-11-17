@@ -32,4 +32,21 @@ public interface ProductVariantRepository extends JpaRepository<ProductVariant, 
     List<ProductVariant> findAllByProductIdForUpdate(
             @Param("productId") Long productId
     );
+    // 재고 감소 - 서브쿼리를 써야하는 이유 - 동시에 감소하는 경우가 있을 수있음 - 쿼리는 update문에서 검사하고 감소하기때문에 더 안전함 
+    @Modifying
+    @Query("""
+    UPDATE ProductVariant p
+    SET p.stock = p.stock - :quantity
+    WHERE p.id = :productVariantId
+    AND p.stock >= :quantity
+    """)
+    int decreaseStock(@Param("productVariantId") Long productVariantId, @Param("quantity") Integer quantity);
+    // 재고 증가
+    @Modifying
+    @Query("""
+    UPDATE ProductVariant p
+    SET p.stock = p.stock + :quantity
+    WHERE p.id = :productVariantId
+    """)
+    int increaseStock( @Param("productVariantId") Long productVariantId, @Param("quantity") Integer quantity);
 }

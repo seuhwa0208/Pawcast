@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface NoticeRepository extends JpaRepository<Notice, Long>{
     // List<Notice> findAllByOrderByIsPinnedDescCreatedAtDesc();
+    Optional<Notice> findByIdAndDeletedAtIsNull(Long id);
     @Query("""
     SELECT n FROM Notice n WHERE n.deletedAt IS NULL
       AND (:type IS NULL OR n.noticeType = :type)

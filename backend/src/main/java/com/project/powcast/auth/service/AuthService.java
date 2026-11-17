@@ -12,7 +12,7 @@ import com.project.powcast.member.dto.MemberResponse;
 import com.project.powcast.auth.entity.EmailVerification;
 import com.project.powcast.auth.repository.EmailVerificationRepository;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ import java.time.LocalDateTime;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AuthService {
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final EmailVerificationRepository emailVerificationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
@@ -38,12 +38,12 @@ public class AuthService {
 
     //아이디 중복 검사
     public boolean checkUserId(String userId){
-        return memberRepository.existsByUserId(userId);
+        return membersRepository.existsByUserId(userId);
     }
     
     // 이메일로 회원 정보 불러오기
     public Members findByEmailMember(String email){
-        return memberRepository.findByEmail(email).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        return membersRepository.findByEmail(email).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
     }
 
 
@@ -92,7 +92,7 @@ public class AuthService {
         // 이메일이 인증 되었는지
         if(emailVerification.getVerifiedAt() == null){throw new BusinessException(ErrorCode.NOT_VERIFIED_EMAIL);}
         // 이미 가입된 이메일인지(중복검사)
-        if (memberRepository.existsByEmail(request.email())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
+        if (membersRepository.existsByEmail(request.email())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
 
         // 비밀번호 일치 확인
         if(!request.passwordHash().equals(request.checkPasswordHash())) {throw new BusinessException(ErrorCode.CHECK_PASSWORD_ERROR);}
@@ -126,7 +126,7 @@ public class AuthService {
         member.setAgreedEfinance(request.isAgreedEfinance());
         member.setAgreedMarketing(request.isAgreedMarketing());
         //가입정보 리턴
-        return MemberResponse.from(memberRepository.save(member));
+        return MemberResponse.from(membersRepository.save(member));
     }
 
 
@@ -134,7 +134,7 @@ public class AuthService {
     @Transactional
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest){
         // 계정조회
-        Members member = memberRepository.findByUserId(request.userId()).orElseThrow(()-> new BusinessException(ErrorCode.LOGIN_FAILED));
+        Members member = membersRepository.findByUserId(request.userId()).orElseThrow(()-> new BusinessException(ErrorCode.LOGIN_FAILED));
         // 비활성화 및 탈퇴한 회원 여부 조회
         if (member.getStatus() == Members.Status.INACTIVE){throw new BusinessException(ErrorCode.MEMBER_INACTIVE);}
         if (member.getStatus() == Members.Status.DELETED){throw new BusinessException(ErrorCode.MEMBER_DELETED);}

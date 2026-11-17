@@ -1,11 +1,10 @@
 package com.project.powcast.product.service;
 
 import com.project.powcast.product.entity.Category;
-import com.project.powcast.product.service.CategoryService;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.product.dto.*;
 import com.project.powcast.product.entity.*;
 import com.project.powcast.product.repository.*;
@@ -37,7 +36,7 @@ public class ProductService {
     private final DeviceDetailRepository deviceRepository;
     private final CategoryService categoryService;
     private final ReviewService reviewService;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final Validator validator;
 
@@ -244,7 +243,7 @@ public class ProductService {
         if (memberId == null) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
-        Members member = memberRepository.findById(memberId)
+        Members member = membersRepository.findById(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         if (member.getStatus() != Members.Status.ACTIVE) {
             throw new BusinessException(ErrorCode.FORBIDDEN);

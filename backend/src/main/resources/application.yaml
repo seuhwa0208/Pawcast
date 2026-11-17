@@ -23,6 +23,10 @@ payment:
     secret-key: ${TOSS_SECRET_KEY}
     client-key: ${TOSS_CLIENT_KEY}
 
+oauth:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
     

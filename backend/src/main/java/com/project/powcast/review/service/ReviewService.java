@@ -3,7 +3,7 @@ package com.project.powcast.review.service;
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.review.event.ReviewAnalysisRequested;
 import com.project.powcast.security.AuthorizationValidator;
 import com.project.powcast.order.entity.OrderItem;
@@ -38,7 +38,7 @@ public class ReviewService {
     private final ReviewSentimentRepository reviewSentimentRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductRepository productRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -241,7 +241,7 @@ public class ReviewService {
     public void deleteReview(Long reviewId, Long memberId) {
         validateLogin(memberId);
 
-        Members member = memberRepository.findById(memberId)
+        Members member = membersRepository.findById(memberId)
                 .orElseThrow(
                         () -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER)
                 );

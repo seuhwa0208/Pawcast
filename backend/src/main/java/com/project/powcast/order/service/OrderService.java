@@ -4,7 +4,7 @@ import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.common.util.OrderNumberGenerator;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.order.dto.OrderItemRequest;
 import com.project.powcast.order.dto.OrderRequest;
 import com.project.powcast.order.dto.OrderResponse;
@@ -13,7 +13,6 @@ import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.order.entity.OrderStatus;
 import com.project.powcast.order.repository.OrderItemRepository;
 import com.project.powcast.order.repository.OrderRepository;
-import com.project.powcast.product.entity.Product;
 import com.project.powcast.product.entity.ProductVariant;
 import com.project.powcast.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +31,7 @@ import java.util.stream.Collectors;
 public class OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
 
     // 주문하기
@@ -45,7 +43,7 @@ public class OrderService {
         // 회원 조회 - 비회원이면 null로 처리
         Members member = null;
         if (memberId != null){
-            member = memberRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+            member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         }
 
         // 상품 옵션 조회 -> 재고 여부와 판매 가능한 상태, 재고가 주문수량 이상인지 검사

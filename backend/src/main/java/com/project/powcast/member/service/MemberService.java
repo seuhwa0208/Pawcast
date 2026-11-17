@@ -8,7 +8,7 @@ import com.project.powcast.member.dto.MemberRequest;
 import com.project.powcast.member.dto.MemberResponse;
 import com.project.powcast.member.dto.PasswordRequest;
 import com.project.powcast.member.entity.Members;
-import com.project.powcast.member.repository.MemberRepository;
+import com.project.powcast.member.repository.MembersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,13 +20,13 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class MemberService {
-    private final MemberRepository memberRepository;
+    private final MembersRepository membersRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenRepository refreshTokenRepository;
 
     // 기본 findById
     public Members findById(Long id){
-        return memberRepository.findById(id).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        return membersRepository.findById(id).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
     }
 
     //비밀번호 재설정
@@ -76,7 +76,7 @@ public class MemberService {
         member.setTel(request.tel());
         member.setAgreedMarketing(request.isAgreedMarketing());
 
-        return MemberResponse.from(memberRepository.save(member));
+        return MemberResponse.from(membersRepository.save(member));
     }
 
     // 내 정보 수정전 비밀번호 확인
