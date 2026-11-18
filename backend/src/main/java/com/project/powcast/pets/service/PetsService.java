@@ -44,6 +44,7 @@ public class PetsService {
                 .breedName(request.breedName())
                 .birthday(request.birthday())
                 .weightKg(request.weightKg())
+                .lifeStage((request.lifeStage()))
                 .allergies(request.allergies())
                 .build();
         return PetsResponse.from(petsRepository.save(pets));
@@ -59,6 +60,7 @@ public class PetsService {
         pets.setPetType(request.petType());
         pets.setBreedName(request.breedName());
         pets.setBirthday(request.birthday());
+        pets.setLifeStage(request.lifeStage());
         pets.setWeightKg(request.weightKg());
         pets.setAllergies(request.allergies());
 

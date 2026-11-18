@@ -26,6 +26,8 @@ public record PetsRequest(
         @Digits(integer = 3, fraction = 2, message = "체중은 최대 3자리, 소수점 2자리까지 표시가 가능합니다.")
         BigDecimal weightKg,
 
+        String lifeStage,
+
         String allergies
 ) {
 }

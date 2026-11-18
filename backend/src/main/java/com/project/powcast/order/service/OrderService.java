@@ -15,6 +15,7 @@ import com.project.powcast.order.repository.OrderItemRepository;
 import com.project.powcast.order.repository.OrderRepository;
 import com.project.powcast.product.entity.ProductVariant;
 import com.project.powcast.product.repository.ProductVariantRepository;
+import com.project.powcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final AuthorizationValidator validator;
 
     // 주문하기
     // 상품 검증 → 가격 계산 → 주문 생성 → 주문 상세 생성 → 재고 차감 → 결제 처리
@@ -194,5 +196,27 @@ public class OrderService {
     }
 
     // 취소 요청의 진행상태? 및 환불 정보 조회 - 취소된 목록X 취소된 하나의 정보 불러오는것
+
+
+    //전체 목록 띄우고
+    public List<OrderResponse> getOrderList(Long memberId){
+        // 권한 검사
+        Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+        return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(OrderResponse::from).toList();
+    }
+
+    // 주문 상태 변경 ( 관리자 매니저 영역 - 주문 정보 상태 변경만 넣을꺼임)
+    @Transactional
+    public void changeOrderStatus(Long memberId, Long orderId,){
+        // 권한 검사
+        Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+
+        Order order = orderRepository.findById(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+
+        order.setStatus();
+
+    }
 
 }
