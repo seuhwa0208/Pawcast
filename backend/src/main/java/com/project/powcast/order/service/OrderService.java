@@ -8,6 +8,7 @@ import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.order.dto.OrderItemRequest;
 import com.project.powcast.order.dto.OrderRequest;
 import com.project.powcast.order.dto.OrderResponse;
+import com.project.powcast.order.dto.OrderStatusRequest;
 import com.project.powcast.order.entity.Order;
 import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.order.entity.OrderStatus;
@@ -208,15 +209,12 @@ public class OrderService {
 
     // 주문 상태 변경 ( 관리자 매니저 영역 - 주문 정보 상태 변경만 넣을꺼임)
     @Transactional
-    public void changeOrderStatus(Long memberId, Long orderId,){
+    public void changeOrderStatus(Long memberId, Long orderId, OrderStatusRequest request){
         // 권한 검사
         Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
 
         Order order = orderRepository.findById(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-
-        order.setStatus();
-
+        order.setStatus(request.orderStatus());
     }
-
 }

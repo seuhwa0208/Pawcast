@@ -3,7 +3,9 @@ package com.project.powcast.member.admin.service;
 
 import com.project.powcast.common.exception.BusinessException;
 import com.project.powcast.common.exception.ErrorCode;
+import com.project.powcast.member.admin.dto.MemberRoleRequest;
 import com.project.powcast.member.admin.dto.MemberRoleResponse;
+import com.project.powcast.member.admin.dto.MemberStatusRequest;
 import com.project.powcast.member.dto.MemberResponse;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MembersRepository;
@@ -35,20 +37,20 @@ public class AdminService {
     
     // 회원 역할 변경
     @Transactional
-    public void changeMemberRole(Long adminId, Long userId, Members.Role role){
+    public void changeMemberRole(Long adminId, Long userId, MemberRoleRequest request){
         // 권한 검사
         Members member = membersRepository.findById(adminId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateAdmin(member);
         Members user = membersRepository.findById(userId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        user.setRole(role);
+        user.setRole(request.role());
     }
     
     // 회원 상태 변경
     @Transactional
-    public void changeMemberStatus(Long adminId, Long userId, Members.Status status){
+    public void changeMemberStatus(Long adminId, Long userId, MemberStatusRequest request){
         Members member = membersRepository.findById(adminId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateAdmin(member);
         Members user = membersRepository.findById(userId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        user.setStatus(status);
+        user.setStatus(request.status());
     }
 }

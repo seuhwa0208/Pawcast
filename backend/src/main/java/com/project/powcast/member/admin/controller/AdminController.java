@@ -28,11 +28,11 @@ public class AdminController {
     // 회원 상태 변경
     @PatchMapping("/members/{userId}/status")
     public void changeMemberStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long userId, @RequestBody MemberStatusRequest request){
-        adminService.changeMemberStatus(member.getId(),userId, request.status());
+        adminService.changeMemberStatus(member.getId(),userId, request);
     }
     // 회원 역할 변경
     @PatchMapping("/members/{userId}/role")
     public void changeMemberRole(@AuthenticationPrincipal LoginMember member, @PathVariable Long userId, @RequestBody MemberRoleRequest request){
-        adminService.changeMemberRole(member.getId(),userId,request.role());
+        adminService.changeMemberRole(member.getId(),userId, request);
     }
 }

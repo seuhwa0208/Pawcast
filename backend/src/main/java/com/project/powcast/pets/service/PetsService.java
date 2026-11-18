@@ -18,12 +18,13 @@ import java.util.List;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PetsService {
+    private static final int MAX_PET_COUNT=3;
     private final PetsRepository petsRepository;
     private final MembersRepository membersRepository;
 
     //단순 펫_ID와 멤버_ID로 배송지 조회
     public Pets findByIdAndMemberId(Long petsId, Long memberId){
-        return petsRepository.findByIdAndMemberId(petsId, memberId)
+        return petsRepository.findByIdAndMember_Id(petsId, memberId)
                 .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PETS));
     }
 
@@ -36,6 +37,10 @@ public class PetsService {
     @Transactional
     public PetsResponse createPets(Long memberId, PetsRequest request){
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+        //펫 3마리 까지 등록
+        long petCount = petsRepository.countByMember_Id(memberId);
+        if (petCount >= MAX_PET_COUNT) {throw new BusinessException(ErrorCode.PET_LIMIT_EXCEEDED);}
 
         Pets pets = Pets.builder()
                 .member(member)
