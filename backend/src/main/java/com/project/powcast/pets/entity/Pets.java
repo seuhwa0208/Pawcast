@@ -43,6 +43,9 @@ public class Pets extends BaseTime {
     @Column(columnDefinition = "TEXT")
     private String allergies;
 
+    @Column(name = "life_stage")
+    private String lifeStage;
+
     public enum PetType {
         CAT,
         DOG

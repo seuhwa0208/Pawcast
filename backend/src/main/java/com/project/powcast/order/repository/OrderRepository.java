@@ -2,6 +2,7 @@ package com.project.powcast.order.repository;
 
 import com.project.powcast.order.entity.Order;
 import jakarta.persistence.LockModeType;
+import org.aspectj.weaver.ast.Or;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,6 +15,7 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findAllByMember_IdOrderByCreatedAtDesc(Long memberId);
+    List<Order> findAllByOrderByCreatedAtDesc();
     Optional<Order> findByIdAndMemberId(Long orderId, Long memberId);
     @Query("SELECT o FROM Order o WHERE o.recipientEmail = :email AND o.orderNumber = :orderNumber")
     Optional<Order> findByEmailAndOrderNumber(@Param("email") String email,

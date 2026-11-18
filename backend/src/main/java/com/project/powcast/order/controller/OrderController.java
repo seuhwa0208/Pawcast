@@ -1,10 +1,17 @@
 package com.project.powcast.order.controller;
 
+import com.project.powcast.common.exception.BusinessException;
+import com.project.powcast.common.exception.ErrorCode;
+import com.project.powcast.member.entity.Members;
+import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.order.dto.OrderRequest;
 import com.project.powcast.order.dto.OrderResponse;
+import com.project.powcast.order.dto.OrderStatusRequest;
 import com.project.powcast.order.service.OrderService;
+import com.project.powcast.security.AuthorizationValidator;
 import com.project.powcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
+import org.checkerframework.checker.units.qual.A;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +22,8 @@ import java.util.List;
 @RequestMapping("/api/orders")
 public class OrderController {
     private final OrderService orderService;
+    private final AuthorizationValidator validator;
+    private final MembersRepository membersRepository;
 
     // 주문하기
     @PostMapping
@@ -43,4 +52,16 @@ public class OrderController {
     
     // 취소 요청의 진행상태 및 환불 정보 조회 - 취소된 주문 정보 조회 - 제외
     //@GetMapping("/{orderId}/cancel/{cancelId}")
+
+    // 전체 주문 목록
+    @GetMapping("/admin")
+    public List<OrderResponse> getOrderList(@AuthenticationPrincipal LoginMember member){
+        return orderService.getOrderList(member.getId());
+
+    }
+    // 상태 변경 - 주문
+    @PostMapping("/admin/{orderId}/status")
+    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, OrderStatusRequest request){
+        orderService.changeOrderStatus(member.getId(),orderId,request);
+    }
 }

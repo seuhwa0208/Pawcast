@@ -10,6 +10,7 @@ public record PetsResponse(
         LocalDate birthday,
         String breedName,
         BigDecimal weightKg,
+        String lifeStage,
         String allergies
 ) {
     public static PetsResponse from(Pets pets) {
@@ -19,6 +20,7 @@ public record PetsResponse(
                 pets.getBirthday(),
                 pets.getBreedName(),
                 pets.getWeightKg(),
+                pets.getLifeStage(),
                 pets.getAllergies()
         );
     }

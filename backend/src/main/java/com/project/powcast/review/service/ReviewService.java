@@ -5,6 +5,7 @@ import com.project.powcast.common.exception.ErrorCode;
 import com.project.powcast.member.entity.Members;
 import com.project.powcast.member.repository.MembersRepository;
 import com.project.powcast.review.event.ReviewAnalysisRequested;
+import com.project.powcast.review.filter.ProfanityFilter;
 import com.project.powcast.security.AuthorizationValidator;
 import com.project.powcast.order.entity.OrderItem;
 import com.project.powcast.order.entity.OrderStatus;
@@ -41,6 +42,7 @@ public class ReviewService {
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final ApplicationEventPublisher eventPublisher;
+    private final ProfanityFilter profanityFilter;
 
     // 리뷰 등록
     @Transactional
@@ -75,6 +77,9 @@ public class ReviewService {
         if (reviewRepository.existsByOrderItemId(orderItem.getId())) {
             throw new BusinessException(ErrorCode.DUPLICATE_REVIEW);
         }
+        
+        // 리뷰 욕설 필터링 기능
+        profanityFilter.containsProhibitedWord(request.content());
 
         ProductReview review = ProductReview.builder()
                 .member(orderMember)

@@ -91,4 +91,6 @@ public class MemberService {
         member.setStatus(Members.Status.DELETED);
         member.setDeletedAt(LocalDateTime.now());
     }
+
+    //
 }

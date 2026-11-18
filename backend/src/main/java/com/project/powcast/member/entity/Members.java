@@ -62,7 +62,8 @@ public class Members extends BaseTime {
     public enum Status {
         ACTIVE,
         INACTIVE,
-        DELETED;
+        DELETED,
+        KICKED;
     }
 
     public enum Role {
