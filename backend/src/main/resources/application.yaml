@@ -1,0 +1,36 @@
+spring:
+  application:
+    name: pawcast
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    # .env로 분리해 개발자별 DB 계정이 소스에 남지 않도록 한다.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pawcast}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+petmall:
+  jwt:
+    # HS256 서명에는 32바이트 이상인 비밀키가 필수다.
+    secret: ${JWT_SECRET}
+    access-token-validity-seconds: 1800
+    refresh-token-validity-seconds: 1209600
+    issuer: ${JWT_ISSUER:pawcast}
+
+payment:
+  toss:
+    secret-key: ${TOSS_SECRET_KEY}
+    client-key: ${TOSS_CLIENT_KEY}
+
+oauth:
+  google:
+    client-id: ${GOOGLE_CLIENT_ID}
+
+ai:
+  base-url: ${AI_BASE_URL:http://localhost:8000}
+    
