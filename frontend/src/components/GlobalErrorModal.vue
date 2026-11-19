@@ -5,9 +5,15 @@ defineProps({
   title: { type: String, default: "요청을 처리하지 못했어요" },
   message: { type: String, default: "잠시 후 다시 시도해주세요." },
   details: { type: Array, default: () => [] },
+  confirmLabel: { type: String, default: "확인" },
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "confirm"]);
+
+function confirm() {
+  emit("confirm");
+  emit("update:modelValue", false);
+}
 </script>
 
 <template>
@@ -43,9 +49,9 @@ const emit = defineEmits(["update:modelValue"]);
           <button
             type="button"
             class="primary"
-            @click="emit('update:modelValue', false)"
+            @click="confirm"
           >
-            확인
+            {{ confirmLabel }}
           </button>
         </div>
       </section>

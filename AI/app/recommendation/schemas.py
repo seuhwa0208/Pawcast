@@ -1,43 +1,26 @@
-# Spring Boot와 주고받는 추천 요청, 응답 구조를 정의
-# 필터링 X, 데이터의 필드, 자료형, 필수 여부와 유효성만 검사함
+"""Spring Boot와 FastAPI 사이의 추천 요청·응답 계약입니다."""
 
 from datetime import date
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import (
-    BaseModel, 
-    ConfigDict, 
-    Field, 
-    model_validator,)
+from pydantic import BaseModel, ConfigDict, Field
+
 
 def to_camel(value: str) -> str:
-    # 파이썬의 snake_case 필드명을 자바의 camelCase JSON 필드명으로 자동 반환
-    # pet_id = petID, life_stage = lifeStage
-    
     first, *rest = value.split("_")
-    
-    return first + "".join(
-        word.capitalize() # 각 단어의 첫글자는 대문자, 나머지 소문자로 변환
-        for word in rest
-    )
-    
-# 추천 요청과 응답 스키마가 공통으로 상속받는 기본 클래스, 공통 설정값 지정
+    return first + "".join(word.capitalize() for word in rest)
+
+
 class ApiModel(BaseModel):
-    model_config = ConfigDict(
-        alias_generator= to_camel,
-        populate_by_name= True, # 파이싼의 스네이크 케이스와 자바의 카멜케이스를 모두 입력 가능함
-        str_strip_whitespace= True, # " dog "처럼 앞뒤에 공백이 포함된 문자열을 자동으로 정리함
-    )
-    
-# PETS.pet_type 컬럼에서 사용할 반려동물 종류
-# Enum을 사용하면 dog와 cat 이의의 값이 들어오는 걸 파이썬이 자동으로 차단
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, str_strip_whitespace=True)
+
+
 class PetType(str, Enum):
     DOG = "DOG"
     CAT = "CAT"
-    
-# 추천에서 사용할 공통 생애주기 코드
-# 생애주기 계산 결과 X, 급여 가능한 상품에 사용하는 생애주기 코드
+
+
 class LifeStage(str, Enum):
     PUPPY = "PUPPY"
     JUNIOR = "JUNIOR"
@@ -45,5 +28,63 @@ class LifeStage(str, Enum):
     SENIOR = "SENIOR"
     ALL_AGES = "ALL_AGES"
 
-# Spring Boot가 PETS 테이블에서 조회해 FastAPI로 전달하는 반려동물 정보
-# Life_stage 필드가 없는 이유: 반려동물의 생애주기는 DB에 저장된 고정값이 아니고 birthday와 현재 날짜를 이용해 파이썬에서 계산해서
+
+class PetProfile(ApiModel):
+    pet_id: int
+    pet_type: PetType
+    birthday: date
+    breed_name: str | None = None
+    weight_kg: Decimal | None = None
+    allergies: list[str] = Field(default_factory=list)
+
+
+class RecommendationCandidate(ApiModel):
+    product_id: int
+    variant_id: int
+    name: str
+    brand: str | None = None
+    category_id: int
+    category_name: str | None = None
+    image_path: str | None = None
+    sale_price: Decimal
+    average_rating: Decimal = Decimal("0")
+    review_count: int = 0
+    sales_count: int = 0
+    sold_out: bool = False
+    pet_type: str
+    main_ingredient: str | None = None
+    life_stage: str = "ALL_AGES"
+
+
+class RecommendationRequest(ApiModel):
+    member_id: int
+    pet: PetProfile
+    purchased_product_ids: list[int] = Field(default_factory=list)
+    preferred_category_ids: list[int] = Field(default_factory=list)
+    wish_product_ids: list[int] = Field(default_factory=list)
+    peer_product_ids: list[int] = Field(default_factory=list)
+    products: list[RecommendationCandidate] = Field(default_factory=list)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class RecommendationItem(ApiModel):
+    rank: int
+    product_id: int
+    variant_id: int
+    name: str
+    brand: str | None = None
+    category_name: str | None = None
+    image_path: str | None = None
+    sale_price: Decimal
+    average_rating: Decimal
+    review_count: int
+    recommendation_score: float
+    recommendation_reasons: list[str]
+
+
+class MemberRecommendationResponse(ApiModel):
+    member_id: int
+    pet_id: int
+    life_stage: LifeStage
+    age_months: int
+    items: list[RecommendationItem]

@@ -1,6 +1,7 @@
 package com.project.pawcast.security;
 
 import lombok.RequiredArgsConstructor;
+import com.project.pawcast.common.config.PetmallProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -21,6 +22,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtFilter;
+    private final PetmallProperties petmallProperties;
 
     /*
      * JWT REST API
@@ -66,7 +68,7 @@ public class SecurityConfig {
 
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOrigins(List.of("http://localhost:5173"));
+        config.setAllowedOrigins(petmallProperties.cors().allowedOrigins());
 
         config.setAllowedMethods(List.of("GET", "POST", "PUT","PATCH", "DELETE", "OPTIONS"));
 

@@ -68,6 +68,14 @@ public class AddressService {
 
         return AddressResponse.from(addresses);
     }
+
+    @Transactional
+    public AddressResponse setDefaultAddress(Long addressId, Long memberId) {
+        Addresses selected = findByIdAndMemberId(addressId, memberId);
+        addressRepository.findAllByMember_Id(memberId)
+                .forEach(address -> address.setDefault(address.getId().equals(addressId)));
+        return AddressResponse.from(selected);
+    }
     
     // 배송지 삭제
     // 본인 확인

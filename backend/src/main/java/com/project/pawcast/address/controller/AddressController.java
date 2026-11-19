@@ -5,6 +5,7 @@ import com.project.pawcast.address.dto.AddressResponse;
 import com.project.pawcast.address.service.AddressService;
 import com.project.pawcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,14 +26,19 @@ public class AddressController {
 
     //배송지 등록
     @PostMapping
-    public AddressResponse createAddress(@AuthenticationPrincipal LoginMember member, AddressRequest request){
+    public AddressResponse createAddress(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody AddressRequest request){
         return addressService.createAddress(member.getId(),request);
     }
     
     //배송지 수정
     @PatchMapping("/{addressId}")
-    public AddressResponse updateAddress(@AuthenticationPrincipal LoginMember member,@PathVariable Long addressId, AddressRequest request){
+    public AddressResponse updateAddress(@AuthenticationPrincipal LoginMember member,@PathVariable Long addressId, @Valid @RequestBody AddressRequest request){
         return addressService.updateAddress(addressId,member.getId(),request);
+    }
+
+    @PatchMapping("/{addressId}/default")
+    public AddressResponse setDefaultAddress(@AuthenticationPrincipal LoginMember member, @PathVariable Long addressId){
+        return addressService.setDefaultAddress(addressId, member.getId());
     }
     
     //배송지 삭제

@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record PetsResponse(
+        Long id,
         String name,
         Pets.PetType petType,
         LocalDate birthday,
@@ -15,6 +16,7 @@ public record PetsResponse(
 ) {
     public static PetsResponse from(Pets pets) {
         return new PetsResponse(
+                pets.getId(),
                 pets.getName(),
                 pets.getPetType(),
                 pets.getBirthday(),

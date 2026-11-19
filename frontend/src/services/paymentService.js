@@ -7,16 +7,8 @@ export const paymentService = {
       method: "POST",
       body: jsonBody(payload),
     }),
-  preparePayment: (orderId, payload, orderAccessToken) =>
-    springRequest(`/orders/${orderId}/payments`, {
-      method: "POST",
-      body: jsonBody(payload),
-      headers: orderAccessToken
-        ? { Authorization: `Bearer ${orderAccessToken}` }
-        : {},
-    }),
-  confirmPayment: (orderId, paymentId, payload, orderAccessToken) =>
-    springRequest(`/orders/${orderId}/payments/${paymentId}/confirm`, {
+  confirmPayment: (orderId, payload, orderAccessToken) =>
+    springRequest(`/orders/${orderId}/payments/confirm`, {
       method: "POST",
       body: jsonBody(payload),
       headers: orderAccessToken

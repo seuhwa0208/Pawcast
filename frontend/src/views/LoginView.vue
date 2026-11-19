@@ -1,6 +1,6 @@
 <!-- 회원 로그인과 Google OAuth 진입, 로그인 후 원래 경로 복귀를 담당합니다. -->
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { authService } from "@/services/authService";
 import { useAuthSession } from "@/stores/auth";
@@ -12,7 +12,49 @@ const loading = ref(false);
 const errorMessage = ref("");
 const registered = computed(() => route.query.registered === "1");
 const { setAccessToken, setCurrentUserId, setUserRole } = useAuthSession();
-const startGoogleLogin = () => authService.startGoogleLogin();
+const googleButton = ref(null);
+let googleInitTimer;
+
+async function handleGoogleCredential(response) {
+  errorMessage.value = "";
+  try {
+    loading.value = true;
+    const result = await authService.googleLogin(response.credential);
+    setAccessToken(result.accessToken);
+    setCurrentUserId(result.userId || result.name || String(result.memberId || "google-member"));
+    setUserRole(result.role || "USER");
+    router.push(typeof route.query.redirect === "string" ? route.query.redirect : "/member");
+  } catch (error) {
+    errorMessage.value = error.message || "Google 로그인에 실패했습니다.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+function renderGoogleButton() {
+  if (!window.google?.accounts?.id || !googleButton.value) return false;
+  window.google.accounts.id.initialize({
+    client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential,
+  });
+  window.google.accounts.id.renderButton(googleButton.value, {
+    type: "standard",
+    theme: "outline",
+    size: "large",
+    text: "continue_with",
+    shape: "rectangular",
+    width: Math.min(450, googleButton.value.clientWidth || 450),
+  });
+  return true;
+}
+
+onMounted(() => {
+  if (renderGoogleButton()) return;
+  googleInitTimer = window.setInterval(() => {
+    if (renderGoogleButton()) window.clearInterval(googleInitTimer);
+  }, 200);
+});
+onBeforeUnmount(() => window.clearInterval(googleInitTimer));
 
 async function submit() {
   errorMessage.value = "";
@@ -24,7 +66,7 @@ async function submit() {
     loading.value = true;
     const result = await authService.login({
       userId: form.userId.trim(),
-      password: form.password,
+      passwordHash: form.password,
     });
     setAccessToken(result.accessToken);
     setCurrentUserId(form.userId.trim());
@@ -90,30 +132,7 @@ async function submit() {
           {{ loading ? "로그인 중..." : "로그인" }}
         </button>
         <div class="auth-divider"><span>또는 간편 로그인</span></div>
-        <button
-          class="google-login-button"
-          type="button"
-          @click="startGoogleLogin"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              fill="#4285F4"
-              d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.4a4.6 4.6 0 0 1-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.4Z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1a5.8 5.8 0 0 1-5.4-4H3.3v2.6A10 10 0 0 0 12 22Z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M6.6 14.1a6 6 0 0 1 0-4.2V7.3H3.3a10 10 0 0 0 0 9.4l3.3-2.6Z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.9-2.8A9.7 9.7 0 0 0 3.3 7.3l3.3 2.6A5.8 5.8 0 0 1 12 5.9Z"
-            /></svg
-          ><span>Google로 계속하기</span>
-        </button>
+        <div ref="googleButton" class="google-identity-button" aria-label="Google로 계속하기"></div>
 
         <div class="signup-guide">
           <div>

@@ -17,12 +17,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshTokens, Lon
 
     /** 로그아웃·비밀번호 변경·탈퇴 시 그 회원의 모든 토큰을 끊는다. */
     @Modifying(clearAutomatically = true)
-    @Query("UPDATE RefreshToken t SET t.revoked = true " + "WHERE t.member.id = :memberId AND t.revoked = false")
+    @Query("UPDATE RefreshTokens t SET t.revoked = true " + "WHERE t.member.id = :memberId AND t.revoked = false")
     int revokeAllByMember(@Param("memberId") Long memberId);
 
     /** 만료된 토큰 정리 배치. 쌓아 두면 테이블만 커진다. */
     @Modifying
-    @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :threshold")
+    @Query("DELETE FROM RefreshTokens t WHERE t.expiresAt < :threshold")
     int deleteExpired(@Param("threshold") OffsetDateTime threshold);
 
     long countByMemberIdAndRevokedFalse(Long memberId);

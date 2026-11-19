@@ -73,7 +73,15 @@ public class SocialLoginService {
         String refreshToken = jwtTokenProvider.createRefreshToken(member.getId(),member.getEmail(),member.getRole().toString());
 
         // 로그인 결과 반환 -> 자동 로그인?
-        return new SocialLoginResponse(accessToken, refreshToken, isNewMember);
+        return new SocialLoginResponse(
+                accessToken,
+                refreshToken,
+                member.getId(),
+                member.getUserId(),
+                member.getName(),
+                member.getRole(),
+                isNewMember
+        );
     }
 
     // 회원가입

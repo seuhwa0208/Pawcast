@@ -1,34 +1,38 @@
 package com.project.pawcast.order.dto;
 
-import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.order.entity.Order;
+import com.project.pawcast.order.entity.OrderItem;
 import com.project.pawcast.order.entity.OrderStatus;
 import com.project.pawcast.pets.dto.PetsResponse;
 import com.project.pawcast.pets.entity.Pets;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record OrderResponse(
-        Members member,
+        Long id,
+        Long memberId,
         String orderNumber,
         OrderStatus status,
-        BigDecimal total_amount,
-        BigDecimal discount_amount,
-        BigDecimal shipping_fee,
-        BigDecimal final_amount,
-        String recipient_name,
-        String recipient_phone,
-        String recipient_email,
-        String delivery_zipcode,
-        String delivery_address1,
-        String delivery_address2,
-        String delivery_message,
-        LocalDateTime created_at
+        BigDecimal totalAmount,
+        BigDecimal discountAmount,
+        BigDecimal shippingFee,
+        BigDecimal finalAmount,
+        String recipientName,
+        String recipientPhone,
+        String recipientEmail,
+        String deliveryZipcode,
+        String deliveryAddress1,
+        String deliveryAddress2,
+        String deliveryMessage,
+        LocalDateTime createdAt,
+        List<OrderItemResponse> items
 ) {
-    public static OrderResponse from(Order order) {
+    public static OrderResponse from(Order order, List<OrderItem> items) {
         return new OrderResponse(
-                order.getMember(),
+                order.getId(),
+                order.getMember() == null ? null : order.getMember().getId(),
                 order.getOrderNumber(),
                 order.getStatus(),
                 order.getTotalAmount(),
@@ -42,7 +46,21 @@ public record OrderResponse(
                 order.getDeliveryAddress1(),
                 order.getDeliveryAddress2(),
                 order.getDeliveryMessage(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                items.stream().map(OrderItemResponse::from).toList()
         );
+    }
+
+    public record OrderItemResponse(
+            Long id, Long productId, Long variantId, String productName,
+            String optionLabel, Integer quantity, BigDecimal unitPrice, BigDecimal totalPrice
+    ) {
+        public static OrderItemResponse from(OrderItem item) {
+            return new OrderItemResponse(
+                    item.getId(), item.getProductVariant().getProduct().getId(),
+                    item.getProductVariant().getId(), item.getProductName(),
+                    item.getOptionLabel(), item.getQuantity(), item.getUnitPrice(), item.getTotalPrice()
+            );
+        }
     }
 }

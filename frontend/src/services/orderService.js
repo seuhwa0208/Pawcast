@@ -5,7 +5,7 @@ export const orderService = {
   getMyOrders: ({ period = "6m", status } = {}) => {
     const query = new URLSearchParams({ period });
     if (status) query.set("status", status);
-    return springRequest(`/members/me/orders?${query.toString()}`);
+    return springRequest(`/orders?${query.toString()}`);
   },
   getOrder: (orderId) => springRequest(`/orders/${orderId}`),
 };

@@ -20,8 +20,8 @@ public interface QnaRepository extends JpaRepository<Qna, Long> {
     Optional<Qna> findByIdAndDeletedAtIsNull(Long qnaId);
     List<Qna> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
     @Query("""
-    SELECT q FROM Qnas q WHERE q.deletedAt IS NULL
-      AND (:type IS NULL OR q.qnaType = :type)
+    SELECT q FROM Qna q WHERE q.deletedAt IS NULL
+      AND (:type IS NULL OR q.type = :type)
       AND (
           :keyword IS NULL
           OR LOWER(q.title) LIKE LOWER(CONCAT('%', :keyword, '%'))
