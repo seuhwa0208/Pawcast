@@ -85,7 +85,9 @@ async function loadOrders() {
     ordersLoading.value = true;
     ordersError.value = "";
     const result = await orderService.getMyOrders({ period: "6m" });
-    const serverOrders = result.content || result.items || result.orders || [];
+    const serverOrders = Array.isArray(result)
+      ? result
+      : result.content || result.items || result.orders || [];
     orders.value = serverOrders;
   } catch (error) {
     orders.value = [];

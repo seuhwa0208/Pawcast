@@ -1,11 +1,12 @@
 <!-- 전역 헤더·현재 라우트 화면·푸터를 조립하는 애플리케이션 최상위 셸입니다. -->
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import AppHeader from "@/components/AppHeader.vue";
 import AppFooter from "@/components/AppFooter.vue";
 import GlobalErrorModal from "@/components/GlobalErrorModal.vue";
 import { useAuthSession } from "@/stores/auth";
+import { petService } from "@/services/petService";
 
 const route = useRoute();
 const router = useRouter();
@@ -13,6 +14,8 @@ const { accessToken, setAccessToken } = useAuthSession();
 const errorOpen = ref(false);
 const errorContent = reactive({ title: "", message: "", details: [] });
 const usesAdminLayout = computed(() => Boolean(route.meta.adminLayout));
+const petPromptOpen = ref(false);
+let checkedPetToken = "";
 
 const errorTitles = {
   MEMBER_BLOCKED: "임시 차단된 계정입니다",
@@ -58,6 +61,23 @@ onMounted(() => window.addEventListener("powcast-api-error", handleApiError));
 onBeforeUnmount(() =>
   window.removeEventListener("powcast-api-error", handleApiError),
 );
+
+async function checkPetRegistration(token) {
+  if (!token || token === checkedPetToken || route.meta.requiresAdmin) return;
+  checkedPetToken = token;
+  try {
+    const pets = await petService.getPets();
+    if (Array.isArray(pets) && pets.length === 0) petPromptOpen.value = true;
+  } catch {
+    // 공통 API 오류 처리기가 서버·인증 오류를 안내합니다.
+  }
+}
+
+watch(accessToken, checkPetRegistration, { immediate: true });
+
+function goToPetRegistration() {
+  router.push("/mypage/pets");
+}
 </script>
 <template>
   <div class="app-shell" :class="{ 'admin-app-shell': usesAdminLayout }">
@@ -69,6 +89,13 @@ onBeforeUnmount(() =>
       :title="errorContent.title"
       :message="errorContent.message"
       :details="errorContent.details"
+    />
+    <GlobalErrorModal
+      v-model="petPromptOpen"
+      title="반려동물 정보를 등록해주세요"
+      message="우리 아이에게 맞는 상품 추천을 위해 반려동물 정보를 먼저 등록해주세요."
+      confirm-label="등록하러 가기"
+      @confirm="goToPetRegistration"
     />
   </div>
 </template>

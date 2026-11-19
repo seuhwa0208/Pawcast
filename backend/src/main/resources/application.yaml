@@ -1,11 +1,22 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
-    name: powcast
+    name: pawcast
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://localhost:5432/powcast
-    username: postgres
-    password: 1004
+    # .env로 분리해 개발자별 DB 계정이 소스에 남지 않도록 한다.
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pawcast}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
   jpa:
     hibernate:
       ddl-auto: update
@@ -14,9 +25,18 @@ spring:
       hibernate:
         format_sql: true
 petmall:
+  cors:
+    allowed-origins:
+      - http://127.0.0.1:5174
+      - http://localhost:5174
+      - http://127.0.0.1:5173
+      - http://localhost:5173
   jwt:
+    # HS256 서명에는 32바이트 이상인 비밀키가 필수다.
+    secret: ${JWT_SECRET}
     access-token-validity-seconds: 1800
     refresh-token-validity-seconds: 1209600
+    issuer: ${JWT_ISSUER:pawcast}
 
 payment:
   toss:
@@ -29,4 +49,3 @@ oauth:
 
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
-    

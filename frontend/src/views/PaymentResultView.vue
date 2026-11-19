@@ -42,15 +42,14 @@ onMounted(async () => {
     orderNumber.value = context.orderNumber || route.query.orderId || "";
     orderEmail.value = context.orderEmail || "";
     memberOrder.value = Boolean(context.isMember);
-    if (!context.orderId || !context.paymentId) {
-      throw new Error("저장된 결제 준비 정보를 찾지 못했습니다.");
+    if (!context.orderId) {
+      throw new Error("저장된 주문 정보를 찾지 못했습니다.");
     }
     await paymentService.confirmPayment(
       context.orderId,
-      context.paymentId,
       {
         paymentKey: route.query.paymentKey,
-        orderId: route.query.orderId,
+        orderNumber: route.query.orderId,
         amount: Number(route.query.amount),
       },
       context.orderAccessToken,

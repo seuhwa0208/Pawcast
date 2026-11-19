@@ -91,8 +91,9 @@ async function loadAddresses() {
   try {
     addressLoading.value = true;
     const result = await addressService.getAddresses();
-    const serverAddresses =
-      result?.content || result?.items || result?.addresses || [];
+    const serverAddresses = Array.isArray(result)
+      ? result
+      : result?.content || result?.items || result?.addresses || [];
     addresses.value = serverAddresses.map(normalizeAddress);
     const initial =
       addresses.value.find((address) => address.isDefault) || addresses.value[0];
@@ -219,8 +220,7 @@ async function requestPayment() {
     submitting.value = true;
     const order = await paymentService.createOrder({
       items: checkoutItems.value.map((item) => ({
-        productId: item.id,
-        variantId: item.variantId || null,
+        productVariantId: item.variantId || item.id,
         quantity: item.quantity,
       })),
       recipientName: selectedAddress.value.recipient,
@@ -239,20 +239,11 @@ async function requestPayment() {
       order.orderAccessToken || order.accessToken || order.guestOrderToken;
     if (!orderId) throw new Error("백엔드 주문 생성 응답에 주문 ID가 없습니다.");
 
-    const prepared = await paymentService.preparePayment(
-      orderId,
-      { paymentMethod: paymentMethod.value },
-      orderAccessToken,
-    );
-    const paymentId = prepared.id || prepared.paymentId;
-    if (!paymentId) throw new Error("백엔드 결제 준비 응답에 결제 ID가 없습니다.");
-
     sessionStorage.setItem(
       "powcast-payment-context",
       JSON.stringify({
         orderId,
         orderNumber,
-        paymentId,
         orderAccessToken,
         orderEmail: buyerEmail.value,
         isMember: isMember.value,
