@@ -30,7 +30,6 @@ public class QnaService {
     private final ProductRepository productRepository;
     private final AuthorizationValidator validator;
 
-
     // 단순 조회
     public Qna findById(Long id){
         return qnaRepository.findById(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
@@ -133,7 +132,7 @@ public class QnaService {
     public List<QnaResponse> getListQnaAdminAndManager(Long memberId){
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return qnaRepository.findAllByDeletedAtIsNullOrderByCreatedAtDesc().stream().map(QnaResponse::from).toList();
+        return qnaRepository.findAllForAdmin().stream().map(QnaResponse::from).toList();
     }
 
     // 매니저 관리자 상세 조회

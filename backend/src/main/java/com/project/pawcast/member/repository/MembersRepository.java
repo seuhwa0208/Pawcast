@@ -18,6 +18,7 @@ public interface MembersRepository extends JpaRepository<Members, Long> {
     Optional<Members> findByUserId(String userId);
     Optional<Members> findByEmail(String email);
     List<Members> findAllByStatusNotOrderByCreatedAtAsc(Members.Status status);
+    //boolean existsByLoginId(String loginId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Members m WHERE m.id = :id")

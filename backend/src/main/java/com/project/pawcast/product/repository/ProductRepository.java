@@ -416,4 +416,9 @@ public interface ProductRepository
             @Param("productId") Long productId,
             @Param("rating") int rating
     );
+
+    // 판매량 BEST 3
+    List<ProductListView> findTop3ByDeletedAtIsNullOrderBySalesCountDescIdDesc();
+    // 판매량 WORST 3
+    List<ProductListView> findTop3ByDeletedAtIsNullOrderBySalesCountAscIdDesc();
 }
