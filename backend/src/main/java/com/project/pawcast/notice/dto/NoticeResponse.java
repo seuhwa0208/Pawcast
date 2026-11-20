@@ -7,7 +7,7 @@ import com.project.pawcast.notice.entity.NoticeType;
 import java.time.LocalDateTime;
 
 public record NoticeResponse(
-
+        Long noticeId,
         Members members,
         NoticeType noticeType,
         String title,
@@ -19,6 +19,7 @@ public record NoticeResponse(
 ) {
     public static NoticeResponse from(Notice notice) {
         return new NoticeResponse(
+                notice.getId(),
                 notice.getMember(),
                 notice.getNoticeType(),
                 notice.getTitle(),

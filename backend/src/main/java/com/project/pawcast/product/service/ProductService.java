@@ -217,6 +217,7 @@ public class ProductService {
         }
     }
 
+    // 재고 조정
     @Transactional
     public ProductDetailResponse adjustStock(Long memberId, Long variantId, int quantityChange) {
         validateManager(memberId);

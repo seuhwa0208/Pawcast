@@ -57,9 +57,9 @@ public class PetsService {
     
     // 수정
     @Transactional
-    public PetsResponse updatePets(Long petsId, Long memberId, PetsRequest request){
+    public PetsResponse updatePets(Long petId, Long memberId, PetsRequest request){
 
-        Pets pets = findByIdAndMemberId(petsId, memberId);
+        Pets pets = findByIdAndMemberId(petId, memberId);
 
         pets.setName(request.name());
         pets.setPetType(request.petType());
