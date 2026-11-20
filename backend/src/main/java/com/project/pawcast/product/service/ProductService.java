@@ -271,28 +271,38 @@ public class ProductService {
         }
     }
 
+    // 상품 타입 검증
     private void validateDetailType(
             ProductType type, FoodDetailCreateRequest food, DeviceDetailCreateRequest device, boolean required
     ) {
-        boolean wrongType = type == ProductType.FOOD ? device != null : food != null;
-        boolean missingDetail = required && (type == ProductType.FOOD ? food == null : device == null);
+        boolean wrongType = switch (type) {
+            case DOG, CAT -> device != null;
+            case DEVICE -> food != null;
+        };
+
+        boolean missingDetail = required && switch (type) {
+            case DOG, CAT -> food == null;
+            case DEVICE -> device == null;
+        };
         if (wrongType || missingDetail) {
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_DETAIL);
         }
     }
-
+    
     private void validateImages(List<ImageCreateRequest> images) {
         if (images != null && images.stream().filter(ImageCreateRequest::main).count() > 1) {
             throw new BusinessException(ErrorCode.MULTIPLE_MAIN_IMAGES);
         }
     }
 
+    // 상품 요소 검증
     private void validateVariantFields(
             ProductType type, String color, Integer weight, Integer volume, Integer capacity, Integer height
     ) {
-        boolean invalid = type == ProductType.FOOD
-                ? (color != null && !color.isBlank()) || capacity != null || height != null
-                : weight != null || volume != null;
+        boolean invalid = switch (type) {
+            case DOG, CAT -> (color != null && !color.isBlank()) || capacity != null || height != null;
+            case DEVICE -> weight != null || volume != null;
+        };
         if (invalid) {
             throw new BusinessException(ErrorCode.INVALID_VARIANT_FIELDS);
         }
