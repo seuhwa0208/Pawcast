@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.repository.query.Param;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -19,8 +21,14 @@ public class AuthController {
 
     // 아이디 중복 여부(버튼)
     @PostMapping("/availability")
-    public boolean checkUserId(@RequestParam String userid){
-        return authService.checkUserId(userid);
+    public Map<String, Boolean> checkUserId(@RequestParam String userid){
+        return Map.of("available", !authService.checkUserId(userid));
+    }
+
+    // 이메일 중복 확인: 인증번호 발송 전에 가입 가능 여부를 명확히 안내한다.
+    @PostMapping("/email-availability")
+    public Map<String, Boolean> checkEmail(@RequestParam String email){
+        return Map.of("available", !authService.checkEmail(email));
     }
 
     // 이메일 인증 (이메일 발송)(버튼)

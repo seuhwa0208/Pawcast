@@ -40,6 +40,10 @@ public class AuthService {
     public boolean checkUserId(String userId){
         return membersRepository.existsByUserId(userId);
     }
+
+    public boolean checkEmail(String email){
+        return membersRepository.existsByEmail(email);
+    }
     
     // 이메일로 회원 정보 불러오기
     public Members findByEmailMember(String email){

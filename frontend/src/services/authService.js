@@ -12,6 +12,8 @@ const postQuery = (path, params) =>
 export const authService = {
   checkAvailability: ({ userId }) =>
     postQuery("/auth/availability", { userid: userId }),
+  checkEmailAvailability: (email) =>
+    postQuery("/auth/email-availability", { email }),
   sendEmailCode: (email) => postQuery("/auth/email-verify", { email }),
   confirmEmailCode: (email, verificationCode) =>
     postQuery("/auth/email-verify/confirm", {
