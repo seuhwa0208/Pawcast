@@ -1,30 +1,44 @@
 <!-- 장바구니 수량·삭제·합계를 전역 cart 스토어와 연결해 보여주는 화면입니다. -->
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useCart } from "@/stores/cart";
-import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
-import { products } from "@/data/products";
 import ProductCard from "@/components/ProductCard.vue";
 import { useRoute, useRouter } from "vue-router";
+import { wishlistService } from "@/services/wishlistService";
+import { toProductCard } from "@/services/productService";
+import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
 
 const { items, total, setQuantity, remove } = useCart();
-const { isFavorite } = useWishlist();
 const { accessToken } = useAuthSession();
 const route = useRoute();
 const router = useRouter();
 const BASE_SHIPPING_FEE = 3000;
 const FREE_SHIPPING_THRESHOLD = 20000;
 const activeTab = ref(route.query.tab === "wishlist" ? "wishlist" : "cart");
-const wishlistItems = computed(() =>
-  products.filter((item) => isFavorite(item.id)),
-);
+const wishlistItems = ref([]);
+const loginRequired = ref(false);
+async function loadWishlist() {
+  if (!accessToken.value) {
+    wishlistItems.value = [];
+    return;
+  }
+  try {
+    const response = await wishlistService.list();
+    wishlistItems.value = Array.isArray(response)
+      ? response.map((item) => toProductCard(item.product || item))
+      : [];
+  } catch {
+    wishlistItems.value = [];
+  }
+}
 function selectTab(tab) {
   activeTab.value = tab;
   router.replace({
     path: "/cart",
     query: tab === "wishlist" ? { tab: "wishlist" } : {},
   });
+  if (tab === "wishlist") loadWishlist();
 }
 function moveToCheckout() {
   router.push("/checkout");
@@ -33,6 +47,14 @@ const shippingFee = computed(() =>
   total.value >= FREE_SHIPPING_THRESHOLD ? 0 : BASE_SHIPPING_FEE,
 );
 const finalAmount = computed(() => total.value + shippingFee.value);
+onMounted(() => {
+  if (!accessToken.value) loginRequired.value = true;
+  else loadWishlist();
+});
+function goToLogin() {
+  loginRequired.value = false;
+  router.push({ path: "/login", query: { redirect: route.fullPath } });
+}
 </script>
 
 <template>
@@ -63,13 +85,6 @@ const finalAmount = computed(() => total.value + shippingFee.value);
         위시리스트 <b>{{ wishlistItems.length }}</b>
       </button>
     </nav>
-    <p
-      v-if="activeTab === 'cart' && !accessToken"
-      class="guest-cart-storage-notice"
-    >
-      비회원 장바구니는 현재 브라우저에 저장됩니다. 브라우저 데이터 삭제 또는
-      다른 기기 이용 시 담은 상품이 유지되지 않을 수 있습니다.
-    </p>
     <section v-if="activeTab === 'cart' && items.length" class="cart-layout">
       <div class="cart-list">
         <article v-for="item in items" :key="item.key" class="cart-item">
@@ -158,4 +173,5 @@ const finalAmount = computed(() => total.value + shippingFee.value);
       <RouterLink to="/">상품 둘러보기</RouterLink>
     </section>
   </main>
+  <LoginRequiredModal v-model="loginRequired" @login="goToLogin" />
 </template>

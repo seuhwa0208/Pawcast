@@ -12,9 +12,8 @@ import QnaView from "@/views/QnaView.vue";
 import NoticeView from "@/views/NoticeView.vue";
 import MyPageView from "@/views/MyPageView.vue";
 import MemberDashboardView from "@/views/MemberDashboardView.vue";
-import ConsumptionManagementView from "@/views/ConsumptionManagementView.vue";
-import PetManagementView from "@/views/PetManagementView.vue";
 import ClaimManagementView from "@/views/ClaimManagementView.vue";
+import PetManagementView from "@/views/PetManagementView.vue";
 import CheckoutView from "@/views/CheckoutView.vue";
 import PaymentResultView from "@/views/PaymentResultView.vue";
 import ErrorView from "@/views/ErrorView.vue";
@@ -22,6 +21,9 @@ import { useAuthSession } from "@/stores/auth";
 
 // 용량이 큰 ECharts는 관리자 경로에 들어왔을 때만 내려받도록 화면을 지연 로딩합니다.
 const AdminDashboardView = () => import("@/views/AdminDashboardView.vue");
+const AdminOverviewView = () => import("@/views/AdminOverviewView.vue");
+const AdminOperationsView = () => import("@/views/AdminOperationsView.vue");
+const AdminDemoView = () => import("@/views/AdminDemoView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -47,21 +49,15 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresPasswordVerification: true },
     },
     {
-      path: "/mypage/consumption",
-      name: "consumption-management",
-      component: ConsumptionManagementView,
+      path: "/mypage/claims",
+      name: "claim-management",
+      component: ClaimManagementView,
       meta: { requiresAuth: true },
     },
     {
       path: "/mypage/pets",
       name: "pet-management",
       component: PetManagementView,
-      meta: { requiresAuth: true },
-    },
-    {
-      path: "/mypage/claims",
-      name: "claim-management",
-      component: ClaimManagementView,
       meta: { requiresAuth: true },
     },
     { path: "/dog", component: CategoryView, props: { pet: "DOG" } },
@@ -88,7 +84,25 @@ const router = createRouter({
     {
       path: "/admin/dashboard",
       name: "admin-dashboard",
+      component: AdminOverviewView,
+      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+    },
+    {
+      path: "/admin/sales",
+      name: "admin-sales",
       component: AdminDashboardView,
+      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+    },
+    {
+      path: "/admin/:section(orders|products|members|qna|notices)",
+      name: "admin-operations",
+      component: AdminOperationsView,
+      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+    },
+    {
+      path: "/admin/:tool(category|settings)",
+      name: "admin-demo",
+      component: AdminDemoView,
       meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
     },
     {

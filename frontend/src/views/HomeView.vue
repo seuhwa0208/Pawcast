@@ -1,13 +1,16 @@
 <!-- 홈 검색 조건, 추천 상품, 공지 배너와 인기 상품 자동 전환을 관리하는 메인 화면입니다. -->
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
 import UiTag from "@/components/UiTag.vue";
-import { products } from "@/data/products";
-import { notices } from "@/data/notices";
+import { productService } from "@/services/productService";
+import { noticeService } from "@/services/noticeService";
+import { petService } from "@/services/petService";
+import { getMyProfile } from "@/services/memberService";
+import { aiRecommendationService } from "@/services/aiRecommendationService";
 
-defineProps({ memberMode: { type: Boolean, default: false } });
+const props = defineProps({ memberMode: { type: Boolean, default: false } });
 
 const detailOpen = ref(true);
 const router = useRouter();
@@ -33,39 +36,7 @@ const ratingRanges = [
   { value: 4, label: "4점대" },
   { value: 4.5, label: "4.5점 이상" },
 ];
-const ingredientDefinitions = [
-  { label: "닭고기", keywords: ["닭", "치킨"] },
-  { label: "연어", keywords: ["연어"] },
-  { label: "참치", keywords: ["참치"] },
-  { label: "오리", keywords: ["오리"] },
-  { label: "소고기", keywords: ["소고기", "비프"] },
-  { label: "양고기", keywords: ["양고기", "램"] },
-  { label: "흰살생선", keywords: ["흰살생선", "대구", "피쉬", "복어"] },
-  { label: "칠면조", keywords: ["칠면조", "터키"] },
-  { label: "돼지고기", keywords: ["돼지고기", "포크"] },
-  { label: "고구마", keywords: ["고구마"] },
-  { label: "감자", keywords: ["감자", "포테이토"] },
-  { label: "유산균", keywords: ["유산균", "프로바이오틱스"] },
-  { label: "글루코사민", keywords: ["글루코사민"] },
-  { label: "오메가", keywords: ["오메가"] },
-];
-const homePetProducts = computed(() =>
-  products.filter((item) =>
-    deviceSelected.value ? item.pet === "ALL" : item.pet === pet.value,
-  ),
-);
-const homeIngredientOptions = computed(() =>
-  ingredientDefinitions.filter((option) =>
-    homePetProducts.value.some((item) =>
-      option.keywords.some((keyword) => item.name.includes(keyword)),
-    ),
-  ),
-);
-const homeBrandOptions = computed(() =>
-  [
-    ...new Set(homePetProducts.value.map((item) => item.brand).filter(Boolean)),
-  ].sort((a, b) => a.localeCompare(b, "ko")),
-);
+const homeBrandOptions = ref([]);
 const priceSelectionLabel = computed(() =>
   selectedPriceRanges.value.length
     ? `${selectedPriceRanges.value.length}개 가격대 선택`
@@ -86,56 +57,20 @@ const brandSelectionLabel = computed(() =>
     ? `${selectedBrands.value.length}개 브랜드 선택`
     : "브랜드 전체",
 );
-const reviewHighlights = [
-  {
-    text: "기호성이 정말 좋아요. 입맛 까다로운 아이가 먼저 찾아 먹어요.",
-    author: "보리 보호자",
-  },
-  {
-    text: "성분을 확인하고 골랐는데 잘 먹고 배송 상태도 깔끔했습니다.",
-    author: "콩이 보호자",
-  },
-  {
-    text: "여러 제품을 비교해 봤는데 재구매하고 싶을 만큼 만족스러워요.",
-    author: "두부 보호자",
-  },
-  {
-    text: "급여하기 편하고 포장도 꼼꼼해서 안심하고 먹이고 있습니다.",
-    author: "호두 보호자",
-  },
-  {
-    text: "꾸준히 먹여 보니 만족도가 높아서 주변 집사에게도 추천했어요.",
-    author: "나비 보호자",
-  },
-];
-const topDogProducts = computed(() =>
-  products
-    .filter((item) => item.pet === "DOG" && item.stock > 0)
-    .sort((a, b) => b.salesCount - a.salesCount)
-    .slice(0, 5),
-);
-const topCatProducts = computed(() =>
-  products
-    .filter((item) => item.pet === "CAT" && item.stock > 0)
-    .sort((a, b) => b.salesCount - a.salesCount)
-    .slice(0, 5),
-);
+const topDogProducts = ref([]);
+const topCatProducts = ref([]);
+const bestReviewProducts = ref([]);
+const bannerItems = ref([]);
+const recommendationPets = ref([]);
+const selectedRecommendationPetId = ref("");
+const recommendedProducts = ref([]);
+const recommendationLoading = ref(false);
+const recommendationMessage = ref("");
 const popularPet = ref("DOG");
 const popularPaused = ref(false);
 const visiblePopularProducts = computed(() =>
   popularPet.value === "DOG" ? topDogProducts.value : topCatProducts.value,
 );
-const bestReviewProducts = computed(() =>
-  products
-    .filter((item) => item.stock > 0 && item.reviewCount > 0)
-    .sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount)
-    .slice(0, 5)
-    .map((item, index) => ({
-      ...item,
-      featuredReview: reviewHighlights[index],
-    })),
-);
-const bannerItems = computed(() => notices.filter((item) => item.pinned));
 const bannerIndex = ref(0);
 const currentBanner = computed(() => bannerItems.value[bannerIndex.value]);
 let bannerTimer;
@@ -188,7 +123,7 @@ function performSearch() {
         ? "/cat"
         : "/dog",
     query: {
-      keyword: keyword.value || undefined,
+      keyword: keyword.value.trim() || undefined,
       ingredients: selectedIngredients.value.length
         ? selectedIngredients.value.join(",")
         : undefined,
@@ -202,6 +137,7 @@ function performSearch() {
       ratings: selectedRatings.value.length
         ? selectedRatings.value.join(",")
         : undefined,
+      searched: "1",
     },
   });
 }
@@ -232,9 +168,112 @@ function restartPopularTimer() {
   }, 10000);
 }
 onMounted(() => {
+  loadHomeData();
   restartBannerTimer();
   restartPopularTimer();
   document.addEventListener("pointerdown", closeFilterMenuOnOutside);
+});
+
+async function loadHomeData() {
+  const saleFilters = { sortType: "SALES_DESC", inStockOnly: true };
+  const reviewFilters = { sortType: "RATING_DESC", inStockOnly: true };
+  try {
+    const [dog, cat, dogReviews, catReviews, notices] = await Promise.all([
+      productService.list({ ...saleFilters, productType: "DOG" }, "DOG"),
+      productService.list({ ...saleFilters, productType: "CAT" }, "CAT"),
+      productService.bestReviews({ ...reviewFilters, productType: "DOG" }, "DOG"),
+      productService.bestReviews({ ...reviewFilters, productType: "CAT" }, "CAT"),
+      noticeService.list(),
+    ]);
+    topDogProducts.value = dog.slice(0, 5);
+    topCatProducts.value = cat.slice(0, 5);
+    bestReviewProducts.value = [...dogReviews, ...catReviews]
+      .sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount)
+      .slice(0, 5);
+    bannerItems.value = notices.filter((item) => item.pinned);
+    bannerIndex.value = 0;
+    restartBannerTimer();
+    homeBrandOptions.value = [...new Set([...dog, ...cat].map((item) => item.brand).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "ko"));
+    if (props.memberMode) await loadRecommendationPets(dog, cat);
+  } catch {
+    // 공통 API 오류 처리기가 화면 수준의 오류를 안내합니다.
+  }
+}
+
+async function loadRecommendationPets(dogProducts, catProducts) {
+  try {
+    const pets = await petService.getPets();
+    recommendationPets.value = (Array.isArray(pets) ? pets : []).filter((pet) => pet.id && pet.birthday);
+    selectedRecommendationPetId.value = recommendationPets.value[0]?.id || "";
+    if (!selectedRecommendationPetId.value)
+      recommendationMessage.value = "생일을 포함한 반려동물 정보를 등록하면 AI 맞춤 추천을 받을 수 있습니다.";
+  } catch {
+    recommendationMessage.value = "반려동물 정보를 불러오지 못했습니다.";
+  }
+}
+
+async function loadRecommendations(dogProducts = topDogProducts.value, catProducts = topCatProducts.value) {
+  const pet = recommendationPets.value.find((item) => String(item.id) === String(selectedRecommendationPetId.value));
+  if (!pet) return;
+  recommendationLoading.value = true;
+  recommendationMessage.value = "";
+  try {
+    const member = await getMyProfile();
+    const candidates = [...dogProducts, ...catProducts].map((product) => ({
+      productId: product.id,
+      variantId: product.variantId,
+      name: product.name,
+      brand: product.brand || null,
+      categoryId: product.categoryId,
+      categoryName: product.category,
+      imagePath: product.image || null,
+      salePrice: product.price,
+      averageRating: product.rating,
+      reviewCount: product.reviewCount,
+      salesCount: product.salesCount,
+      soldOut: product.stock <= 0,
+      petType: product.productType,
+      mainIngredient: product.mainIngredient || null,
+      ...(product.lifeStage ? { lifeStage: product.lifeStage } : {}),
+    }));
+    const result = await aiRecommendationService.recommend({
+      memberId: member.id,
+      pet: {
+        petId: pet.id,
+        petType: pet.petType,
+        birthday: pet.birthday,
+        breedName: pet.breedName || null,
+        weightKg: pet.weightKg || null,
+        allergies: pet.allergies ? pet.allergies.split(",").map((item) => item.trim()).filter(Boolean) : [],
+      },
+      products: candidates,
+      limit: 5,
+    });
+    recommendedProducts.value = (result.items || []).map((item) => ({
+      id: item.productId,
+      variantId: item.variantId,
+      name: item.name,
+      brand: item.brand,
+      category: item.categoryName || "기타",
+      image: item.imagePath || "/images/product-placeholder.svg",
+      price: Number(item.salePrice || 0),
+      rating: Number(item.averageRating || 0),
+      reviewCount: Number(item.reviewCount || 0),
+      stock: 1,
+      pet: pet.petType,
+      recommendationReasons: item.recommendationReasons || [],
+    }));
+    if (!recommendedProducts.value.length) recommendationMessage.value = "조건에 맞는 추천 상품이 없습니다.";
+  } catch (error) {
+    recommendationMessage.value = error.message || "AI 추천을 불러오지 못했습니다.";
+  } finally {
+    recommendationLoading.value = false;
+  }
+}
+
+watch(selectedRecommendationPetId, () => {
+  if (selectedRecommendationPetId.value) loadRecommendations();
 });
 // 화면을 떠난 뒤에도 자동 전환이 실행되는 메모리 누수를 막습니다.
 onBeforeUnmount(() => {
@@ -269,8 +308,8 @@ onBeforeUnmount(() => {
           <b
             >{{
               currentBanner.type === "이벤트"
-                ? "POWCAST EVENT"
-                : "POWCAST NOTICE"
+                ? "PAWCAST EVENT"
+                : "PAWCAST NOTICE"
             }}
             · {{ currentBanner.date }}</b
           >
@@ -393,32 +432,6 @@ onBeforeUnmount(() => {
               </div>
             </fieldset>
             <fieldset class="side-multi-filter">
-              <legend>원료</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'ingredient' }"
-                  @click="toggleHomeFilterMenu('ingredient')"
-                >
-                  <span>{{ ingredientSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div
-                  v-if="openFilterMenu === 'ingredient'"
-                  class="side-multi-menu"
-                >
-                  <label v-for="item in homeIngredientOptions" :key="item.label"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedIngredients.includes(item.label)"
-                      @change="toggleSelection(selectedIngredients, item.label)"
-                    /><i /><span>{{ item.label }}</span></label
-                  >
-                </div>
-              </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
               <legend>브랜드</legend>
               <div class="side-multi-select">
                 <button
@@ -490,24 +503,26 @@ onBeforeUnmount(() => {
       </form>
     </section>
 
-    <section
-      v-if="memberMode"
-      class="product-section recommendation member-recommendation"
-    >
+
+    <section v-if="memberMode" class="product-section recommendation member-recommendation">
       <div class="recommendation-heading">
         <div>
-          <h2>나와 비슷한 집사의 선택!</h2>
-          <p>회원님의 관심사와 비슷한 집사들이 선택한 상품이에요.</p>
+          <h2>AI 맞춤 추천</h2>
+          <p>등록한 반려동물 정보와 실제 판매 상품을 바탕으로 추천합니다.</p>
         </div>
-        <span>MEMBER PICK</span>
+        <label v-if="recommendationPets.length" class="recommendation-pet-select">
+          <span class="sr-only">추천 반려동물 선택</span>
+          <select v-model="selectedRecommendationPetId">
+            <option v-for="petItem in recommendationPets" :key="petItem.id" :value="petItem.id">
+              {{ petItem.name }} · {{ petItem.petType === 'CAT' ? '고양이' : '강아지' }}
+            </option>
+          </select>
+        </label>
       </div>
-      <div class="product-grid">
-        <ProductCard
-          v-for="p in products.slice(0, 5)"
-          :key="p.id"
-          :product="p"
-          :pet="p.pet"
-        />
+      <p v-if="recommendationLoading" class="dashboard-order-state">AI 추천을 불러오는 중입니다.</p>
+      <p v-else-if="recommendationMessage" class="dashboard-order-state">{{ recommendationMessage }}</p>
+      <div v-else class="product-grid">
+        <ProductCard v-for="product in recommendedProducts" :key="product.id" :product="product" :pet="product.pet" />
       </div>
     </section>
 
@@ -573,32 +588,7 @@ onBeforeUnmount(() => {
           class="review-product"
         >
           <ProductCard :product="p" :pet="p.pet" />
-          <div class="review-highlight">
-            <b>BEST REVIEW</b>
-            <p>“{{ p.featuredReview.text }}”</p>
-            <small>{{ p.featuredReview.author }}</small>
-          </div>
         </article>
-      </div>
-    </section>
-    <section v-if="!memberMode" class="product-section recommendation">
-      <h2>나와 비슷한 집사의 선택!</h2>
-      <div class="product-grid blurred">
-        <ProductCard
-          v-for="p in products.slice(0, 5)"
-          :key="p.id"
-          :product="p"
-          :pet="p.pet"
-        />
-      </div>
-      <div class="member-lock">
-        🔒<small>MEMBERS ONLY</small>
-        <h3>추천 기능은 회원에게만 제공하고 있는 기능입니다.</h3>
-        <p>로그인하시면 맞춤 추천을 받아보실 수 있어요.</p>
-        <div>
-          <RouterLink to="/login">로그인</RouterLink
-          ><RouterLink to="/signup">회원가입</RouterLink>
-        </div>
       </div>
     </section>
   </div>

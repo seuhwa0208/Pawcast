@@ -9,8 +9,8 @@ public record ProductSearchRequest(
         String keyword,
 
         @Pattern(
-                regexp = "FOOD|DEVICE",
-                message = "상품 종류는 FOOD 또는 DEVICE여야 합니다."
+                regexp = "DOG|CAT|DEVICE",
+                message = "상품 종류는 DOG 또는 CAT 또는 DEVICE여야 합니다."
         )
         String productType,
 

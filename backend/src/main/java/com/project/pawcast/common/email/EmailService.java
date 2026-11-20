@@ -3,6 +3,7 @@ package com.project.pawcast.common.email;
 import com.project.pawcast.common.exception.EmailSendException;
 import com.project.pawcast.common.exception.ErrorCode;
 import jakarta.mail.MessagingException;
+import org.springframework.mail.MailException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,7 +24,7 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(body.replace("\n", "<br/>"), true);
             mailSender.send(message);
-        } catch (MessagingException e) {
+        } catch (MessagingException | MailException e) {
             throw new EmailSendException(ErrorCode.EMAIL_SEND_ERROR);
         }
     }

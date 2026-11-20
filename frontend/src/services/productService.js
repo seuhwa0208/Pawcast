@@ -17,6 +17,11 @@ export function toProductCard(product, pet = "") {
     reviewCount: Number(product.reviewCount || 0),
     rating: Number(product.averageRating || 0),
     variantId: product.variantId,
+    bestReview: product.bestReview || null,
+    categoryId: product.categoryId,
+    productType: product.productType,
+    mainIngredient: product.mainIngredient,
+    lifeStage: product.lifeStage,
   };
 }
 
@@ -31,5 +36,12 @@ export const productService = {
   },
   detail: (productId) => springRequest(`/products/${productId}`),
   categories: () => springRequest("/categories"),
-  bestReviews: () => springRequest("/products/best-reviews"),
+  bestReviews: async (filters = {}, pet = "") => {
+    const query = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") query.set(key, String(value));
+    });
+    const response = await springRequest(`/products/best-reviews${query.size ? `?${query}` : ""}`);
+    return Array.isArray(response) ? response.map((product) => toProductCard(product, pet)) : [];
+  },
 };

@@ -32,7 +32,7 @@ function mapQna(item, index) {
     title: item.title,
     content: item.content,
     visibility: item.isPrivate ? "PRIVATE" : "PUBLIC",
-    author: item.member?.name || "회원",
+    author: item.memberName || "회원",
     status: item.answer ? "ANSWERED" : "PENDING",
     answer: item.answer?.content || "",
   };

@@ -20,14 +20,9 @@ const emit = defineEmits(["settings"]);
         >주문·배송 조회</RouterLink
       >
       <RouterLink to="/mypage/claims" :class="{ on: active === 'claims' }"
-        >취소·반품·교환</RouterLink
+        >취소·반품(환불)</RouterLink
       >
       <strong>나의 활동</strong>
-      <RouterLink
-        to="/mypage/consumption"
-        :class="{ on: active === 'consumption' }"
-        >소진일 관리</RouterLink
-      >
       <RouterLink to="/mypage/pets" :class="{ on: active === 'pets' }"
         >반려동물 정보</RouterLink
       >

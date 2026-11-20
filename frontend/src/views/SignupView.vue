@@ -32,6 +32,9 @@ const state = reactive({
   idChecked: false,
   idCheckMessage: "",
   idCheckStatus: "",
+  emailChecked: false,
+  emailCheckMessage: "",
+  emailCheckStatus: "",
   emailSent: false,
   emailVerified: false,
   loading: false,
@@ -39,6 +42,8 @@ const state = reactive({
 const notice = ref({ text: "", type: "" });
 const activeTerm = ref(null);
 const signupComplete = ref(false);
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
 const termDetails = {
   terms: {
     title: "서비스 이용약관 동의",
@@ -163,7 +168,9 @@ const canSubmit = computed(() => {
     ? required
     : required &&
         state.idChecked &&
+        state.emailChecked &&
         emailValid.value &&
+        state.emailVerified &&
         passwordValid.value &&
         passwordMatches.value;
 });
@@ -179,9 +186,27 @@ function resetIdCheck() {
 }
 
 function resetEmailVerification() {
+  state.emailChecked = false;
+  state.emailCheckMessage = "";
+  state.emailCheckStatus = "";
   state.emailSent = false;
   state.emailVerified = false;
   form.verificationCode = "";
+}
+
+async function checkEmail() {
+  if (!emailValid.value) return showNotice("올바른 이메일 주소를 입력해주세요.");
+  try {
+    state.loading = true;
+    const result = await authService.checkEmailAvailability(form.email);
+    state.emailChecked = result.available === true;
+    state.emailCheckStatus = state.emailChecked ? "valid" : "invalid";
+    state.emailCheckMessage = state.emailChecked ? "가입 가능한 이메일입니다. 인증번호를 발송해주세요." : "이미 가입된 이메일입니다.";
+  } catch (error) {
+    state.emailChecked = false;
+    state.emailCheckStatus = "invalid";
+    state.emailCheckMessage = error.message || "이메일 중복 확인에 실패했습니다.";
+  } finally { state.loading = false; }
 }
 
 function formatTel(event) {
@@ -227,6 +252,7 @@ async function checkId() {
 async function sendEmailCode() {
   if (!/^\S+@\S+\.\S+$/.test(form.email))
     return showNotice("올바른 이메일 주소를 입력해주세요.");
+  if (!state.emailChecked) return showNotice("이메일 중복 확인을 먼저 해주세요.");
   try {
     state.loading = true;
     await authService.sendEmailCode(form.email);
@@ -249,7 +275,7 @@ async function confirmEmailCode() {
       form.email,
       form.verificationCode,
     );
-    if (result.verified === false)
+    if (result !== true && result?.verified !== true)
       throw new Error("인증번호가 일치하지 않습니다.");
     state.emailVerified = true;
     showNotice("이메일 인증이 완료되었습니다.", "success");
@@ -346,27 +372,17 @@ async function submit() {
               >영문 소문자로 시작하고 소문자와 숫자만 사용할 수 있어요.</small
             ></label
           >
-          <label class="form-field"
-            ><span>이메일 <b>*</b></span
-            ><input
-              v-model.trim="form.email"
-              type="email"
-              autocomplete="email"
-              placeholder="example@powcast.com"
-              @input="resetEmailVerification"
-            /><small :class="{ invalid: form.email && !emailValid }"
-              >가입에 사용할 이메일 주소를 입력해주세요.</small
-            ></label
-          >
+          <label class="form-field"><span>이메일 <b>*</b></span><div class="input-action"><input v-model.trim="form.email" type="email" autocomplete="email" placeholder="example@powcast.com" @input="resetEmailVerification" /><button type="button" :disabled="state.loading || !emailValid" @click="checkEmail">중복 확인</button></div><small v-if="state.emailCheckMessage" :class="state.emailCheckStatus">{{ state.emailCheckMessage }}</small><small v-else :class="{ invalid: form.email && !emailValid }">가입에 사용할 이메일 주소를 입력해주세요.</small></label>
+          <div v-if="state.emailChecked" class="email-verification"><div class="input-action"><input v-model.trim="form.verificationCode" inputmode="numeric" maxlength="6" placeholder="이메일로 받은 6자리 인증번호" :disabled="state.emailVerified" /><button type="button" :disabled="state.loading || state.emailVerified" @click="sendEmailCode">{{ state.emailSent ? "인증번호 재발송" : "인증번호 발송" }}</button></div><div v-if="state.emailSent" class="input-action"><span class="verification-guide">5분 안에 인증번호를 입력해주세요.</span><button type="button" :disabled="state.loading || state.emailVerified" @click="confirmEmailCode">{{ state.emailVerified ? "인증 완료" : "인증 확인" }}</button></div><small v-if="state.emailVerified" class="valid">이메일 인증이 완료되었습니다.</small></div>
           <div class="form-grid">
             <label class="form-field"
               ><span>비밀번호 <b>*</b></span
-              ><input
+              ><div class="password-input"><input
                 v-model="form.passwordHash"
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="영문·숫자·특수문자 포함 8~20자"
-              /><small
+              /><button type="button" class="password-visibility" :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-5 9.5-5 9.5 5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.7"/><path v-if="!showPassword" d="m4 4 16 16"/></svg></button></div><small
                 v-if="form.passwordHash && !passwordCompositionValid"
                 class="invalid"
                 >영문, 숫자, 특수문자를 각각 1개 이상 포함해주세요.</small
@@ -377,12 +393,12 @@ async function submit() {
               ></label
             ><label class="form-field"
               ><span>비밀번호 확인 <b>*</b></span
-              ><input
+              ><div class="password-input"><input
                 v-model="form.checkPasswordHash"
-                type="password"
+                :type="showPasswordConfirm ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="비밀번호를 다시 입력해주세요"
-              /><small
+              /><button type="button" class="password-visibility" :aria-label="showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 표시'" :aria-pressed="showPasswordConfirm" @click="showPasswordConfirm = !showPasswordConfirm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-5 9.5-5 9.5 5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.7"/><path v-if="!showPasswordConfirm" d="m4 4 16 16"/></svg></button></div><small
                 v-if="form.checkPasswordHash"
                 :class="{ valid: passwordMatches, invalid: !passwordMatches }"
                 >{{

@@ -57,7 +57,12 @@ export async function springRequest(path, options = {}) {
       });
     } else if (response.status === 401 && !isLoginFailure) {
       notifyApiError({ status: 401, code: error.code, message: error.message });
-    } else if ([403, 404, 500].includes(response.status)) {
+    } else if (
+      [403, 404, 500].includes(response.status) &&
+      !["/orders/admin", "/admin", "/qna/manage", "/notices"].some((adminPath) =>
+        path.startsWith(adminPath),
+      )
+    ) {
       notifyApiError({
         status: response.status,
         code: error.code,

@@ -38,7 +38,7 @@ async function submitRequest() {
         <span>ACCOUNT HELP</span>
         <h1>비밀번호 초기화 요청</h1>
         <p>
-          관리자가 요청을 확인한 후 임시 비밀번호를 가입 이메일로 보내드립니다.
+          가입 이메일을 확인한 뒤 임시 비밀번호를 바로 발송합니다.
         </p>
       </header>
       <div v-if="requested" class="password-request-complete">
@@ -46,10 +46,7 @@ async function submitRequest() {
           <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4L18 8" /></svg>
         </div>
         <h2>초기화 요청이 접수되었습니다</h2>
-        <p>
-          관리자 처리 완료 후 등록된 이메일로 임시 비밀번호가 발송됩니다.<br />처리
-          전까지 기존 비밀번호는 변경되지 않습니다.
-        </p>
+        <p>등록된 이메일로 임시 비밀번호를 발송했습니다.<br />로그인한 뒤 비밀번호를 변경해주세요.</p>
         <RouterLink class="login-submit" to="/login"
           >로그인으로 돌아가기</RouterLink
         >
@@ -58,9 +55,9 @@ async function submitRequest() {
         <div class="reset-process">
           <b>처리 절차</b>
           <ol>
-            <li>초기화 요청 접수</li>
-            <li>관리자 확인 및 초기화</li>
-            <li>임시 비밀번호 이메일 발송</li>
+            <li>가입 이메일 확인</li>
+            <li>임시 비밀번호 발급</li>
+            <li>이메일 발송 후 로그인</li>
           </ol>
         </div>
         <label class="form-field"

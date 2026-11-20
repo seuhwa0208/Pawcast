@@ -121,6 +121,13 @@ function initializeGuestOrder() {
   });
 }
 
+function formatPhoneNumber(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 // 비회원이 주문자와 수령인이 같다고 선택하면 연락처까지 함께 동기화합니다.
 watch([ordererName, ordererPhone, sameAsOrderer], () => {
   if (!sameAsOrderer.value) return;
@@ -344,6 +351,7 @@ onMounted(() => {
               주문자 전화번호
               <input
                 v-model.trim="ordererPhone"
+                @input="ordererPhone = formatPhoneNumber($event.target.value)"
                 type="tel"
                 autocomplete="tel"
                 placeholder="010-1234-5678"
@@ -416,6 +424,7 @@ onMounted(() => {
               연락처
               <input
                 v-model.trim="addressForm.tel"
+                @input="addressForm.tel = formatPhoneNumber($event.target.value)"
                 type="tel"
                 placeholder="010-1234-5678"
                 :readonly="sameAsOrderer"
@@ -537,7 +546,7 @@ onMounted(() => {
               >받는 분<input v-model.trim="addressForm.recipient" required
             /></label>
             <label
-              >연락처<input v-model.trim="addressForm.tel" required
+              >연락처<input v-model.trim="addressForm.tel" @input="addressForm.tel = formatPhoneNumber($event.target.value)" type="tel" placeholder="010-1234-5678" required
             /></label>
             <label class="address-search-field"
               >우편번호<span

@@ -33,7 +33,7 @@ use([
 
 const router = useRouter();
 const { setAccessToken } = useAuthSession();
-const periodUnit = ref("month");
+const periodUnit = ref("day");
 const selectedYear = ref("2026");
 const fromDate = ref("2026-01-01");
 const toDate = ref("2026-12-31");
@@ -42,6 +42,9 @@ const appliedAt = ref("초기 화면 데이터");
 const sidebarCollapsed = ref(false);
 const dashboard = ref(null);
 const loading = ref(false);
+const error = ref("");
+const retraining = ref(false);
+const retrainMessage = ref("");
 const salesChartElement = ref(null);
 const categoryChartElement = ref(null);
 let salesChart;
@@ -82,6 +85,7 @@ async function applyFilters() {
   if (!selectedCategories.value.length)
     selectedCategories.value = ["DOG", "CAT", "ALL"];
   loading.value = true;
+  error.value = "";
   try {
     dashboard.value = await adminDashboardService.getSalesDashboard({
       unit: periodUnit.value,
@@ -94,9 +98,23 @@ async function applyFilters() {
       hour: "2-digit",
       minute: "2-digit",
     })} 조회`;
+  } catch (cause) {
+    error.value = cause.message || "매출 데이터를 불러오지 못했습니다.";
+    dashboard.value = { summary: { totalSales: 0, totalOrders: 0, averageOrderAmount: 0, refundAmount: 0 }, trend: { labels: [], sales: [], orders: [] }, categories: [], forecast: { predictedSales: 0, growthRate: 0, insight: "API 응답을 기다리는 중입니다.", topProducts: [] } };
   } finally {
     loading.value = false;
   }
+}
+
+async function retrainModel() {
+  retraining.value = true; retrainMessage.value = "";
+  try {
+    const result = await adminDashboardService.retrainSalesModel(new Date().toISOString().slice(0, 10));
+    retrainMessage.value = `재학습 완료 · ${result.trainingDays || 0}일 주문 데이터를 반영했습니다.`;
+    await applyFilters();
+  } catch (cause) {
+    retrainMessage.value = `재학습 요청 실패: ${cause.message || "AI 서버 연결을 확인해주세요."}`;
+  } finally { retraining.value = false; }
 }
 
 function renderCharts() {
@@ -254,16 +272,16 @@ onBeforeUnmount(() => {
       </button>
       <header><b>POWCAST</b><span>관리자 페이지</span></header>
       <nav>
-        <button type="button">⌂ <span>대시보드</span></button>
-        <button type="button" class="active">
+        <button type="button" @click="router.push('/admin/dashboard')">⌂ <span>대시보드</span></button>
+        <button type="button" class="active" @click="router.push('/admin/sales')">
           ▥ <span>매출 대시보드</span>
         </button>
-        <button type="button">▤ <span>주문 관리</span></button>
-        <button type="button">◇ <span>상품 관리</span></button>
-        <button type="button">▦ <span>카테고리 관리</span></button>
-        <button type="button">♙ <span>고객 관리</span></button>
-        <button type="button">▥ <span>통계 분석</span></button>
-        <button type="button">⚙ <span>환경 설정</span></button>
+        <button type="button" @click="router.push('/admin/orders')">▤ <span>주문 관리</span></button>
+        <button type="button" @click="router.push('/admin/products')">◇ <span>상품 관리</span></button>
+        <button type="button" @click="router.push('/admin/category')">▦ <span>카테고리 관리</span></button>
+        <button type="button" @click="router.push('/admin/members')">♙ <span>고객 관리</span></button>
+        <button type="button" @click="router.push('/admin/sales')">▥ <span>통계 분석</span></button>
+        <button type="button" @click="router.push('/admin/settings')">⚙ <span>환경 설정</span></button>
       </nav>
       <button type="button" class="admin-logout" @click="logout">
         로그아웃
@@ -290,6 +308,7 @@ onBeforeUnmount(() => {
           <legend>조회 단위</legend>
           <label
             v-for="item in [
+              { key: 'day', label: '일별' },
               { key: 'month', label: '월별' },
               { key: 'quarter', label: '분기별' },
               { key: 'year', label: '연도별' },
@@ -349,23 +368,24 @@ onBeforeUnmount(() => {
       <section class="admin-kpi-grid">
         <article>
           <small>총 매출</small><strong>{{ formatWon(totalSales) }}</strong>
-          <p>전년 동기 대비 <b>▲ 12.8%</b></p>
+          <p>선택 조회 기간 기준</p>
         </article>
         <article>
           <small>주문 건수</small
           ><strong>{{ totalOrders.toLocaleString() }}건</strong>
-          <p>전년 동기 대비 <b>▲ 11.4%</b></p>
+          <p>선택 조회 기간 기준</p>
         </article>
         <article>
           <small>평균 주문금액</small
           ><strong>{{ formatWon(averageOrder) }}</strong>
-          <p>전년 동기 대비 <b>▲ 1.3%</b></p>
+          <p>선택 조회 기간 기준</p>
         </article>
         <article>
           <small>취소·환불</small><strong>{{ formatWon(totalRefund) }}</strong>
-          <p>전체 매출 대비 <em>3.0%</em></p>
+          <p>취소·환불 주문 합계</p>
         </article>
       </section>
+      <p v-if="error" class="dashboard-error">{{ error }}</p>
 
       <section class="admin-chart-grid">
         <article class="admin-panel sales-trend-panel">
@@ -373,8 +393,10 @@ onBeforeUnmount(() => {
             <div>
               <h2>
                 {{
-                  periodUnit === "month"
-                    ? "월별"
+                  periodUnit === "day"
+                    ? "일별"
+                    : periodUnit === "month"
+                      ? "월별"
                     : periodUnit === "quarter"
                       ? "분기별"
                       : "연도별"
@@ -400,7 +422,7 @@ onBeforeUnmount(() => {
             <small>AI SALES FORECAST</small>
             <h2>다음 달 판매 예측</h2>
           </div>
-          <span>예측 기준: 2026.11.15</span>
+          <button type="button" :disabled="retraining" @click="retrainModel">{{ retraining ? "AI 재학습 중" : "AI 모델 재학습" }}</button>
         </header>
         <div class="ai-forecast-grid">
           <div class="forecast-total">
@@ -421,6 +443,7 @@ onBeforeUnmount(() => {
             </li>
           </ol>
         </div>
+        <p v-if="retrainMessage" class="retrain-message">{{ retrainMessage }}</p>
       </section>
 
       <section class="admin-panel sales-summary-panel">

@@ -3,11 +3,12 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
-import { products } from "@/data/products";
+import { productService } from "@/services/productService";
 
 const props = defineProps({ pet: String, device: Boolean });
 const route = useRoute();
 const router = useRouter();
+const products = ref([]);
 const foodCategories = ["사료", "간식", "영양제"];
 const deviceCategories = ["급식기", "급수기", "일반 식기", "정수 / 필터"];
 const subcategoryMap = {
@@ -115,7 +116,7 @@ const subcategories = computed(
   () => subcategoryMap[category.value] || ["전체보기"],
 );
 const scopedProducts = computed(() =>
-  products.filter((item) => {
+  products.value.filter((item) => {
     const inSection = props.device
       ? item.mainCategory === "식기·급수관"
       : item.pet === props.pet;
@@ -165,11 +166,23 @@ const selectedRatingLabel = computed(() =>
 );
 watch(
   () => [props.pet, props.device],
-  () => {
+  async () => {
     category.value = categories.value[0];
     subcategory.value = "전체보기";
+    await loadProducts();
   },
 );
+
+async function loadProducts() {
+  try {
+    products.value = await productService.list(
+      { productType: props.device ? "DEVICE" : props.pet },
+      props.device ? "ALL" : props.pet,
+    );
+  } catch {
+    products.value = [];
+  }
+}
 
 function selectCategory(value) {
   category.value = value;
@@ -216,8 +229,9 @@ function closeFilterMenuOnOutside(event) {
   if (!event.target.closest?.(".category-sidebar .side-multi-select"))
     closeFilterMenus();
 }
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener("pointerdown", closeFilterMenuOnOutside);
+  await loadProducts();
 });
 onBeforeUnmount(() => {
   document.removeEventListener("pointerdown", closeFilterMenuOnOutside);
@@ -244,8 +258,8 @@ function applyFilters() {
 
 const list = computed(() => {
   let result = props.device
-    ? products.filter((item) => item.mainCategory === "식기·급수관")
-    : products.filter((item) => item.pet === props.pet);
+    ? products.value.filter((item) => item.mainCategory === "식기·급수관")
+    : products.value.filter((item) => item.pet === props.pet);
   result = result.filter((item) => item.category === category.value);
   if (subcategory.value !== "전체보기")
     result = result.filter((item) => item.subcategory === subcategory.value);

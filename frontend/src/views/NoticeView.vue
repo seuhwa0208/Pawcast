@@ -1,16 +1,23 @@
 <!-- 공지/이벤트의 검색·고정 글 분리·페이지네이션·상세 열람을 처리하는 게시판입니다. -->
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { notices } from "@/data/notices";
+import { noticeService } from "@/services/noticeService";
 const route = useRoute(),
   router = useRouter();
-const initialNotice =
-  notices.find((item) => item.id === Number(route.query.id)) || null;
+const notices = ref([]);
 const filter = ref("전체"),
   keyword = ref(""),
-  selected = ref(initialNotice),
+  selected = ref(null),
   page = ref(1);
+onMounted(async () => {
+  try {
+    notices.value = await noticeService.list();
+    selected.value = notices.value.find((item) => item.id === Number(route.query.id)) || null;
+  } catch {
+    notices.value = [];
+  }
+});
 const filtered = computed(() =>
   notices
     .filter(

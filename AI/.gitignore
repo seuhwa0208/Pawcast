@@ -6,12 +6,16 @@ __pycache__/
 
 # Local environment settings
 .env
+.env.*
+!.env.example
 
 # Downloaded AI model files (run download_model.py locally)
 models/
 
 # Generated evaluation reports
 evaluation_results/
+__pycache__/
+*.py[cod]
 
 # Test and editor caches
 .pytest_cache/

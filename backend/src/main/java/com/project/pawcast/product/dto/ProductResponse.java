@@ -10,6 +10,10 @@ public record ProductResponse(
         String name,
         String brand,
         String categoryName,
+        Long categoryId,
+        String productType,
+        String mainIngredient,
+        String lifeStage,
         String imagePath,
         Long variantId,
         BigDecimal price,
@@ -27,6 +31,7 @@ public record ProductResponse(
     public static ProductResponse from(ProductListView product, BestReviewResponse bestReview) {
         return new ProductResponse(
                 product.getId(), product.getName(), product.getBrand(), product.getCategoryName(),
+                product.getCategoryId(), product.getProductType(), product.getMainIngredient(), product.getLifeStage(),
                 product.getImagePath(), product.getVariantId(), product.getPrice(),
                 product.getSalesCount(),
                 product.getWishCount(), product.getReviewCount(), product.getAverageRating(),

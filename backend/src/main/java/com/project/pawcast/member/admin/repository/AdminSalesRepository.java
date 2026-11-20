@@ -41,7 +41,7 @@ public interface AdminSalesRepository extends JpaRepository<Order, Long> {
            WHERE p.paid_at >= :startDate
              AND p.paid_at < :endDate
         """, nativeQuery = true)
-    List<Object[]> findSalesStatistics(@Param("period") String period, @Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+    List<Object[]> findSalesStatistics(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
 
 }

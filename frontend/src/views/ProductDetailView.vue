@@ -100,16 +100,24 @@ const getOptionExtra = (option) =>
 const { add } = useCart();
 const { isFavorite, toggle } = useWishlist();
 const { accessToken } = useAuthSession();
-const addToCart = () => {
-  add(
+const addToCart = async () => {
+  if (!accessToken.value) {
+    loginRequired.value = true;
+    return;
+  }
+  try {
+    await add(
     {
       ...product.value,
       option: currentOption.value,
       price: currentPrice.value,
     },
     props.pet,
-  );
-  cartAdded.value = true;
+    );
+    cartAdded.value = true;
+  } catch (error) {
+    if (error.message === "LOGIN_REQUIRED") loginRequired.value = true;
+  }
 };
 const buyNow = () => {
   sessionStorage.setItem(
@@ -198,8 +206,8 @@ const purchaseGuide = [
     text: "결제 완료 후 상품 준비가 시작되며, 상품 합계 20,000원 미만은 배송비 3,000원이 부과됩니다. 20,000원 이상은 무료 배송입니다.",
   },
   {
-    title: "교환·반품 안내",
-    text: "상품 수령 후 상태를 확인해주세요. 개봉 또는 사용한 상품은 단순 변심 교환·반품이 제한될 수 있습니다.",
+    title: "반품·환불 안내",
+    text: "상품 수령 후 상태를 확인해주세요. 개봉 또는 사용한 상품은 단순 변심 반품·환불이 제한될 수 있습니다.",
   },
   {
     title: "주문 변경 안내",

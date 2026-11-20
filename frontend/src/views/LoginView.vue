@@ -10,6 +10,7 @@ const router = useRouter();
 const form = reactive({ userId: "", password: "" });
 const loading = ref(false);
 const errorMessage = ref("");
+const showPassword = ref(false);
 const registered = computed(() => route.query.registered === "1");
 const { setAccessToken, setCurrentUserId, setUserRole } = useAuthSession();
 const googleButton = ref(null);
@@ -20,9 +21,9 @@ async function handleGoogleCredential(response) {
   try {
     loading.value = true;
     const result = await authService.googleLogin(response.credential);
+    setUserRole(result.role || "USER");
     setAccessToken(result.accessToken);
     setCurrentUserId(result.userId || result.name || String(result.memberId || "google-member"));
-    setUserRole(result.role || "USER");
     router.push(typeof route.query.redirect === "string" ? route.query.redirect : "/member");
   } catch (error) {
     errorMessage.value = error.message || "Google 로그인에 실패했습니다.";
@@ -68,9 +69,9 @@ async function submit() {
       userId: form.userId.trim(),
       passwordHash: form.password,
     });
+    setUserRole(result.role || result.memberRole || "MEMBER");
     setAccessToken(result.accessToken);
     setCurrentUserId(form.userId.trim());
-    setUserRole(result.role || result.memberRole || "MEMBER");
     router.push(
       typeof route.query.redirect === "string"
         ? route.query.redirect
@@ -113,12 +114,7 @@ async function submit() {
         </label>
         <label class="form-field">
           <span>비밀번호</span>
-          <input
-            v-model="form.password"
-            type="password"
-            autocomplete="current-password"
-            placeholder="비밀번호를 입력해주세요"
-          />
+          <div class="password-input"><input v-model="form.password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="비밀번호를 입력해주세요" /><button type="button" class="password-visibility" :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-5 9.5-5 9.5 5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.7"/><path v-if="!showPassword" d="m4 4 16 16"/></svg></button></div>
         </label>
 
         <nav class="login-tools" aria-label="계정 찾기">
