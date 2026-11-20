@@ -86,6 +86,7 @@ public class ProductService {
         return response(product, false);
     }
 
+
     public List<ProductResponse> managementList(Long memberId) {
         validateManager(memberId);
         return productRepository.findAllByOrderByIdAsc().stream()
@@ -195,6 +196,7 @@ public class ProductService {
         return response(variant.getProduct(), true);
     }
 
+    // 판매 종료
     @Transactional
     public void discontinue(Long memberId, Long productId) {
         // 관리자 권한 확인
@@ -401,5 +403,29 @@ public class ProductService {
                 product.getSalesCount(), product.getWishCount(), product.getReviewCount(),
                 average, soldOut, null
         );
+    }
+
+    // 베스트3 판매량 기준
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getBestProducts(Long memberId) {
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateManager(member);
+        return productRepository
+                .findTop3ByDeletedAtIsNullOrderBySalesCountDescIdDesc()
+                .stream()
+                .map(ProductResponse::from)
+                .toList();
+    }
+
+    // 워스트 3
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getWorstProducts(Long memberId) {
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateManager(member);
+        return productRepository
+                .findTop3ByDeletedAtIsNullOrderBySalesCountAscIdDesc()
+                .stream()
+                .map(ProductResponse::from)
+                .toList();
     }
 }

@@ -1,5 +1,6 @@
 package com.project.pawcast.payment.client;
 
+import com.project.pawcast.payment.dto.TossCancelResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -41,13 +42,13 @@ public class TossPaymentClient {
     }
 
     // 결제 취소
-    public Map<String, Object> cancel(String paymentKey, String cancelReason) {
+    public TossCancelResponse cancel(String paymentKey, String cancelReason) {
         return restClient.post()
                 .uri("/payments/{paymentKey}/cancel", paymentKey)
                 .header(HttpHeaders.AUTHORIZATION, getAuthorization())
                 .body(Map.of("cancelReason", cancelReason))
                 .retrieve()
-                .body(new ParameterizedTypeReference<Map<String, Object>>() {});
+                .body(TossCancelResponse.class);
     }
 
 }
