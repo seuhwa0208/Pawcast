@@ -34,6 +34,11 @@ public class Qna extends BaseTime {
     @Builder.Default
     private QnaType type = QnaType.GENERAL;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private QnaStatus status = QnaStatus.WAITING;
+
     @Column(length = 100, nullable = false)
     private String title;
 

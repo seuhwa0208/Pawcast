@@ -31,12 +31,13 @@ public record ProductDetailResponse(
             FoodDetail foodDetail,
             DeviceDetail deviceDetail
     ) {
-        boolean isFood = product.getProductType() == ProductType.FOOD;
+        boolean isDog = product.getProductType() == ProductType.DOG;
+        boolean isCat = product.getProductType() == ProductType.CAT;
         boolean isDevice = product.getProductType() == ProductType.DEVICE;
 
-        List<FoodVariantResponse> foodVariants = isFood ? variants.stream()
-                .map(FoodVariantResponse::from).toList()
-                : List.of();
+        List<FoodVariantResponse> foodVariants = (isDog || isCat) ? variants.stream()
+                        .map(FoodVariantResponse::from)
+                        .toList() : List.of();
 
         List<DeviceVariantResponse> deviceVariants = isDevice ? variants.stream()
                 .map(DeviceVariantResponse::from).toList()
@@ -63,7 +64,7 @@ public record ProductDetailResponse(
                 images.stream()
                         .map(ImageResponse::from)
                         .toList(),
-                isFood ? FoodDetailResponse.from(foodDetail) : null,
+                isDog || isCat ? FoodDetailResponse.from(foodDetail) : null,
                 isDevice ? DeviceDetailResponse.from(deviceDetail) : null
         );
     }

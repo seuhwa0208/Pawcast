@@ -4,8 +4,10 @@ import com.project.pawcast.product.dto.ProductDetailResponse;
 import com.project.pawcast.product.dto.ProductResponse;
 import com.project.pawcast.product.dto.ProductSearchRequest;
 import com.project.pawcast.product.service.ProductService;
+import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,5 +36,18 @@ public class ProductController {
     @GetMapping("/brands")
     public List<String> brands() {
         return productService.brands();
+    }
+
+
+    // 판매량 BEST 3 - > 관리자 매니저 전용
+    @GetMapping("/products/best-sales")
+    public List<ProductResponse> getBestProducts(@AuthenticationPrincipal LoginMember member) {
+        return productService.getBestProducts(member.getId());
+    }
+
+    // 판매량 WORST 3
+    @GetMapping("/products/worst-sales")
+    public List<ProductResponse> getWorstProducts(@AuthenticationPrincipal LoginMember member) {
+        return productService.getWorstProducts(member.getId());
     }
 }
