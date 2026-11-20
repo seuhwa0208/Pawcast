@@ -13,6 +13,8 @@ const { isFavorite } = useWishlist();
 const { accessToken } = useAuthSession();
 const route = useRoute();
 const router = useRouter();
+const BASE_SHIPPING_FEE = 3000;
+const FREE_SHIPPING_THRESHOLD = 20000;
 const activeTab = ref(route.query.tab === "wishlist" ? "wishlist" : "cart");
 const wishlistItems = computed(() =>
   products.filter((item) => isFavorite(item.id)),
@@ -27,6 +29,10 @@ function selectTab(tab) {
 function moveToCheckout() {
   router.push("/checkout");
 }
+const shippingFee = computed(() =>
+  total.value >= FREE_SHIPPING_THRESHOLD ? 0 : BASE_SHIPPING_FEE,
+);
+const finalAmount = computed(() => total.value + shippingFee.value);
 </script>
 
 <template>
@@ -115,10 +121,11 @@ function moveToCheckout() {
           <dt>상품 금액</dt>
           <dd>{{ total.toLocaleString() }}원</dd>
           <dt>배송비</dt>
-          <dd>3,000원</dd>
+          <dd>{{ shippingFee ? `${shippingFee.toLocaleString()}원` : "무료" }}</dd>
           <dt>총 결제 금액</dt>
-          <dd>{{ (total + 3000).toLocaleString() }}원</dd>
+          <dd>{{ finalAmount.toLocaleString() }}원</dd>
         </dl>
+        <p class="cart-shipping-notice">20,000원 이상 구매 시 배송비 무료</p>
         <button type="button" @click="moveToCheckout">주문하기</button>
       </aside>
     </section>

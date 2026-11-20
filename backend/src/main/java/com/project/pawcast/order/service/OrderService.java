@@ -102,7 +102,7 @@ public class OrderService {
             }// for문 끝 / OrderItem 주문 상품 목록 끝
         // 최종금액 및 배달비 및 할인 금액 계산 / for문 위에 있음
             //배달비
-        BigDecimal shippingFee = BigDecimal.valueOf(3000);
+        BigDecimal shippingFee = totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0 ? BigDecimal.ZERO : BigDecimal.valueOf(3000);
             // 최종 금액 / 총액 + 배달비
         BigDecimal finalAmount = totalAmount.add(shippingFee);
 
@@ -129,28 +129,22 @@ public class OrderService {
         // orderItem들 order 값 저장
         for (OrderItem item : orderItems) {item.setOrder(order);}
         orderItemRepository.saveAll(orderItems);
-        return OrderResponse.from(order, orderItems);
+        return OrderResponse.from(order);
     }
 
     // 주문 내역(목록) 조회
     public List<OrderResponse> listOrder(Long memberId){
-        return orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream()
-                .map(order -> OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(order.getId())))
-                .toList();
+        return orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(OrderResponse::from).toList();
     }
 
     // 주문 정보(상세) 조회( 회원 비회원 - 이메일과 주문번호)
     public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber){
         // 회원은 - 회원 아이디로 조회 / 비회원은 이메일 + 주문번호
-        if (memberId != null){
-            Order order = orderRepository.findByIdAndMemberId(orderId, memberId)
-                    .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-            return OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(order.getId()));
-        }
+        if (memberId != null){return OrderResponse.from(orderRepository.findByIdAndMemberId(orderId, memberId)
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));}
         // 비회원
-        Order order = orderRepository.findByEmailAndOrderNumber(email, orderNumber)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        return OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(order.getId()));
+        return OrderResponse.from(orderRepository.findByEmailAndOrderNumber(email, orderNumber)
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));
     }
     
     // 공통 - orderId 와 memberId로 조회
@@ -175,7 +169,7 @@ public class OrderService {
         order.setDeliveryAddress2(request.deliveryAddress2());
         order.setDeliveryMessage(request.deliveryMessage());
 
-        return OrderResponse.from(orderRepository.save(order), orderItemRepository.findAllByOrder_Id(order.getId()));
+        return OrderResponse.from(orderRepository.save(order));
     }
 
     // 삭제 - 소프트삭제 - 삭제할 이유는 보관 기간이 만료되어서 삭제 될때말곤 없어서 필요없는 기능임
@@ -210,9 +204,7 @@ public class OrderService {
         // 권한 검사
         Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return orderRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(order -> OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(order.getId())))
-                .toList();
+        return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(OrderResponse::from).toList();
     }
 
     // 주문 상태 변경 ( 관리자 매니저 영역 - 주문 정보 상태 변경만 넣을꺼임)

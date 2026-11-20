@@ -10,7 +10,8 @@ import { paymentService } from "@/services/paymentService";
 const TOSS_CLIENT_KEY =
   import.meta.env.VITE_TOSS_CLIENT_KEY ||
   "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
-const SHIPPING_FEE = 3000;
+const BASE_SHIPPING_FEE = 3000;
+const FREE_SHIPPING_THRESHOLD = 20000;
 
 const router = useRouter();
 const route = useRoute();
@@ -34,7 +35,10 @@ const checkoutTotal = computed(() =>
     0,
   ),
 );
-const finalAmount = computed(() => checkoutTotal.value + SHIPPING_FEE);
+const shippingFee = computed(() =>
+  checkoutTotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : BASE_SHIPPING_FEE,
+);
+const finalAmount = computed(() => checkoutTotal.value + shippingFee.value);
 const orderName = computed(() => {
   const firstName = checkoutItems.value[0]?.name || "POWCAST 상품";
   return checkoutItems.value.length > 1
@@ -484,7 +488,7 @@ onMounted(() => {
           <dt>상품 금액</dt>
           <dd>{{ checkoutTotal.toLocaleString() }}원</dd>
           <dt>배송비</dt>
-          <dd>{{ SHIPPING_FEE.toLocaleString() }}원</dd>
+          <dd>{{ shippingFee ? `${shippingFee.toLocaleString()}원` : "무료" }}</dd>
           <dt>총 결제 금액</dt>
           <dd>{{ finalAmount.toLocaleString() }}원</dd>
         </dl>

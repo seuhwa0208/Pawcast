@@ -135,9 +135,9 @@ const bestReviewProducts = computed(() =>
       featuredReview: reviewHighlights[index],
     })),
 );
-const bannerItems = notices.filter((item) => item.pinned);
+const bannerItems = computed(() => notices.filter((item) => item.pinned));
 const bannerIndex = ref(0);
-const currentBanner = computed(() => bannerItems[bannerIndex.value]);
+const currentBanner = computed(() => bannerItems.value[bannerIndex.value]);
 let bannerTimer;
 let popularTimer;
 
@@ -207,15 +207,17 @@ function performSearch() {
 }
 
 function moveBanner(step) {
+  if (!bannerItems.value.length) return;
   bannerIndex.value =
-    (bannerIndex.value + step + bannerItems.length) % bannerItems.length;
+    (bannerIndex.value + step + bannerItems.value.length) % bannerItems.value.length;
   restartBannerTimer();
 }
 // 재시작 전에 기존 타이머를 지워 중복 interval이 쌓이는 것을 방지합니다.
 function restartBannerTimer() {
   window.clearInterval(bannerTimer);
+  if (!bannerItems.value.length) return;
   bannerTimer = window.setInterval(() => {
-    bannerIndex.value = (bannerIndex.value + 1) % bannerItems.length;
+    bannerIndex.value = (bannerIndex.value + 1) % bannerItems.value.length;
   }, 10000);
 }
 function selectPopularPet(value) {
@@ -245,6 +247,7 @@ onBeforeUnmount(() => {
 <template>
   <div class="container home">
     <section
+      v-if="currentBanner"
       id="notice"
       class="notice notice-carousel"
       aria-label="공지 및 이벤트 배너"

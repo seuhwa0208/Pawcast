@@ -23,7 +23,7 @@ public class RefreshTokens {
     @JoinColumn(name = "member_id", nullable = false)
     private Members member;
 
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, length = 1000)
     private String token;
 
     @Column(name = "expires_at", nullable = false)

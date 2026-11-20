@@ -11,8 +11,6 @@ import com.project.pawcast.order.service.OrderService;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
-import jakarta.validation.Valid;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +27,7 @@ public class OrderController {
 
     // 주문하기
     @PostMapping
-    public OrderResponse createOrder(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody OrderRequest request){
+    public OrderResponse createOrder(@AuthenticationPrincipal LoginMember member, OrderRequest request){
        return orderService.createOrder(member.getId(), request);
     }
     
@@ -57,15 +55,13 @@ public class OrderController {
 
     // 전체 주문 목록
     @GetMapping("/admin")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
     public List<OrderResponse> getOrderList(@AuthenticationPrincipal LoginMember member){
         return orderService.getOrderList(member.getId());
 
     }
     // 상태 변경 - 주문
     @PostMapping("/admin/{orderId}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
-    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @RequestBody OrderStatusRequest request){
+    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, OrderStatusRequest request){
         orderService.changeOrderStatus(member.getId(),orderId,request);
     }
 }

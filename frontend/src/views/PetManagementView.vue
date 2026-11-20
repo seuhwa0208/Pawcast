@@ -19,6 +19,15 @@ const formOpen = ref(false);
 const editingId = ref(null);
 const toast = ref("");
 const form = reactive({ name: "", type: "DOG", birth: "", breed: "", weight: "", allergy: "" });
+const BREEDS_BY_TYPE = {
+  DOG: ["말티즈", "푸들", "말티푸", "포메라니안", "비숑 프리제", "시츄", "치와와", "요크셔테리어", "웰시코기", "골든리트리버", "래브라도리트리버", "진돗개", "시바견", "프렌치불도그", "믹스견"],
+  CAT: ["코리안 숏헤어", "브리티시 숏헤어", "러시안 블루", "샴", "페르시안", "스코티시 폴드", "아메리칸 숏헤어", "노르웨이 숲", "메인쿤", "랙돌", "아비시니안", "벵갈", "먼치킨", "스핑크스", "믹스묘"],
+};
+const breedOptions = computed(() => BREEDS_BY_TYPE[form.type] || []);
+
+function handleTypeChange() {
+  form.breed = "";
+}
 
 // API 응답 필드명을 화면 전용 모델로 통일합니다.
 function normalizePet(pet) {
@@ -179,21 +188,26 @@ onMounted(loadPets);
           </button>
           <h2>{{ editingId ? "반려동물 정보 수정" : "반려동물 추가" }}</h2>
           <div class="pet-form-grid">
-            <label>이름<input v-model.trim="form.name" required /></label>
+            <label>이름 *<input v-model.trim="form.name" maxlength="20" required /></label>
             <label
-              >종류<select v-model="form.type">
+              >종류 *<select v-model="form.type" required @change="handleTypeChange">
                 <option value="DOG">강아지</option>
                 <option value="CAT">고양이</option>
               </select></label
             >
-            <label>품종<input v-model.trim="form.breed" required /></label>
+            <label>품종 *<select v-model="form.breed" required>
+              <option disabled value="">품종을 선택해주세요</option>
+              <option v-if="form.breed && !breedOptions.includes(form.breed)" :value="form.breed">{{ form.breed }}</option>
+              <option v-for="breed in breedOptions" :key="breed" :value="breed">{{ breed }}</option>
+            </select></label>
             <label>생일<input v-model="form.birth" type="date" /></label>
             <label
               >체중(kg)<input
                 v-model="form.weight"
                 type="number"
-                min="0"
-                step=".1"
+                min="0.01"
+                max="999.99"
+                step=".01"
             /></label>
             <label>알레르기<input v-model.trim="form.allergy" /></label>
           </div>
