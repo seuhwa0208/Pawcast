@@ -1,7 +1,6 @@
 package com.project.pawcast.product.repository;
 
 import com.project.pawcast.product.entity.Product;
-import com.project.pawcast.product.repository.ProductListView;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -418,7 +417,7 @@ public interface ProductRepository
     );
 
     // 판매량 BEST 3
-    List<ProductListView> findTop3ByDeletedAtIsNullOrderBySalesCountDescIdDesc();
+    List<ProductListView> findTop3ByOrderBySalesCountDescIdDesc();
     // 판매량 WORST 3
-    List<ProductListView> findTop3ByDeletedAtIsNullOrderBySalesCountAscIdDesc();
+    List<ProductListView> findTop3ByOrderBySalesCountAscIdDesc();
 }

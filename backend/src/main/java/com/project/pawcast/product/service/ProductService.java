@@ -217,6 +217,7 @@ public class ProductService {
         }
     }
 
+    // 재고 조정
     @Transactional
     public ProductDetailResponse adjustStock(Long memberId, Long variantId, int quantityChange) {
         validateManager(memberId);
@@ -411,7 +412,7 @@ public class ProductService {
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(member);
         return productRepository
-                .findTop3ByDeletedAtIsNullOrderBySalesCountDescIdDesc()
+                .findTop3ByOrderBySalesCountDescIdDesc()
                 .stream()
                 .map(ProductResponse::from)
                 .toList();
@@ -423,7 +424,7 @@ public class ProductService {
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(member);
         return productRepository
-                .findTop3ByDeletedAtIsNullOrderBySalesCountAscIdDesc()
+                .findTop3ByOrderBySalesCountAscIdDesc()
                 .stream()
                 .map(ProductResponse::from)
                 .toList();

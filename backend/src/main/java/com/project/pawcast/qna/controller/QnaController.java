@@ -17,7 +17,7 @@ import java.util.List;
 @RequestMapping("/api/qna")
 public class QnaController {
 
-    private QnaService qnaService;
+    private final QnaService qnaService;
 
     // QNA-01 공개 문의 목록 조회
     @GetMapping

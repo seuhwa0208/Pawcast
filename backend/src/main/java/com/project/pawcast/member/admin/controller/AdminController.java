@@ -17,7 +17,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @RequestMapping("/api/admin")
 public class AdminController {
-    private AdminService adminService;
+    private final AdminService adminService;
     
     // 회원 전체목록
     @GetMapping
