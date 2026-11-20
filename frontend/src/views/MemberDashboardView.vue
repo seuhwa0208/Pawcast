@@ -501,7 +501,7 @@ async function verifyPassword() {
             </select>
           </label>
           <label>리뷰 내용
-            <textarea v-model="reviewContent" rows="5" placeholder="상품을 사용해본 경험을 작성해주세요."></textarea>
+            <textarea v-model="reviewContent" rows="5" placeholder="상품에 대한 리뷰를 남겨쥬세요."></textarea>
           </label>
           <div class="common-modal-actions">
             <button type="button" class="secondary" @click="reviewOpen = false">취소</button>
