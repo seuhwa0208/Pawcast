@@ -77,6 +77,8 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.BAD_REQUEST,"유효하지 않은 토큰 입니다."),
     DUPLICATE_MEMBER(HttpStatus.CONFLICT,"이미 존재하는 회원 입니다."),
     PET_LIMIT_EXCEEDED(HttpStatus.CONFLICT,"반려동물은 최대 3마리 까지 가능합니다."),
+    INVALID_SALES_PERIOD(HttpStatus.BAD_REQUEST, "유효하지 않은 매출 조회 기간입니다."),
+    INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "조회 시작일은 종료일보다 늦을 수 없습니다."),
     CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
 
 

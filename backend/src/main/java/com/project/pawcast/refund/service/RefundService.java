@@ -3,9 +3,12 @@ package com.project.pawcast.refund.service;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.order.entity.Order;
+import com.project.pawcast.order.entity.OrderItem;
+import com.project.pawcast.order.repository.OrderItemRepository;
 import com.project.pawcast.order.repository.OrderRepository;
 import com.project.pawcast.payment.entity.Payment;
 import com.project.pawcast.payment.repository.PaymentRepository;
+import com.project.pawcast.product.repository.ProductRepository;
 import com.project.pawcast.refund.dto.RefundResponse;
 import com.project.pawcast.refund.entity.Refund;
 import com.project.pawcast.refund.repository.RefundRepository;
@@ -13,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -23,6 +27,8 @@ public class RefundService {
     private final RefundRepository refundRepository;
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final ProductRepository productRepository;
 
     // 추가
     @Transactional
@@ -36,7 +42,16 @@ public class RefundService {
                 .status(Refund.RefundStatus.COMPLETED)
                 .build();
 
-        return refundRepository.save(refund);
+        refundRepository.save(refund);
+
+        // 주문 상품 조회
+        List<OrderItem> orderItems = orderItemRepository.findAllByOrder_Id(payment.getOrder().getId());
+        // 상품 판매량 감소
+        for (OrderItem item : orderItems) {
+            Long productId = item.getProductVariant().getProduct().getId();
+            productRepository.decreaseSalesCount(productId, item.getQuantity());
+        }
+        return refund;
     }
 
     // 조회

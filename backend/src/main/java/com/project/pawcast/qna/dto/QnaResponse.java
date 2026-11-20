@@ -8,6 +8,7 @@ import com.project.pawcast.qna.entity.Qna;
 import com.project.pawcast.qna.entity.QnaType;
 
 public record QnaResponse(
+        Long id,
         Members member,
         Product product,
         QnaType type,
@@ -17,6 +18,7 @@ public record QnaResponse(
 ) {
     public static QnaResponse from(Qna qna) {
         return new QnaResponse(
+                qna.getId(),
                 qna.getMember(),
                 qna.getProduct(),
                 qna.getType(),

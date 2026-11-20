@@ -15,6 +15,7 @@ import com.project.pawcast.order.entity.OrderStatus;
 import com.project.pawcast.order.repository.OrderItemRepository;
 import com.project.pawcast.order.repository.OrderRepository;
 import com.project.pawcast.product.entity.ProductVariant;
+import com.project.pawcast.product.repository.ProductRepository;
 import com.project.pawcast.product.repository.ProductVariantRepository;
 import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class OrderService {
     private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
     private final AuthorizationValidator validator;
+    private final ProductRepository productRepository;
 
     // 주문하기
     // 상품 검증 → 가격 계산 → 주문 생성 → 주문 상세 생성 → 재고 차감 → 결제 처리
@@ -207,14 +209,24 @@ public class OrderService {
         return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(OrderResponse::from).toList();
     }
 
-    // 주문 상태 변경 ( 관리자 매니저 영역 - 주문 정보 상태 변경만 넣을꺼임)
+    // 주문 상태 변경 (관리자 및 매니저) 및 배송 완료되면 판매량 증가 + 1
     @Transactional
-    public void changeOrderStatus(Long memberId, Long orderId, OrderStatusRequest request){
+    public void changeOrderStatus(Long memberId, Long orderId, OrderStatusRequest request) {
         // 권한 검사
-        Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
 
-        Order order = orderRepository.findById(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+        Order order = orderRepository.findById(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+
+        // 배송 완료로 변경되는 경우 판매량 증가
+        if (order.getStatus() != OrderStatus.DELIVERED && request.orderStatus() == OrderStatus.DELIVERED) {
+            List<OrderItem> orderItems = orderItemRepository.findAllByOrder_Id(orderId);
+
+            for (OrderItem item : orderItems) {
+                Long productId = item.getProductVariant().getProduct().getId();
+                productRepository.increaseSalesCount(productId, item.getQuantity());
+            }
+        }
         order.setStatus(request.orderStatus());
     }
 }

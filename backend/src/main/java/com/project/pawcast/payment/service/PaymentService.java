@@ -10,9 +10,11 @@ import com.project.pawcast.order.repository.OrderItemRepository;
 import com.project.pawcast.order.repository.OrderRepository;
 import com.project.pawcast.payment.client.TossPaymentClient;
 import com.project.pawcast.payment.dto.PaymentDtos;
+import com.project.pawcast.payment.dto.TossCancelResponse;
 import com.project.pawcast.payment.entity.Payment;
 import com.project.pawcast.payment.entity.PaymentsStatus;
 import com.project.pawcast.payment.repository.PaymentRepository;
+import com.project.pawcast.refund.service.RefundService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class PaymentService {
     private final InventoryService inventoryService;
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
+    private final RefundService refundService;
 
     // 결제
     @Transactional
@@ -143,10 +146,18 @@ public class PaymentService {
         //결제 상태 검사
         if (payment.getStatus() != PaymentsStatus.PAID) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
         // 토스 취소
-        tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
+        TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
+        TossCancelResponse.CancelInfo cancelInfo = response.cancels().get(response.cancels().size() - 1);
+        // 취소 성공 확인
+        // Toss 취소 상태 - DONE, CANCELED
+        if (!"DONE".equals(cancelInfo.cancelStatus())) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
+
         // 결제 상태 취소
         payment.setStatus(PaymentsStatus.CANCELLED);
         order.setStatus(OrderStatus.CANCELLED);
+
+        // 환불 만듬
+        refundService.createRefund(payment,cancelReason, cancelInfo.transactionKey());
         // 재고 복구
         List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId())
                 .stream()

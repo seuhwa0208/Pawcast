@@ -18,7 +18,20 @@ public interface QnaRepository extends JpaRepository<Qna, Long> {
     List<Qna> findAllByMember_IdOrderByCreatedAtDesc(Long memberId);
     Optional<Qna> findByIdAndMember_Id(Long qnaId, Long memberId);
     Optional<Qna> findByIdAndDeletedAtIsNull(Long qnaId);
-    List<Qna> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
+    @Query("""
+    SELECT q
+    FROM Qna q
+    WHERE q.deletedAt IS NULL
+    ORDER BY
+        CASE
+            WHEN q.status = 'WAITING' THEN 0
+            WHEN q.status = 'ANSWERED' THEN 1
+            ELSE 2
+        END ASC,
+        q.createdAt DESC
+    """)
+    List<Qna> findAllForAdmin();
+    //List<Qna> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
     @Query("""
     SELECT q FROM Qna q WHERE q.deletedAt IS NULL
       AND (:type IS NULL OR q.type = :type)

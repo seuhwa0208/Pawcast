@@ -97,7 +97,7 @@ CREATE TABLE products (
     category_id  bigint REFERENCES categories (id),
     name         varchar(200) NOT NULL,
     brand        varchar(100),
-    product_type varchar(255) NOT NULL CHECK (product_type IN ('FOOD','DEVICE')),
+    product_type varchar(255) NOT NULL CHECK (product_type IN ('DOG','CAT','DEVICE')),
     description  text,
     sales_count  bigint       NOT NULL DEFAULT 0,
     wish_count   bigint       NOT NULL DEFAULT 0,
