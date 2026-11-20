@@ -398,6 +398,9 @@ public class ProductService {
         return new ProductResponse(
                 product.getId(), product.getName(), product.getBrand(),
                 product.getCategory() == null ? null : product.getCategory().getName(),
+                product.getCategory() == null ? null : product.getCategory().getId(),
+                product.getProductType() == null ? null : product.getProductType().name(),
+                null, null,
                 mainImage == null ? null : mainImage.getImagePath(),
                 variant == null ? null : variant.getId(),
                 variant == null ? null : variant.getPrice(),

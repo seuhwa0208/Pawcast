@@ -20,9 +20,9 @@ async function handleGoogleCredential(response) {
   try {
     loading.value = true;
     const result = await authService.googleLogin(response.credential);
+    setUserRole(result.role || "USER");
     setAccessToken(result.accessToken);
     setCurrentUserId(result.userId || result.name || String(result.memberId || "google-member"));
-    setUserRole(result.role || "USER");
     router.push(typeof route.query.redirect === "string" ? route.query.redirect : "/member");
   } catch (error) {
     errorMessage.value = error.message || "Google 로그인에 실패했습니다.";
@@ -68,9 +68,9 @@ async function submit() {
       userId: form.userId.trim(),
       passwordHash: form.password,
     });
+    setUserRole(result.role || result.memberRole || "MEMBER");
     setAccessToken(result.accessToken);
     setCurrentUserId(form.userId.trim());
-    setUserRole(result.role || result.memberRole || "MEMBER");
     router.push(
       typeof route.query.redirect === "string"
         ? route.query.redirect

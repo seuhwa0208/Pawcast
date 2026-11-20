@@ -8,7 +8,6 @@ import { useWishlist } from "@/stores/wishlist";
 import { orderService } from "@/services/orderService";
 import { cartService } from "@/services/cartService";
 import { reviewService } from "@/services/reviewService";
-import { products } from "@/data/products";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const route = useRoute();
@@ -47,6 +46,8 @@ const verifyError = ref("");
 const verifying = ref(false);
 const statusLabels = {
   PAYMENT_COMPLETED: "결제 완료",
+  PENDING_PAYMENT: "결제 대기",
+  PAID: "결제 완료",
   PREPARING: "상품 준비중",
   SHIPPING: "배송중",
   DELIVERED: "배송 완료",
@@ -59,10 +60,11 @@ const orderCards = computed(() =>
     const firstItem = orderItems[0] || {};
     return {
       ...order,
+      id: order.orderId ?? order.id,
       orderItems,
       firstItem,
       displayStatus: statusLabels[order.status] || order.status,
-      displayDate: String(order.createdAt || order.orderDate || "")
+      displayDate: String(order.createdAt || order.created_at || order.orderDate || "")
         .slice(0, 10)
         .replaceAll("-", "."),
       extraCount: Math.max(0, orderItems.length - 1),
@@ -104,6 +106,17 @@ async function openOrderDetail(orderId) {
     showActionMessage(error.message || "주문 상세를 불러오지 못했습니다.");
   }
 }
+async function cancelOrder(order) {
+  const orderId = order.orderId || order.id;
+  if (!orderId || !window.confirm("주문을 취소할까요? 취소 후 결제 금액은 환불 처리됩니다.")) return;
+  try {
+    await orderService.cancelOrder(orderId);
+    showActionMessage("주문이 취소되었습니다.");
+    await loadOrders();
+  } catch (error) {
+    showActionMessage(error.message || "주문을 취소하지 못했습니다.");
+  }
+}
 async function repurchaseOrderItem(item) {
   if (!item.variantId) return;
   try {
@@ -143,10 +156,7 @@ function notifyDirectPaymentPending() {
   showActionMessage("바로 결제는 주문·PG 요청 형식 확정 후 연결됩니다.");
 }
 function productDetailPath(item) {
-  const product = products.find(
-    (entry) => String(entry.id) === String(item?.productId),
-  );
-  return `/products/${item?.pet || product?.pet || "DOG"}/${item?.productId || product?.id || 1}`;
+  return `/products/${item?.pet || "DOG"}/${item?.productId || 1}`;
 }
 function requestSettings() {
   password.value = "";
@@ -228,12 +238,16 @@ async function verifyPassword() {
             주문 내역을 불러오는 중입니다.
           </p>
           <div v-else-if="orderCards.length" class="order-list">
-            <article v-for="order in orderCards" :key="order.id">
+            <article v-for="order in orderCards" :key="order.orderId || order.id">
               <header>
                 <b>{{ order.displayDate }} 주문</b
-                ><button type="button" @click="openOrderDetail(order.id)">
+                ><button type="button" @click="openOrderDetail(order.orderId || order.id)">
                   주문 상세
-                </button>
+                </button><button
+                  v-if="['PENDING_PAYMENT', 'PAID', 'PAYMENT_COMPLETED'].includes(order.status)"
+                  type="button"
+                  @click="cancelOrder(order)"
+                >주문 취소</button>
               </header>
               <div class="order-product-list">
                 <article

@@ -19,11 +19,24 @@ const loginRequired = ref(false);
 const soldOutNotice = ref(false);
 const cartAdded = ref(false);
 // 찜은 회원 전용 기능이므로 토큰 유무에 따라 실제 토글과 로그인 안내를 분기합니다.
-const handleWishlist = (id) =>
-  accessToken.value ? toggle(id) : (loginRequired.value = true);
-const handleCart = () => {
-  add(props.product, props.pet);
-  cartAdded.value = true;
+const handleWishlist = async (id) => {
+  if (!accessToken.value) {
+    loginRequired.value = true;
+    return;
+  }
+  try {
+    await toggle(id);
+  } catch {
+    loginRequired.value = true;
+  }
+};
+const handleCart = async () => {
+  try {
+    await add(props.product, props.pet);
+    cartAdded.value = true;
+  } catch {
+    loginRequired.value = true;
+  }
 };
 const goToLogin = () => {
   loginRequired.value = false;

@@ -14,6 +14,14 @@ public interface ProductListView {
 
     String getCategoryName();
 
+    Long getCategoryId();
+
+    String getProductType();
+
+    String getMainIngredient();
+
+    String getLifeStage();
+
     String getImagePath();
 
     Long getVariantId();

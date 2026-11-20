@@ -2476,6 +2476,17 @@
   font-size: 13px;
   line-height: 1.7;
 }
+
+.home-api-empty {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  margin: 0;
+  border: 1px solid var(--line, #ead8c6);
+  border-radius: 18px;
+  color: var(--muted, #8b7566);
+  background: #fffdfa;
+}
 .site-header.nav-wrap .nav-inner nav {
   gap: 30px;
 }
@@ -4373,7 +4384,7 @@
   }
 }
 
-/* 취소·반품·교환 상태별 검수 화면 */
+/* 취소·반품(환불) 상태별 화면 */
 .claim-summary-card {
   display: flex;
   align-items: flex-end;
@@ -4462,10 +4473,6 @@
 .claim-type.return {
   background: #edf4e9;
   color: #5d7c53;
-}
-.claim-type.exchange {
-  background: #edf2f8;
-  color: #55708b;
 }
 .claim-product-row {
   display: grid;
@@ -7048,6 +7055,17 @@ button.qna-row:hover:not(:disabled) {
 .login-submit:disabled {
   background: #bdb2a8;
   cursor: wait;
+}
+.google-identity-button {
+  display: flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+}
+.google-identity-button > div {
+  display: flex !important;
+  justify-content: center;
 }
 .signup-guide {
   display: flex;

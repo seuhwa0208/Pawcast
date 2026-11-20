@@ -35,14 +35,18 @@ public class AdminSalesService {
 
         LocalDateTime[] dateRange = getDateRange(request);
 
-        List<Object[]> results = adminSalesRepository.findSalesStatistics(request.period().name(), dateRange[0], dateRange[1]);
+        List<Object[]> results = adminSalesRepository.findSalesStatistics(dateRange[0], dateRange[1]);
 
+        // findSalesStatistics 쿼리는 집계값 4개(매출·주문 수·평균 주문금액·취소금액)만 반환합니다.
+        // 기존에는 이를 5개 열(기간 포함)으로 읽어 첫 번째 BigDecimal을 String으로 캐스팅하면서
+        // 관리자 로그인 직후 대시보드가 500으로 실패했습니다. 기간 라벨은 요청 값으로 구성합니다.
+        String periodLabel = buildPeriodLabel(request, dateRange[0]);
         return results.stream().map(row -> new SalesResponse(
-                        (String) row[0],
-                        (BigDecimal) row[1],
-                        (Long) row[2],
-                        (BigDecimal) row[3],
-                        (BigDecimal) row[4]
+                        periodLabel,
+                        decimal(row[0]),
+                        number(row[1]),
+                        decimal(row[2]),
+                        decimal(row[3])
                 )).toList();
     }
 
@@ -81,5 +85,22 @@ public class AdminSalesService {
         }
         return new LocalDateTime[]{startDate.atStartOfDay(), endDate.atStartOfDay()
         };
+    }
+
+    private String buildPeriodLabel(SalesRequest request, LocalDateTime startDate) {
+        return switch (request.period()) {
+            case DAILY -> startDate.toLocalDate().toString();
+            case MONTHLY -> String.format("%d-%02d", request.year(), request.month());
+            case QUARTERLY -> String.format("%d Q%d", request.year(), request.quarter());
+            case YEARLY -> String.format("%d", request.startYear());
+        };
+    }
+
+    private BigDecimal decimal(Object value) {
+        return value == null ? BigDecimal.ZERO : new BigDecimal(value.toString());
+    }
+
+    private Long number(Object value) {
+        return value == null ? 0L : ((Number) value).longValue();
     }
 }
