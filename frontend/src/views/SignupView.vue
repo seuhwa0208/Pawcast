@@ -42,6 +42,8 @@ const state = reactive({
 const notice = ref({ text: "", type: "" });
 const activeTerm = ref(null);
 const signupComplete = ref(false);
+const showPassword = ref(false);
+const showPasswordConfirm = ref(false);
 const termDetails = {
   terms: {
     title: "서비스 이용약관 동의",
@@ -375,12 +377,12 @@ async function submit() {
           <div class="form-grid">
             <label class="form-field"
               ><span>비밀번호 <b>*</b></span
-              ><input
+              ><div class="password-input"><input
                 v-model="form.passwordHash"
-                type="password"
+                :type="showPassword ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="영문·숫자·특수문자 포함 8~20자"
-              /><small
+              /><button type="button" class="password-visibility" :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'" :aria-pressed="showPassword" @click="showPassword = !showPassword"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-5 9.5-5 9.5 5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.7"/><path v-if="!showPassword" d="m4 4 16 16"/></svg></button></div><small
                 v-if="form.passwordHash && !passwordCompositionValid"
                 class="invalid"
                 >영문, 숫자, 특수문자를 각각 1개 이상 포함해주세요.</small
@@ -391,12 +393,12 @@ async function submit() {
               ></label
             ><label class="form-field"
               ><span>비밀번호 확인 <b>*</b></span
-              ><input
+              ><div class="password-input"><input
                 v-model="form.checkPasswordHash"
-                type="password"
+                :type="showPasswordConfirm ? 'text' : 'password'"
                 autocomplete="new-password"
                 placeholder="비밀번호를 다시 입력해주세요"
-              /><small
+              /><button type="button" class="password-visibility" :aria-label="showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 표시'" :aria-pressed="showPasswordConfirm" @click="showPasswordConfirm = !showPasswordConfirm"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.2-5 9.5-5 9.5 5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"/><circle cx="12" cy="12" r="2.7"/><path v-if="!showPasswordConfirm" d="m4 4 16 16"/></svg></button></div><small
                 v-if="form.checkPasswordHash"
                 :class="{ valid: passwordMatches, invalid: !passwordMatches }"
                 >{{

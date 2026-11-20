@@ -6657,6 +6657,12 @@ button.qna-row:hover:not(:disabled) {
   border-color: #956a45;
   box-shadow: 0 0 0 3px rgb(149 106 69 / 11%);
 }
+.password-input { position: relative; width: 100%; }
+.password-input input { padding-right: 48px; }
+.password-visibility { position: absolute; top: 50%; right: 8px; display: grid; width: 34px; height: 34px; place-items: center; transform: translateY(-50%); border: 0; border-radius: 7px; background: transparent; color: #765238; cursor: pointer; }
+.password-visibility:hover { background: #f5e7d8; }
+.password-visibility:focus-visible { outline: 2px solid #956a45; outline-offset: 1px; }
+.password-visibility svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
 .form-field small {
   min-height: 18px;
   color: #958a81;
