@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public record OrderResponse(
+        Long orderId,
         Members member,
         String orderNumber,
         OrderStatus status,
@@ -28,6 +29,7 @@ public record OrderResponse(
 ) {
     public static OrderResponse from(Order order) {
         return new OrderResponse(
+                order.getId(),
                 order.getMember(),
                 order.getOrderNumber(),
                 order.getStatus(),

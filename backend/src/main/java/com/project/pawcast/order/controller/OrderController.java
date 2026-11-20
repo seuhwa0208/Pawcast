@@ -10,6 +10,7 @@ import com.project.pawcast.order.dto.OrderStatusRequest;
 import com.project.pawcast.order.service.OrderService;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.security.LoginMember;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,7 +28,7 @@ public class OrderController {
 
     // 주문하기
     @PostMapping
-    public OrderResponse createOrder(@AuthenticationPrincipal LoginMember member, OrderRequest request){
+    public OrderResponse createOrder(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody OrderRequest request){
        return orderService.createOrder(member.getId(), request);
     }
     
@@ -61,7 +62,7 @@ public class OrderController {
     }
     // 상태 변경 - 주문
     @PostMapping("/admin/{orderId}/status")
-    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, OrderStatusRequest request){
+    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @Valid @RequestBody OrderStatusRequest request){
         orderService.changeOrderStatus(member.getId(),orderId,request);
     }
 }

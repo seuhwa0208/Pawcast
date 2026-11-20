@@ -17,9 +17,6 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/members")
 public class MemberController {
     private final MemberService memberService;
-    private final AuthenticationManager authenticationManager;
-    private final JwtEncoder jwtEncoder;
-
 
     // 기본 정보 조회
     @GetMapping("/me")
