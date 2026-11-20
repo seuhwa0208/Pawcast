@@ -1,8 +1,8 @@
 <!-- URL의 상품 식별자로 상세 데이터를 찾고 갤러리·옵션·구매 동작을 제어합니다. -->
 <script setup>
-import { computed, ref, watchEffect } from "vue";
+import { computed, onMounted, ref, watch, watchEffect } from "vue";
 import { useRouter } from "vue-router";
-import { products } from "@/data/products";
+import { productService } from "@/services/productService";
 import { useCart } from "@/stores/cart";
 import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
@@ -11,9 +11,42 @@ import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
 
 const props = defineProps({ pet: String, id: String });
 const router = useRouter();
-const product = computed(
-  () => products.find((item) => item.id === Number(props.id)) || products[0],
-);
+const product = ref(null);
+const detailLoading = ref(true);
+const detailError = ref("");
+
+function normalizeDetail(detail) {
+  const variants = detail.productType === "DEVICE" ? detail.deviceVariants : detail.foodVariants;
+  const available = (variants || []).filter((item) => item.status !== "DISCONTINUED");
+  const first = available[0] || {};
+  return {
+    ...detail,
+    category: detail.categoryName || "기타",
+    image: detail.images?.find((item) => item.main)?.imagePath || detail.images?.[0]?.imagePath || "/images/product-placeholder.svg",
+    options: available.map((item) => item.optionLabel || item.optionKey).filter(Boolean),
+    optionPrices: Object.fromEntries(available.map((item) => [item.optionLabel || item.optionKey, Number(item.price || 0)])),
+    option: first.optionLabel || first.optionKey || "기본 옵션",
+    price: Number(first.price || 0),
+    stock: available.some((item) => Number(item.stock || 0) > 0) ? 1 : 0,
+    rating: Number(detail.averageRating || 0),
+    reviewCount: Number(detail.reviewCount || 0),
+  };
+}
+
+async function loadProduct() {
+  detailLoading.value = true;
+  detailError.value = "";
+  try {
+    product.value = normalizeDetail(await productService.detail(props.id));
+  } catch (error) {
+    product.value = null;
+    detailError.value = error.message || "상품 정보를 불러오지 못했습니다.";
+  } finally {
+    detailLoading.value = false;
+  }
+}
+onMounted(loadProduct);
+watch(() => props.id, loadProduct);
 const sectionName = computed(() =>
   props.pet === "CAT"
     ? "고양이관"
@@ -26,7 +59,7 @@ const petLabel = computed(() =>
 );
 // 품절 상세 URL로 직접 들어온 경우 해당 상품관 목록으로 즉시 되돌립니다.
 watchEffect(() => {
-  if (product.value.stock <= 0)
+  if (product.value && product.value.stock <= 0)
     router.replace(
       props.pet === "CAT"
         ? "/cat"
@@ -42,23 +75,26 @@ const cartAdded = ref(false);
 const loginRequired = ref(false);
 const selectedOption = ref("");
 const galleryImages = computed(() =>
+  !product.value
+    ? []
+    :
   Array.from({ length: 4 }, (_, index) => ({
     src: product.value.image,
     alt: `${product.value.name} 상품 이미지 ${index + 1}`,
   })),
 );
 const productOptions = computed(
-  () => product.value.options || [product.value.option],
+  () => product.value?.options?.length ? product.value.options : product.value ? [product.value.option] : [],
 );
 const currentOption = computed(
-  () => selectedOption.value || productOptions.value[0],
+  () => selectedOption.value || productOptions.value[0] || "기본 옵션",
 );
 // 옵션별 가격표가 없는 API 상품도 기본 판매가로 안전하게 표시합니다.
 const currentPrice = computed(
-  () => product.value.optionPrices?.[currentOption.value] || product.value.price,
+  () => product.value?.optionPrices?.[currentOption.value] || product.value?.price || 0,
 );
 const getOptionPrice = (option) =>
-  product.value.optionPrices?.[option] || product.value.price;
+  product.value?.optionPrices?.[option] || product.value?.price || 0;
 const getOptionExtra = (option) =>
   Math.max(0, getOptionPrice(option) - getOptionPrice(productOptions.value[0]));
 const { add } = useCart();
@@ -159,7 +195,7 @@ const productDetailContent = computed(() => {
 const purchaseGuide = [
   {
     title: "배송 안내",
-    text: "결제 완료 후 상품 준비가 시작되며 기본 배송비는 3,000원입니다.",
+    text: "결제 완료 후 상품 준비가 시작되며, 상품 합계 20,000원 미만은 배송비 3,000원이 부과됩니다. 20,000원 이상은 무료 배송입니다.",
   },
   {
     title: "교환·반품 안내",
@@ -174,7 +210,7 @@ const purchaseGuide = [
 </script>
 
 <template>
-  <div class="container detail-page">
+  <div v-if="product" class="container detail-page">
     <p class="breadcrumb">홈 › {{ sectionName }} › {{ product.name }}</p>
     <section class="summary">
       <div class="gallery">
@@ -308,7 +344,7 @@ const purchaseGuide = [
             {{ highlight }}
           </span>
         </div>
-        <dl class="temporary-detail-copy">
+        <dl class="product-detail-copy">
           <dt>권장 사용·급여 방법</dt>
           <dd>{{ productDetailContent.usage }}</dd>
           <dt>보관 방법</dt>
@@ -336,7 +372,7 @@ const purchaseGuide = [
           </section>
         </div>
       </article>
-      <article v-else class="tab-content temporary-review-panel">
+      <article v-else class="tab-content product-review-panel">
         <header>
           <div>
             <small>PRODUCT REVIEWS</small>
@@ -344,10 +380,13 @@ const purchaseGuide = [
           </div>
           <strong>★ {{ product.rating }}</strong>
         </header>
-        <p class="temporary-data-notice">등록된 상품 리뷰가 없습니다.</p>
+        <p class="empty-data-notice">등록된 상품 리뷰가 없습니다.</p>
       </article>
     </section>
     <CartAddedModal v-model="cartAdded" @cart="router.push('/cart')" />
     <LoginRequiredModal v-model="loginRequired" @login="goToLogin" />
   </div>
+  <main v-else class="container detail-page detail-page-state">
+    {{ detailLoading ? "상품 정보를 불러오는 중입니다." : detailError }}
+  </main>
 </template>

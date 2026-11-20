@@ -7,7 +7,9 @@ import com.project.pawcast.member.dto.PasswordRequest;
 import com.project.pawcast.member.service.MemberService;
 import com.project.pawcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/members")
 public class MemberController {
     private final MemberService memberService;
+    private final AuthenticationManager authenticationManager;
+    private final JwtEncoder jwtEncoder;
 
 
     // 기본 정보 조회

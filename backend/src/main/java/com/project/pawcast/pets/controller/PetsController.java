@@ -5,7 +5,6 @@ import com.project.pawcast.pets.dto.PetsResponse;
 import com.project.pawcast.pets.service.PetsService;
 import com.project.pawcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
-import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,19 +24,19 @@ public class PetsController {
     
     // 반려 동물 정보 등록
     @PostMapping
-    public PetsResponse createPets(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody PetsRequest request){
+    public PetsResponse createPets(@AuthenticationPrincipal LoginMember member, PetsRequest request){
         return petsService.createPets(member.getId(),request);
     }
     
     // 수정
     @PatchMapping("/{petId}")
-    public PetsResponse updatePets(@AuthenticationPrincipal LoginMember member, @PathVariable Long petId, @Valid @RequestBody PetsRequest request){
-        return petsService.updatePets(petId,member.getId(),request);
+    public PetsResponse updatePets(@AuthenticationPrincipal LoginMember member, @PathVariable Long petsId, PetsRequest request){
+        return petsService.updatePets(petsId,member.getId(),request);
     }
     
     // 삭제
     @DeleteMapping("/{petId}")
-    public void deletePets(@AuthenticationPrincipal LoginMember member, @PathVariable Long petId){
-        petsService.deletePets(petId, member.getId());
+    public void deletePets(@AuthenticationPrincipal LoginMember member, @PathVariable Long petsId){
+        petsService.deletePets(petsId, member.getId());
     }
 }

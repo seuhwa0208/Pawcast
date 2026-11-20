@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     DB_MAX_OVERFLOW: int = 10
     DB_POOL_TIMEOUT: int = 30
     DB_ECHO: bool = False
+    INTERNAL_API_KEY: str = ""
     
     # 모델은 미리 내려받은 로컬 디렉터리에서만 불러옵니다.
     MODEL_PATH: Path = PROJECT_ROOT / "models" / "review" / "sentiment_model"

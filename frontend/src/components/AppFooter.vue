@@ -3,9 +3,9 @@
   <footer>
     <div class="container footer-grid">
       <section>
-        <h2>POWCAST</h2>
+        <h2>PAWCAST</h2>
         <p>
-          반려동물 건강식품 쇼핑몰<br />POWCAST Co., Ltd.<br />CEO 김종혁 |
+          반려동물 건강식품 쇼핑몰<br />PAWCAST Co., Ltd.<br />CEO 김종혁 |
           Chief Data Officer 오지혁 | Design Officer 이수미
         </p>
       </section>
@@ -19,7 +19,7 @@
       <section>
         <h2>이용 안내</h2>
         <p>
-          © 2026 POWCAST Corp.<br />인천 부평구 경원대로 1366<br />032-1234-5678
+          © 2026 PAWCAST Corp.<br />인천 부평구 경원대로 1366<br />032-1234-5678
         </p>
       </section>
     </div>

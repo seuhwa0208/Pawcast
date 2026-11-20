@@ -65,6 +65,7 @@ public enum ErrorCode {
     REVIEW_NOT_ALLOWED(HttpStatus.BAD_REQUEST,"배송 완료된 주문만 리뷰를 작성할 수 있습니다."),
     PROFANITY_DETECTED(HttpStatus.BAD_REQUEST,"욕설이나 부적절한 표현이 포함되어 있습니다. 내용을 수정해주세요."),
     MODERATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,"내용 검사를 완료하지 못했습니다. 잠시 후 다시 시도해주세요."),
+    SALES_FORECAST_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE,"판매 예측 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요."),
 
     NOT_FOUND_CART_ITEM(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."),
     INVALID_CART_QUANTITY(HttpStatus.BAD_REQUEST, "장바구니 수량은 1 이상이어야 합니다."),
