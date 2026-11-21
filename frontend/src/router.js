@@ -23,6 +23,7 @@ import { useAuthSession } from "@/stores/auth";
 const AdminDashboardView = () => import("@/views/AdminDashboardView.vue");
 const AdminOverviewView = () => import("@/views/AdminOverviewView.vue");
 const AdminOperationsView = () => import("@/views/AdminOperationsView.vue");
+const AdminProductCreateView = () => import("@/views/AdminProductCreateView.vue");
 const AdminDemoView = () => import("@/views/AdminDemoView.vue");
 
 const router = createRouter({
@@ -85,25 +86,38 @@ const router = createRouter({
       path: "/admin/dashboard",
       name: "admin-dashboard",
       component: AdminOverviewView,
-      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
     },
     {
       path: "/admin/sales",
       name: "admin-sales",
       component: AdminDashboardView,
+      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
+    },
+    {
+      path: "/admin/members",
+      name: "admin-members",
+      component: AdminOperationsView,
+      props: { section: "members" },
       meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
     },
     {
-      path: "/admin/:section(orders|products|members|qna|notices)",
+      path: "/admin/products/new",
+      name: "admin-product-create",
+      component: AdminProductCreateView,
+      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
+    },
+    {
+      path: "/admin/:section(orders|products|qna|notices)",
       name: "admin-operations",
       component: AdminOperationsView,
-      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
     },
     {
       path: "/admin/:tool(category|settings)",
       name: "admin-demo",
       component: AdminDemoView,
-      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
+      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
     },
     {
       path: "/error/:status(403|404|500)",
@@ -127,6 +141,11 @@ router.beforeEach((to) => {
     sessionStorage.getItem("powcast-user-role") !== "ADMIN"
   )
     return "/error/403";
+  if (
+    to.meta.requiresManager &&
+    !["ADMIN", "MANAGER"].includes(sessionStorage.getItem("powcast-user-role"))
+  )
+    return "/error/403";
   // 민감한 회원정보 화면은 현재 토큰으로 비밀번호 확인을 마친 세션만 허용합니다.
   if (
     to.meta.requiresPasswordVerification &&
@@ -134,7 +153,7 @@ router.beforeEach((to) => {
   )
     return { path: "/mypage", query: { verify: "1" } };
   if ((to.path === "/login" || to.path === "/signup") && accessToken.value)
-    return sessionStorage.getItem("powcast-user-role") === "ADMIN"
+    return ["ADMIN", "MANAGER"].includes(sessionStorage.getItem("powcast-user-role"))
       ? "/admin/dashboard"
       : "/member";
 });

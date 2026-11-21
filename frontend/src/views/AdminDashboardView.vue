@@ -1,4 +1,4 @@
-<!-- 판매자·관리자가 기간별 매출 실적과 AI 판매 예측을 검수하는 개발용 관리자 대시보드입니다. -->
+<!-- 판매자·관리자가 실제 기간별 매출 실적과 AI 판매 예측을 검수하는 관리자 대시보드입니다. -->
 <script setup>
 import {
   computed,
@@ -8,43 +8,54 @@ import {
   ref,
   watch,
 } from "vue";
-import { BarChart, LineChart, PieChart } from "echarts/charts";
-import {
-  GridComponent,
-  LegendComponent,
-  TooltipComponent,
-} from "echarts/components";
-import { init, use } from "echarts/core";
-import { CanvasRenderer } from "echarts/renderers";
-import { useRouter } from "vue-router";
 import { adminDashboardService } from "@/services/adminDashboardService";
-import { useAuthSession } from "@/stores/auth";
+import AdminSidebar from "@/components/AdminSidebar.vue";
 
-// 관리자 화면에서 사용하는 차트 종류만 등록해 고객 화면의 초기 번들 크기를 줄입니다.
-use([
-  BarChart,
-  LineChart,
-  PieChart,
-  GridComponent,
-  LegendComponent,
-  TooltipComponent,
-  CanvasRenderer,
-]);
+// # ECharts는 매출 화면에서 차트를 그릴 때만 내려받아 초기 관리자 번들을 줄인다.
+let echartsLoader;
+function loadEcharts() {
+  echartsLoader ||= Promise.all([
+    import("echarts/charts"),
+    import("echarts/components"),
+    import("echarts/core"),
+    import("echarts/renderers"),
+  ]).then(([charts, components, core, renderers]) => {
+    core.use([
+      charts.BarChart,
+      charts.LineChart,
+      charts.PieChart,
+      components.GridComponent,
+      components.LegendComponent,
+      components.TooltipComponent,
+      renderers.CanvasRenderer,
+    ]);
+    return core.init;
+  });
+  return echartsLoader;
+}
 
-const router = useRouter();
-const { setAccessToken } = useAuthSession();
-const periodUnit = ref("day");
-const selectedYear = ref("2026");
-const fromDate = ref("2026-01-01");
-const toDate = ref("2026-12-31");
+// # 기본은 월별 흐름으로 보여 주고, 일별 조회는 선택한 날짜 범위에만 사용한다.
+const loginAt = new Date(sessionStorage.getItem("powcast-login-at") || Date.now());
+const loginYear = loginAt.getFullYear();
+const toIsoDate = (date) => date.toISOString().slice(0, 10);
+const periodUnit = ref("month");
+const selectedYear = ref(String(loginYear));
+const selectedMonth = ref(String(loginAt.getMonth() + 1));
+const selectedQuarter = ref(String(Math.floor(loginAt.getMonth() / 3) + 1));
+const availableYears = ref([]);
+const fromDate = ref(`${loginYear}-01-01`);
+const toDate = ref(`${loginYear}-12-31`);
 const selectedCategories = ref(["DOG", "CAT", "ALL"]);
 const appliedAt = ref("초기 화면 데이터");
-const sidebarCollapsed = ref(false);
 const dashboard = ref(null);
 const loading = ref(false);
 const error = ref("");
 const retraining = ref(false);
 const retrainMessage = ref("");
+const exportFormat = ref("csv");
+const exportSection = ref("all");
+const exporting = ref(false);
+const exportMessage = ref("");
 const salesChartElement = ref(null);
 const categoryChartElement = ref(null);
 let salesChart;
@@ -63,7 +74,14 @@ const summary = computed(
 const activeData = computed(
   () => dashboard.value?.trend || { labels: [], sales: [], orders: [] },
 );
-const visibleCategories = computed(() => dashboard.value?.categories || []);
+const visibleCategories = computed(() =>
+  (dashboard.value?.categories || []).map((row) => ({
+    ...row,
+    orders: Number(row.orders || 0),
+    refund: Number(row.refund || 0),
+    growth: Number(row.growth || 0),
+  })),
+);
 const forecast = computed(
   () =>
     dashboard.value?.forecast || {
@@ -79,8 +97,29 @@ const totalRefund = computed(() => summary.value.refundAmount);
 const averageOrder = computed(() => summary.value.averageOrderAmount);
 
 const formatWon = (value) => `${Math.round(value).toLocaleString()}원`;
+const loginTimestamp = computed(() => new Intl.DateTimeFormat("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit", weekday:"short", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }).format(loginAt));
 
-// 조회 조건을 개발용 REST API에 전달하고 응답이 도착한 뒤 ECharts 옵션을 갱신합니다.
+function syncPeriodRange() {
+  const year = Number(selectedYear.value || loginYear);
+  if (periodUnit.value === "day") {
+    fromDate.value = toIsoDate(loginAt);
+    toDate.value = fromDate.value;
+  } else if (periodUnit.value === "month") {
+    const month = Number(selectedMonth.value);
+    fromDate.value = `${year}-${String(month).padStart(2, "0")}-01`;
+    toDate.value = toIsoDate(new Date(year, month, 0));
+  } else if (periodUnit.value === "quarter") {
+    const month = (Number(selectedQuarter.value) - 1) * 3;
+    fromDate.value = toIsoDate(new Date(year, month, 1));
+    toDate.value = toIsoDate(new Date(year, month + 3, 0));
+  } else {
+    const years = availableYears.value.length ? availableYears.value : [year];
+    fromDate.value = `${Math.min(...years)}-01-01`;
+    toDate.value = `${Math.max(...years)}-12-31`;
+  }
+}
+
+// # 조회 조건을 실제 매출 API에 전달하고 응답이 도착한 뒤 ECharts 옵션을 갱신한다.
 async function applyFilters() {
   if (!selectedCategories.value.length)
     selectedCategories.value = ["DOG", "CAT", "ALL"];
@@ -95,30 +134,36 @@ async function applyFilters() {
       categories: selectedCategories.value,
     });
     appliedAt.value = `${new Date().toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
     })} 조회`;
   } catch (cause) {
     error.value = cause.message || "매출 데이터를 불러오지 못했습니다.";
-    dashboard.value = { summary: { totalSales: 0, totalOrders: 0, averageOrderAmount: 0, refundAmount: 0 }, trend: { labels: [], sales: [], orders: [] }, categories: [], forecast: { predictedSales: 0, growthRate: 0, insight: "API 응답을 기다리는 중입니다.", topProducts: [] } };
+    // # API 실패 시 임시 매출 수치를 만들지 않고 빈 차트와 오류 안내를 표시한다.
+    dashboard.value = null;
   } finally {
     loading.value = false;
   }
 }
 
 async function retrainModel() {
-  retraining.value = true; retrainMessage.value = "";
+  retraining.value = true;
+  retrainMessage.value = "";
   try {
-    const result = await adminDashboardService.retrainSalesModel(new Date().toISOString().slice(0, 10));
+    const result = await adminDashboardService.retrainSalesModel(
+      new Date().toISOString().slice(0, 10),
+    );
     retrainMessage.value = `재학습 완료 · ${result.trainingDays || 0}일 주문 데이터를 반영했습니다.`;
     await applyFilters();
   } catch (cause) {
     retrainMessage.value = `재학습 요청 실패: ${cause.message || "AI 서버 연결을 확인해주세요."}`;
-  } finally { retraining.value = false; }
+  } finally {
+    retraining.value = false;
+  }
 }
 
-function renderCharts() {
+async function renderCharts() {
   if (!salesChartElement.value || !categoryChartElement.value) return;
+  const init = await loadEcharts();
   salesChart ||= init(salesChartElement.value);
   categoryChart ||= init(categoryChartElement.value);
 
@@ -200,45 +245,39 @@ function renderCharts() {
   );
 }
 
-function exportCsv() {
-  const header = [
-    "카테고리",
-    "총 매출",
-    "주문 건수",
-    "평균 주문금액",
-    "취소·환불",
-    "성장률",
-  ];
-  const rows = visibleCategories.value.map((row) => [
-    row.name,
-    row.sales,
-    row.orders,
-    Math.round(row.sales / row.orders),
-    row.refund,
-    row.growth,
-  ]);
-  const csv = `\uFEFF${[header, ...rows].map((row) => row.join(",")).join("\n")}`;
-  const url = URL.createObjectURL(
-    new Blob([csv], { type: "text/csv;charset=utf-8" }),
-  );
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `powcast-sales-${selectedYear.value}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
-function logout() {
-  setAccessToken("");
-  router.push("/login");
+async function downloadStatistics() {
+  exporting.value = true;
+  exportMessage.value = "";
+  try {
+    await adminDashboardService.downloadStatistics({
+      startDate: fromDate.value,
+      endDate: toDate.value,
+      format: exportFormat.value,
+      section: exportSection.value,
+    });
+    exportMessage.value = "실제 DB 통계 파일을 생성했습니다.";
+  } catch (cause) {
+    exportMessage.value = cause.message || "통계 파일 다운로드에 실패했습니다.";
+  } finally {
+    exporting.value = false;
+  }
 }
 
 watch(dashboard, async () => {
   await nextTick();
-  renderCharts();
+  await renderCharts();
 });
 
 onMounted(async () => {
+  try {
+    const years = await adminDashboardService.getSalesYears();
+    availableYears.value = Array.isArray(years) && years.length ? years : [loginYear];
+    if (!availableYears.value.includes(loginYear)) availableYears.value.unshift(loginYear);
+    selectedYear.value = String(availableYears.value[0]);
+  } catch {
+    availableYears.value = [loginYear];
+  }
+  syncPeriodRange();
   await applyFilters();
   chartResizeObserver = new ResizeObserver(() => {
     salesChart?.resize();
@@ -250,6 +289,8 @@ onMounted(async () => {
     chartResizeObserver.observe(categoryChartElement.value);
 });
 
+watch([periodUnit, selectedYear, selectedMonth, selectedQuarter], syncPeriodRange);
+
 onBeforeUnmount(() => {
   chartResizeObserver?.disconnect();
   salesChart?.dispose();
@@ -258,35 +299,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="admin-dashboard" :class="{ collapsed: sidebarCollapsed }">
-    <aside class="admin-sidebar" :class="{ collapsed: sidebarCollapsed }">
-      <button
-        type="button"
-        class="sidebar-toggle"
-        :aria-label="
-          sidebarCollapsed ? '관리자 메뉴 펼치기' : '관리자 메뉴 접기'
-        "
-        @click="sidebarCollapsed = !sidebarCollapsed"
-      >
-        {{ sidebarCollapsed ? "›" : "‹" }}
-      </button>
-      <header><b>POWCAST</b><span>관리자 페이지</span></header>
-      <nav>
-        <button type="button" @click="router.push('/admin/dashboard')">⌂ <span>대시보드</span></button>
-        <button type="button" class="active" @click="router.push('/admin/sales')">
-          ▥ <span>매출 대시보드</span>
-        </button>
-        <button type="button" @click="router.push('/admin/orders')">▤ <span>주문 관리</span></button>
-        <button type="button" @click="router.push('/admin/products')">◇ <span>상품 관리</span></button>
-        <button type="button" @click="router.push('/admin/category')">▦ <span>카테고리 관리</span></button>
-        <button type="button" @click="router.push('/admin/members')">♙ <span>고객 관리</span></button>
-        <button type="button" @click="router.push('/admin/sales')">▥ <span>통계 분석</span></button>
-        <button type="button" @click="router.push('/admin/settings')">⚙ <span>환경 설정</span></button>
-      </nav>
-      <button type="button" class="admin-logout" @click="logout">
-        로그아웃
-      </button>
-    </aside>
+  <div class="admin-dashboard">
+    <AdminSidebar />
 
     <main class="admin-main">
       <header class="admin-page-heading">
@@ -298,7 +312,7 @@ onBeforeUnmount(() => {
           {{
             loading
               ? "매출 데이터를 불러오는 중..."
-              : `개발용 API · ${appliedAt}`
+              : `로그인 ${loginTimestamp} · ${appliedAt}`
           }}
         </p>
       </header>
@@ -319,18 +333,11 @@ onBeforeUnmount(() => {
             <span>{{ item.label }}</span>
           </label>
         </fieldset>
-        <label class="select-filter"
-          ><span>기준 연도</span
-          ><select v-model="selectedYear">
-            <option>2026</option>
-            <option>2025</option>
-            <option>2024</option>
-          </select></label
-        >
-        <div class="date-filter">
-          <span>조회 기간</span><input v-model="fromDate" type="date" /><i>~</i
-          ><input v-model="toDate" type="date" />
-        </div>
+        <label v-if="periodUnit === 'month' || periodUnit === 'quarter'" class="select-filter"><span>기준 연도</span><select v-model="selectedYear"><option v-for="year in availableYears" :key="year" :value="String(year)">{{ year }}년</option></select></label>
+        <label v-if="periodUnit === 'month'" class="select-filter"><span>조회 월</span><select v-model="selectedMonth"><option v-for="month in 12" :key="month" :value="String(month)">{{ month }}월</option></select></label>
+        <label v-if="periodUnit === 'quarter'" class="select-filter"><span>조회 분기</span><select v-model="selectedQuarter"><option v-for="quarter in 4" :key="quarter" :value="String(quarter)">{{ quarter }}분기</option></select></label>
+        <div v-if="periodUnit === 'year'" class="available-year-list"><span>비교 연도</span><b v-for="year in availableYears" :key="year">{{ year }}</b></div>
+        <div class="date-filter"><span>{{ periodUnit === 'day' ? '로그인 기준 일자' : '조회 기간' }}</span><b>{{ fromDate }}</b><i v-if="periodUnit !== 'day'">~</i><b v-if="periodUnit !== 'day'">{{ toDate }}</b></div>
         <fieldset class="category-filter">
           <legend>카테고리</legend>
           <label
@@ -387,6 +394,48 @@ onBeforeUnmount(() => {
       </section>
       <p v-if="error" class="dashboard-error">{{ error }}</p>
 
+      <section class="admin-panel export-panel">
+        <header>
+          <div>
+            <small>DATABASE EXPORT</small>
+            <h2>분석·예측 데이터 다운로드</h2>
+            <p>
+              화면값이 아니라 선택 기간의 실제 DB 테이블을 Python에서 다시
+              조회합니다.
+            </p>
+          </div>
+        </header>
+        <div class="export-controls">
+          <label>
+            <span>포함 데이터</span>
+            <select v-model="exportSection">
+              <option value="all">전체 통계</option>
+              <option value="summary">매출 요약</option>
+              <option value="categories">카테고리 통계</option>
+              <option value="daily">일별 매출</option>
+              <option value="products">상품·재고 통계</option>
+              <option value="reviews">리뷰 감정 통계</option>
+              <option value="forecast">판매 예측</option>
+            </select>
+          </label>
+          <label>
+            <span>파일 형식</span>
+            <select v-model="exportFormat">
+              <option value="csv">CSV</option>
+              <option value="xlsx">Excel</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            :disabled="exporting"
+            @click="downloadStatistics"
+          >
+            {{ exporting ? "파일 생성 중" : "DB 통계 다운로드" }}
+          </button>
+        </div>
+        <p v-if="exportMessage" class="export-message">{{ exportMessage }}</p>
+      </section>
+
       <section class="admin-chart-grid">
         <article class="admin-panel sales-trend-panel">
           <header>
@@ -397,9 +446,9 @@ onBeforeUnmount(() => {
                     ? "일별"
                     : periodUnit === "month"
                       ? "월별"
-                    : periodUnit === "quarter"
-                      ? "분기별"
-                      : "연도별"
+                      : periodUnit === "quarter"
+                        ? "분기별"
+                        : "연도별"
                 }}
                 매출 추이
               </h2>
@@ -422,7 +471,9 @@ onBeforeUnmount(() => {
             <small>AI SALES FORECAST</small>
             <h2>다음 달 판매 예측</h2>
           </div>
-          <button type="button" :disabled="retraining" @click="retrainModel">{{ retraining ? "AI 재학습 중" : "AI 모델 재학습" }}</button>
+          <button type="button" :disabled="retraining" @click="retrainModel">
+            {{ retraining ? "AI 재학습 중" : "AI 모델 재학습" }}
+          </button>
         </header>
         <div class="ai-forecast-grid">
           <div class="forecast-total">
@@ -443,13 +494,14 @@ onBeforeUnmount(() => {
             </li>
           </ol>
         </div>
-        <p v-if="retrainMessage" class="retrain-message">{{ retrainMessage }}</p>
+        <p v-if="retrainMessage" class="retrain-message">
+          {{ retrainMessage }}
+        </p>
       </section>
 
       <section class="admin-panel sales-summary-panel">
         <header>
           <h2>매출 요약</h2>
-          <button type="button" @click="exportCsv">CSV 내보내기</button>
         </header>
         <div class="admin-table-wrap">
           <table>
@@ -468,7 +520,7 @@ onBeforeUnmount(() => {
                 <th>{{ row.name }}</th>
                 <td>{{ formatWon(row.sales) }}</td>
                 <td>{{ row.orders.toLocaleString() }}건</td>
-                <td>{{ formatWon(row.sales / row.orders) }}</td>
+                <td>{{ formatWon(row.orders ? row.sales / row.orders : 0) }}</td>
                 <td>{{ formatWon(row.refund) }}</td>
                 <td class="growth">▲ {{ row.growth }}%</td>
               </tr>
@@ -490,16 +542,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .admin-dashboard {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  min-height: 100vh;
-  background: #f7f5f2;
   color: #3f281d;
   font-family: inherit;
-  transition: grid-template-columns 0.22s ease;
-}
-.admin-dashboard.collapsed {
-  grid-template-columns: 70px minmax(0, 1fr);
 }
 .admin-sidebar {
   position: sticky;
@@ -714,6 +758,10 @@ onBeforeUnmount(() => {
   gap: 7px;
   flex-wrap: wrap;
 }
+.date-filter b { display: inline-flex; align-items: center; min-height: 38px; border: 1px solid #decbbb; border-radius: 7px; padding: 0 11px; background: #fffdfb; color: #5c4030; font-size: 13px; font-weight: 700; }
+.available-year-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.available-year-list > span { width: 100%; color: #7a5a42; font-size: 11px; font-weight: 800; }
+.available-year-list b { border-radius: 999px; background: #f1e5d8; padding: 6px 9px; color: #865737; font-size: 12px; }
 .date-filter > span {
   width: 100%;
   margin: 0;
@@ -788,6 +836,54 @@ onBeforeUnmount(() => {
 .admin-kpi-grid b,
 .growth {
   color: #4b9855;
+}
+.export-panel {
+  margin-bottom: 12px;
+  background: #fffaf3;
+}
+.export-panel header p {
+  margin: 5px 0 0;
+  color: #8f7969;
+  font-size: 11px;
+}
+.export-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 140px auto;
+  align-items: end;
+  gap: 12px;
+}
+.export-controls label span {
+  display: block;
+  margin-bottom: 6px;
+  color: #72513a;
+  font-size: 10px;
+  font-weight: 900;
+}
+.export-controls select,
+.export-controls button {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #d8c4b3;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 10px;
+  color: #4b3427;
+}
+.export-controls button {
+  border: 0;
+  background: #95643d;
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+.export-controls button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.export-message {
+  margin: 10px 0 0;
+  color: #765337;
+  font-size: 11px;
 }
 .admin-kpi-grid em {
   color: #d27355;
@@ -919,6 +1015,9 @@ onBeforeUnmount(() => {
 @media (max-width: 1100px) {
   .admin-filter-panel {
     grid-template-columns: 1fr 1fr;
+  }
+  .export-controls {
+    grid-template-columns: 1fr;
   }
   .category-filter,
   .date-filter {

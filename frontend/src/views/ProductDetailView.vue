@@ -1,6 +1,13 @@
 <!-- URL의 상품 식별자로 상세 데이터를 찾고 갤러리·옵션·구매 동작을 제어합니다. -->
 <script setup>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  watchEffect,
+} from "vue";
 import { useRouter } from "vue-router";
 import { productService } from "@/services/productService";
 import { useCart } from "@/stores/cart";
@@ -8,23 +15,45 @@ import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
 import CartAddedModal from "@/components/CartAddedModal.vue";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import { reviewService } from "@/services/reviewService";
 
 const props = defineProps({ pet: String, id: String });
 const router = useRouter();
 const product = ref(null);
 const detailLoading = ref(true);
 const detailError = ref("");
+const reviews = ref([]);
+const reviewsLoading = ref(false);
 
 function normalizeDetail(detail) {
-  const variants = detail.productType === "DEVICE" ? detail.deviceVariants : detail.foodVariants;
-  const available = (variants || []).filter((item) => item.status !== "DISCONTINUED");
+  const variants =
+    detail.productType === "DEVICE"
+      ? detail.deviceVariants
+      : detail.foodVariants;
+  const available = (variants || []).filter(
+    (item) => item.status !== "DISCONTINUED",
+  );
   const first = available[0] || {};
   return {
     ...detail,
     category: detail.categoryName || "기타",
-    image: detail.images?.find((item) => item.main)?.imagePath || detail.images?.[0]?.imagePath || "/images/product-placeholder.svg",
-    options: available.map((item) => item.optionLabel || item.optionKey).filter(Boolean),
-    optionPrices: Object.fromEntries(available.map((item) => [item.optionLabel || item.optionKey, Number(item.price || 0)])),
+    image:
+      detail.images?.find((item) => item.main)?.imagePath ||
+      detail.images?.[0]?.imagePath ||
+      "/images/product-placeholder.svg",
+    options: available
+      .map((item) => item.optionLabel || item.optionKey)
+      .filter(Boolean),
+    optionPrices: Object.fromEntries(
+      available.map((item) => [
+        item.optionLabel || item.optionKey,
+        Number(item.price || 0),
+      ]),
+    ),
+    // # 선택한 옵션의 실제 variant ID를 주문·장바구니 API에 전달한다.
+    optionVariantIds: Object.fromEntries(
+      available.map((item) => [item.optionLabel || item.optionKey, item.id]),
+    ),
     option: first.optionLabel || first.optionKey || "기본 옵션",
     price: Number(first.price || 0),
     stock: available.some((item) => Number(item.stock || 0) > 0) ? 1 : 0,
@@ -37,15 +66,46 @@ async function loadProduct() {
   detailLoading.value = true;
   detailError.value = "";
   try {
-    product.value = normalizeDetail(await productService.detail(props.id));
+    reviewsLoading.value = true;
+    const detail = await productService.detail(props.id);
+    product.value = normalizeDetail(detail);
+    try {
+      const reviewSummary = await reviewService.getProductReviews(props.id);
+      // # 백엔드가 별점 높은 순·동점 작성일 빠른 순으로 정렬해 전달한다.
+      reviews.value = Array.isArray(reviewSummary.reviews)
+        ? reviewSummary.reviews
+        : [];
+    } catch (reviewError) {
+      // # 리뷰 API 오류가 상품 상세 페이지 전체를 막지 않도록 리뷰 영역만 빈 상태로 둔다.
+      reviews.value = [];
+      console.warn("상품 리뷰를 불러오지 못했습니다.", reviewError);
+    }
   } catch (error) {
     product.value = null;
     detailError.value = error.message || "상품 정보를 불러오지 못했습니다.";
   } finally {
     detailLoading.value = false;
+    reviewsLoading.value = false;
   }
 }
-onMounted(loadProduct);
+// # 상품 옵션 드롭다운은 다른 영역을 누르면 닫혀야 키보드·마우스 모두에서 상태가 남지 않는다.
+const optionSelector = ref(null);
+const closeOptionOnOutside = (event) => {
+  if (
+    optionOpen.value &&
+    optionSelector.value &&
+    !optionSelector.value.contains(event.target)
+  ) {
+    optionOpen.value = false;
+  }
+};
+onMounted(() => {
+  loadProduct();
+  document.addEventListener("pointerdown", closeOptionOnOutside);
+});
+onBeforeUnmount(() =>
+  document.removeEventListener("pointerdown", closeOptionOnOutside),
+);
 watch(() => props.id, loadProduct);
 const sectionName = computed(() =>
   props.pet === "CAT"
@@ -69,6 +129,7 @@ watchEffect(() => {
     );
 });
 const tab = ref("detail");
+const showAllReviews = ref(false);
 const galleryIndex = ref(0);
 const optionOpen = ref(false);
 const cartAdded = ref(false);
@@ -77,21 +138,30 @@ const selectedOption = ref("");
 const galleryImages = computed(() =>
   !product.value
     ? []
-    :
-  Array.from({ length: 4 }, (_, index) => ({
-    src: product.value.image,
-    alt: `${product.value.name} 상품 이미지 ${index + 1}`,
-  })),
+    : Array.from({ length: 4 }, (_, index) => ({
+        src: product.value.image,
+        alt: `${product.value.name} 상품 이미지 ${index + 1}`,
+      })),
 );
-const productOptions = computed(
-  () => product.value?.options?.length ? product.value.options : product.value ? [product.value.option] : [],
+const productOptions = computed(() =>
+  product.value?.options?.length
+    ? product.value.options
+    : product.value
+      ? [product.value.option]
+      : [],
 );
 const currentOption = computed(
   () => selectedOption.value || productOptions.value[0] || "기본 옵션",
 );
 // 옵션별 가격표가 없는 API 상품도 기본 판매가로 안전하게 표시합니다.
 const currentPrice = computed(
-  () => product.value?.optionPrices?.[currentOption.value] || product.value?.price || 0,
+  () =>
+    product.value?.optionPrices?.[currentOption.value] ||
+    product.value?.price ||
+    0,
+);
+const currentVariantId = computed(
+  () => product.value?.optionVariantIds?.[currentOption.value] || null,
 );
 const getOptionPrice = (option) =>
   product.value?.optionPrices?.[option] || product.value?.price || 0;
@@ -107,12 +177,13 @@ const addToCart = async () => {
   }
   try {
     await add(
-    {
-      ...product.value,
-      option: currentOption.value,
-      price: currentPrice.value,
-    },
-    props.pet,
+      {
+        ...product.value,
+        option: currentOption.value,
+        price: currentPrice.value,
+        variantId: currentVariantId.value,
+      },
+      props.pet,
     );
     cartAdded.value = true;
   } catch (error) {
@@ -129,6 +200,7 @@ const buyNow = () => {
       name: product.value.name,
       image: product.value.image,
       price: currentPrice.value,
+      variantId: currentVariantId.value,
       option: currentOption.value,
       quantity: 1,
     }),
@@ -172,7 +244,12 @@ const productDetailContent = computed(() => {
       title: `${product.value.name}, 매일 편리하게 사용하는 반려생활 용품`,
       description:
         "반려동물이 편안하게 사용할 수 있도록 안정성과 관리 편의성을 고려한 상품입니다.",
-      highlights: ["간편한 세척", "안정적인 사용", "생활 방수", "반려동물 맞춤"],
+      highlights: [
+        "간편한 세척",
+        "안정적인 사용",
+        "생활 방수",
+        "반려동물 맞춤",
+      ],
       usage:
         "평평하고 안정적인 장소에 설치한 뒤 사용 전 구성품을 깨끗이 세척해주세요.",
       storage: "직사광선과 습기가 많은 장소를 피해 보관해주세요.",
@@ -196,7 +273,8 @@ const productDetailContent = computed(() => {
     highlights: ["엄선한 원료", "균형 영양", "기호성 고려", "신선한 제조"],
     usage:
       "기존에 먹던 식품과 조금씩 섞어 적응 기간을 두고, 체중과 활동량에 따라 급여량을 조절해주세요.",
-    storage: "개봉 후 밀봉하여 직사광선을 피해 서늘하고 건조한 곳에 보관해주세요.",
+    storage:
+      "개봉 후 밀봉하여 직사광선을 피해 서늘하고 건조한 곳에 보관해주세요.",
   };
 });
 
@@ -214,7 +292,6 @@ const purchaseGuide = [
     text: "결제완료 상태에서는 배송지와 배송 요청사항을 변경할 수 있으며 배송준비 이후에는 고객 문의로 접수해주세요.",
   },
 ];
-
 </script>
 
 <template>
@@ -272,8 +349,8 @@ const purchaseGuide = [
           <dd>3,000원</dd>
         </dl>
         <div class="option-selector">
-          <strong>{{ pet === "ALL" ? "옵션 선택" : "중량 선택" }}</strong>
-          <div class="option-control">
+          <strong>옵션 선택 (필수) <em>*</em></strong>
+          <div ref="optionSelector" class="option-control">
             <button
               type="button"
               class="option-trigger"
@@ -287,20 +364,27 @@ const purchaseGuide = [
               </small>
               <i aria-hidden="true" />
             </button>
-            <div v-if="optionOpen" class="option-menu">
-              <button
+            <div
+              v-if="optionOpen"
+              class="option-menu"
+              role="radiogroup"
+              aria-label="상품 옵션"
+            >
+              <label
                 v-for="option in productOptions"
                 :key="option"
-                type="button"
                 :class="{ selected: currentOption === option }"
-                @click="chooseOption(option)"
               >
+                <input
+                  type="radio"
+                  name="product-option"
+                  :checked="currentOption === option"
+                  :value="option"
+                  @change="selectedOption = option"
+                />
+                <i aria-hidden="true" />
                 <span>{{ option }}</span>
-                <small v-if="getOptionExtra(option)">
-                  (+{{ getOptionExtra(option).toLocaleString() }}원)
-                </small>
-                <span v-if="currentOption === option">✓</span>
-              </button>
+              </label>
             </div>
           </div>
         </div>
@@ -388,7 +472,31 @@ const purchaseGuide = [
           </div>
           <strong>★ {{ product.rating }}</strong>
         </header>
-        <p class="empty-data-notice">등록된 상품 리뷰가 없습니다.</p>
+        <!-- # 첫 번째 항목은 최고 별점·가장 이른 작성일 기준의 베스트 리뷰입니다. -->
+        <section v-if="reviews.length" class="review-list">
+          <article class="best-review">
+            <small>BEST REVIEW</small
+            ><b>★ {{ reviews[0].rating }} · {{ reviews[0].writerName }}</b>
+            <p>{{ reviews[0].content }}</p>
+          </article>
+          <button
+            v-if="reviews.length > 1"
+            type="button"
+            class="review-all-button"
+            @click="showAllReviews = !showAllReviews"
+          >
+            {{ showAllReviews ? "접기" : `전체보기 (${reviews.length})` }}
+          </button>
+          <ol v-if="showAllReviews" class="review-items">
+            <li v-for="review in reviews.slice(1)" :key="review.id">
+              <b>★ {{ review.rating }} · {{ review.writerName }}</b>
+              <p>{{ review.content }}</p>
+            </li>
+          </ol>
+        </section>
+        <p v-else-if="!reviewsLoading" class="empty-data-notice">
+          등록된 상품 리뷰가 없습니다.
+        </p>
       </article>
     </section>
     <CartAddedModal v-model="cartAdded" @cart="router.push('/cart')" />

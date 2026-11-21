@@ -110,13 +110,13 @@ async def load_sales_export_frames(
         """
         WITH product_group AS (
             SELECT p.id AS product_id,
-                   CASE WHEN COUNT(DISTINCT ppt.pet_type) > 1 THEN '식기·급수'
-                        WHEN MAX(ppt.pet_type) = 'DOG' THEN '강아지'
-                        WHEN MAX(ppt.pet_type) = 'CAT' THEN '고양이'
-                        ELSE COALESCE(c.name, '기타') END AS category_name
-            FROM products p LEFT JOIN categories c ON c.id = p.category_id
-            LEFT JOIN product_pet_types ppt ON ppt.product_id = p.id
-            GROUP BY p.id, c.name
+                   CASE p.product_type
+                        WHEN 'DOG' THEN '강아지관'
+                        WHEN 'CAT' THEN '고양이관'
+                        WHEN 'DEVICE' THEN '식기·급수관'
+                        ELSE '기타'
+                   END AS category_name
+            FROM products p
         ), current_period AS (
             SELECT pg.category_name, SUM(oi.total_price) AS sales,
                    COUNT(DISTINCT o.id) AS orders

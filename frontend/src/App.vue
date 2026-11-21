@@ -64,9 +64,9 @@ onBeforeUnmount(() =>
 
 async function checkPetRegistration(token) {
   // 관리자는 쇼핑·반려동물 추천 대상이 아니므로 PETS API를 호출하지 않습니다.
-  const isAdmin = sessionStorage.getItem("powcast-user-role") === "ADMIN";
-  if (!token || token === checkedPetToken || route.meta.requiresAdmin || isAdmin) {
-    if (isAdmin) petPromptOpen.value = false;
+  const isOperator = ["ADMIN", "MANAGER"].includes(sessionStorage.getItem("powcast-user-role"));
+  if (!token || token === checkedPetToken || route.meta.requiresManager || route.meta.requiresAdmin || isOperator) {
+    if (isOperator) petPromptOpen.value = false;
     return;
   }
   checkedPetToken = token;

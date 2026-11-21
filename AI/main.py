@@ -27,7 +27,8 @@ app.add_middleware(
     allow_origins=["null"],
     allow_origin_regex=r"https?://(127\.0\.0\.1|localhost)(:\d+)?",
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type"],
+    # Vue의 JWT와 Spring의 서버 간 내부 키를 모두 허용합니다.
+    allow_headers=["Authorization", "Content-Type", "Internal-Api-Key"],
 )
 
 # AI 도메인 라우터 등록

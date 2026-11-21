@@ -4,7 +4,6 @@ import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
-import com.project.pawcast.review.event.ReviewAnalysisRequested;
 import com.project.pawcast.review.filter.ProfanityFilter;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.order.entity.OrderItem;
@@ -18,7 +17,6 @@ import com.project.pawcast.review.repository.ProductReviewRepository;
 import com.project.pawcast.review.repository.ReviewImageRepository;
 import com.project.pawcast.review.repository.ReviewSentimentRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +39,6 @@ public class ReviewService {
     private final ProductRepository productRepository;
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
-    private final ApplicationEventPublisher eventPublisher;
     private final ProfanityFilter profanityFilter;
 
     // 리뷰 등록
@@ -102,14 +99,6 @@ public class ReviewService {
                 productRepository.addReviewStatistics(
                         review.getProduct().getId(),
                         review.getRating()
-                )
-        );
-
-        // 추가: 리뷰 분석 요청 이벤트 발행
-        eventPublisher.publishEvent(
-                new ReviewAnalysisRequested(
-                        response.id(),
-                        response.content()
                 )
         );
 
@@ -187,6 +176,9 @@ public class ReviewService {
     ) {
         ProductReview review = findOwnedReview(reviewId, memberId);
 
+        // 수정된 리뷰 본문도 Python을 호출하지 않고 Java 사전으로 검증
+        profanityFilter.containsProhibitedWord(request.content());
+
         int oldRating = review.getRating();
         Long productId = review.getProduct().getId();
 
@@ -224,16 +216,6 @@ public class ReviewService {
                             productId,
                             oldRating,
                             request.rating()
-                    )
-            );
-        }
-
-        // 4. 본문이 바뀐 경우만 재분석 이벤트를 발행
-        if (contentChanged) {
-            eventPublisher.publishEvent(
-                    new ReviewAnalysisRequested(
-                            response.id(),
-                            response.content()
                     )
             );
         }

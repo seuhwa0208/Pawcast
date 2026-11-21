@@ -6,20 +6,24 @@ import { noticeService } from "@/services/noticeService";
 const route = useRoute(),
   router = useRouter();
 const notices = ref([]);
+const loadError = ref("");
 const filter = ref("전체"),
   keyword = ref(""),
   selected = ref(null),
   page = ref(1);
 onMounted(async () => {
   try {
+    loadError.value = "";
     notices.value = await noticeService.list();
-    selected.value = notices.value.find((item) => item.id === Number(route.query.id)) || null;
-  } catch {
+    selected.value =
+      notices.value.find((item) => item.id === Number(route.query.id)) || null;
+  } catch (error) {
     notices.value = [];
+    loadError.value = error.message || "공지사항을 불러오지 못했습니다.";
   }
 });
 const filtered = computed(() =>
-  notices
+  notices.value
     .filter(
       (item) =>
         (filter.value === "전체" || item.type === filter.value) &&
@@ -72,35 +76,32 @@ function closeDetail() {
             {{ item }}
           </button>
         </div>
-        <label
-          ><input
+        <label>
+          <button type="button" class="notice-search-icon" aria-label="검색" />
+          <input
             v-model.trim="keyword"
             placeholder="제목 또는 내용을 검색하세요"
-          /><span>⌕</span></label
-        ><button class="notice-search">검색</button>
+          />
+        </label>
+        <button class="notice-search">검색</button>
       </div>
-      <div class="pinned-notices">
+      <p v-if="loadError" class="empty-data-notice">
+        {{ loadError }} 서버 연결 상태를 확인해주세요.
+      </p>
+      <div v-if="pinned.length" class="pinned-notices">
         <button v-for="item in pinned" :key="item.id" @click="selected = item">
-          <span class="pin-mark">고정</span
-          ><span
+          <span class="pin-mark">고정</span>
+          <span
             class="notice-type"
             :class="{ event: item.type === '이벤트' }"
             >{{ item.type }}</span
           ><strong>{{ item.title }}</strong
-          ><time>{{ item.date }}</time
-          ><span class="event-state"
-            ><em
-              v-if="item.status"
-              :class="{ ended: item.status === '종료' }"
-              >{{ item.status }}</em
-            ><i v-else>—</i></span
-          >
+          ><time>{{ item.date }}</time>
         </button>
       </div>
-      <div class="notice-list">
+      <div class="notice-list" :class="{ 'without-pinned': !pinned.length }">
         <div class="notice-list-head">
-          <span>번호</span><span>구분</span><span>제목</span><span>등록일</span
-          ><span>이벤트 상태</span><span>조회</span>
+          <span>번호</span><span>구분</span><span>제목</span><span>등록일</span>
         </div>
         <button
           v-for="item in visibleItems"
@@ -115,14 +116,7 @@ function closeDetail() {
               >{{ item.type }}</b
             ></span
           ><span class="notice-title">{{ item.title }}</span
-          ><span>{{ item.date }}</span
-          ><span class="event-state"
-            ><em
-              v-if="item.status"
-              :class="{ ended: item.status === '종료' }"
-              >{{ item.status }}</em
-            ><i v-else>—</i></span
-          ><span>{{ item.views.toLocaleString() }}</span>
+          ><span>{{ item.date }}</span>
         </button>
       </div>
       <nav class="qna-pagination" aria-label="페이지 이동">
@@ -167,8 +161,7 @@ function closeDetail() {
         </div>
         <h2>{{ selected.title }}</h2>
         <p>
-          <time>{{ selected.date }}</time
-          ><span>조회 {{ selected.views.toLocaleString() }}</span>
+          <time>{{ selected.date }}</time>
         </p>
       </header>
       <article class="board-detail-content">

@@ -9,6 +9,7 @@ const props = defineProps({ pet: String, device: Boolean });
 const route = useRoute();
 const router = useRouter();
 const products = ref([]);
+const loadError = ref("");
 const foodCategories = ["사료", "간식", "영양제"];
 const deviceCategories = ["급식기", "급수기", "일반 식기", "정수 / 필터"];
 const subcategoryMap = {
@@ -175,12 +176,14 @@ watch(
 
 async function loadProducts() {
   try {
+    loadError.value = "";
     products.value = await productService.list(
       { productType: props.device ? "DEVICE" : props.pet },
       props.device ? "ALL" : props.pet,
     );
-  } catch {
+  } catch (error) {
     products.value = [];
+    loadError.value = error.message || "상품 목록을 불러오지 못했습니다.";
   }
 }
 
@@ -592,9 +595,18 @@ const list = computed(() => {
         </div>
         <div v-else class="catalog-empty">
           <span aria-hidden="true">···</span>
-          <h2>상품 준비 중입니다</h2>
+          <h2>
+            {{
+              loadError
+                ? "상품 목록을 불러오지 못했습니다"
+                : "상품 준비 중입니다"
+            }}
+          </h2>
           <p>
-            선택하신 분류의 상품을 준비하고 있어요.<br />조금만 기다려 주세요.
+            {{ loadError || "선택하신 분류의 상품을 준비하고 있어요." }}<br />
+            {{
+              loadError ? "잠시 후 다시 시도해주세요." : "조금만 기다려 주세요."
+            }}
           </p>
         </div>
       </section>

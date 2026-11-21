@@ -19,6 +19,7 @@ ap.add_argument('--end', default='2026-11-20')
 ap.add_argument('--now', default='2026-11-20 10:30')
 ap.add_argument('--members', type=int, default=4000)
 ap.add_argument('--rng', type=int, default=20261120)
+ap.add_argument('--ai-dir', default='ai_dataset')
 A = ap.parse_args()
 
 rng = np.random.default_rng(A.rng)
@@ -343,75 +344,10 @@ for o in ORDERS:
     if st in ('SHIPPING', 'DELIVERED'): ship_rows.append((oid, st, shipped, delivered))
 
 # ------------------------------------------------------------------ 6. 리뷰 (본문-평점 일관)
-POS = {
- 'food': {
-  '기호성': ["{pet}가 정말 잘 먹어요.", "기호성이 아주 좋아서 그릇을 싹 비워요.", "처음 먹이는데도 거부감 없이 잘 먹네요.", "편식하는 아이인데 이건 잘 먹어서 놀랐어요."],
-  '소화': ["변 상태가 좋아졌어요.", "먹고 나서 배변이 편안해 보여요.", "속이 편한지 잔병치레가 줄었어요."],
-  '알갱이/냄새': ["알갱이 크기가 적당해요.", "냄새가 심하지 않아서 좋아요."],
-  '포장': ["포장이 꼼꼼해서 안심이 됐어요.", "지퍼백이라 보관하기 편해요."],
-  '가격': ["이 가격에 이 정도면 만족해요.", "할인할 때 사서 가성비가 좋았어요."],
-  '배송': ["배송이 빨라서 좋았어요.", "주문 다음 날 도착했어요."],
-  '모질': ["털에 윤기가 도는 것 같아요.", "꾸준히 먹이니 모질이 좋아졌어요."],
-  '양': ["용량이 넉넉해서 오래 먹일 수 있어요."]},
- 'supp': {
-  '효과': ["꾸준히 먹이니 눈에 띄게 활발해졌어요.", "관절이 좋아진 느낌이에요.", "털 빠짐이 줄었어요."],
-  '기호성': ["간식처럼 잘 먹어요.", "알약도 거부 없이 잘 먹어요."],
-  '부작용': ["부작용 없이 잘 맞아요."],
-  '포장': ["포장이 꼼꼼해서 좋았어요."], '가격': ["꾸준히 먹이기에 부담 없는 가격이에요."], '배송': ["배송이 빨라서 좋았어요."]},
- 'device': {
-  '디자인': ["디자인이 깔끔하고 집에 잘 어울려요.", "색상이 예뻐요."],
-  '소음': ["소음이 거의 없어요.", "조용해서 밤에도 괜찮아요."],
-  '세척': ["분리해서 세척하기 편해요.", "물세척이 쉬워요."],
-  '내구성': ["재질이 튼튼해 보여요.", "마감이 깔끔해요."],
-  '사용성': ["설치가 간단해서 금방 썼어요.", "사용법이 쉬워요."],
-  '용량': ["용량이 넉넉해요."], '포장': ["포장이 꼼꼼해서 좋았어요."], '가격': ["가격 대비 만족스러워요."], '배송': ["배송이 빨라서 좋았어요."]}}
-NEG = {
- 'food': {
-  '기호성': ["{pet}가 냄새만 맡고 안 먹어요.", "기호성이 별로인지 잘 안 먹네요.", "먹다가 남기는 양이 많아요.", "기존 사료보다 덜 먹는 것 같아요."],
-  '소화': ["먹이고 나서 변이 묽어졌어요.", "살짝 설사 기미가 있어서 양을 줄였어요.", "먹고 나서 구토를 해서 걱정이에요."],
-  '알갱이/냄새': ["알갱이가 너무 커서 먹기 힘들어해요.", "냄새가 좀 강해요.", "가루가 많이 남아 있어요."],
-  '포장': ["포장이 찢어진 채로 왔어요.", "박스가 눌려서 와서 속상했어요.", "포장이 부실해서 새어 나올 것 같아요."],
-  '가격': ["가격이 조금 부담돼요.", "용량 대비 비싼 것 같아요."],
-  '배송': ["배송이 너무 늦었어요.", "배송이 지연돼서 사료가 떨어질 뻔했어요.", "택배가 생각보다 오래 걸렸어요."],
-  '모질': ["아직 효과는 잘 모르겠어요."], '양': ["생각보다 양이 적어요."]},
- 'supp': {
-  '효과': ["한 달 먹였는데 효과를 모르겠어요.", "효과가 별로 없는 것 같아요."],
-  '기호성': ["냄새 때문에 안 먹으려고 해요.", "억지로 먹여야 해서 힘들어요."],
-  '부작용': ["먹이고 나서 설사를 했어요.", "먹고 나서 구토를 해서 중단했어요."],
-  '포장': ["포장이 파손된 채로 도착했어요."], '가격': ["가격이 조금 비싸요."], '배송': ["배송이 너무 늦었어요.", "택배가 생각보다 오래 걸렸어요."]},
- 'device': {
-  '디자인': ["사진과 색이 달라요.", "디자인이 생각보다 투박해요."],
-  '소음': ["소음이 커서 {pet}가 놀라요.", "모터 소리가 신경 쓰여요."],
-  '세척': ["틈새 세척이 어려워요.", "세척이 번거로워요."],
-  '내구성': ["플라스틱 재질이 약해 보여요.", "사용 몇 주 만에 고장 났어요.", "마감이 거칠어요."],
-  '사용성': ["설명서가 부실해서 설치가 어려웠어요.", "작동이 번거로워요."],
-  '용량': ["용량이 생각보다 작아요."], '포장': ["포장이 파손된 채로 도착했어요.", "박스가 찌그러져 왔어요."], '가격': ["가격이 좀 비싸요."], '배송': ["배송이 너무 늦었어요.", "택배가 생각보다 오래 걸렸어요."]}}
-INCIDENT = ["물이 새서 바닥이 다 젖었어요.", "펌프에서 이상한 소리가 나요.", "며칠 쓰다가 작동이 멈췄어요.", "센서 오류로 물이 잘 안 나와요."]
-OPEN = {'pos': ["재구매했어요!", "만족스러워요.", "추천합니다.", "배송 잘 받았습니다."], 'neu': ["무난해요.", "그냥 보통이에요.", "써보고 있어요."], 'neg': ["아쉬워요.", "실망했어요.", "기대했는데 별로네요."]}
-CLOSE = {'pos': ["앞으로도 계속 이용할게요.", "주변에도 추천하려고요.", "다음에도 구매할 예정이에요.", "만족합니다 ㅎㅎ"], 'neu': ["좀 더 써보고 다시 남길게요.", "나쁘지 않아요."], 'neg': ["재구매는 고민돼요.", "다른 제품을 알아보려고요.", "개선이 되었으면 좋겠어요.", "아쉽네요 ㅠㅠ"]}
-SHORT = {'pos': ["좋아요", "만족합니다", "굿", "잘 쓰고 있어요", "재구매 의사 있어요"], 'neu': ["보통이에요", "그냥 그래요", "무난합니다"], 'neg': ["별로예요", "실망이에요", "비추합니다"]}
-def make_review(domain, sp, rating, delay_flag, incident):
-    pet = '강아지' if sp == 'DOG' else '고양이'
-    sent = 'pos' if rating >= 4 else ('neu' if rating == 3 else 'neg')
-    if rng.random() < 0.12: return random.choice(SHORT[sent]), sent
-    pos_a = list(POS[domain]); neg_a = list(NEG[domain]); sents = []
-    def pickp(): a = random.choice(pos_a); pos_a.remove(a); return random.choice(POS[domain][a])
-    def pickn(): a = random.choice(neg_a); neg_a.remove(a); return random.choice(NEG[domain][a])
-    k = random.choice([1, 2, 2, 3])
-    if sent == 'pos':
-        sents = [pickp() for _ in range(min(k, len(pos_a)))]
-        if rating == 4 and rng.random() < 0.35: sents.append('다만 ' + pickn())
-    elif sent == 'neu':
-        sents = [pickp(), '그런데 ' + pickn()] if rng.random() < 0.6 else [pickn(), '그래도 ' + pickp()]
-    else:
-        sents = [pickn() for _ in range(min(random.choice([1, 2]), len(neg_a)))]
-        if rng.random() < 0.25 and pos_a: sents.append('그래도 ' + pickp())
-    if delay_flag: sents = [random.choice(NEG[domain]['배송'])] + [s for s in sents if not s.startswith('다만')][:1]
-    if incident: sents = [random.choice(INCIDENT)] + sents[:1]
-    text = ' '.join(sents)
-    if rng.random() < 0.4: text = random.choice(OPEN[sent]) + ' ' + text
-    if rng.random() < 0.5: text = text + ' ' + random.choice(CLOSE[sent])
-    return text.replace('{pet}', pet), sent
+# ------------------------------------------------------------------ 6. 리뷰 (본문-평점 일관, 문장 생성기는 pawcast_review_text.py)
+import os, sys; sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pawcast_review_text import ReviewGen, is_holdout
+RG = ReviewGen(A.rng + 7)
 
 member_bias = rng.normal(0, 0.3, M)
 all_img = sorted({p for v in images.values() for p in v})
@@ -424,13 +360,14 @@ for o in ORDERS:
         inc = (TAGS[prod_tag[pi]] == 'water' and dt.date(2025, 7, 10) <= o['delivered'].date() <= dt.date(2025, 8, 31))
         s = quality[pi] + member_bias[o['mi']] + rng.normal(0, 0.95) - (1.0 if late else 0) - (1.4 if inc else 0)
         rating = int(min(5, max(1, round(s))))
-        p_rev = (0.15 if rating in (3, 4) else (0.30 if rating == 5 else 0.32)) * (1.15 if late else 1.0)
+        p_rev = (0.19 if rating in (3, 4) else (0.37 if rating == 5 else 0.40)) * (1.15 if late else 1.0)
         delay_days = max(0.4, rng.gamma(2.0, 2.5))
         rt = o['delivered'] + dt.timedelta(days=float(delay_days))
         if (rt.year, rt.month) in REVIEW_BOOST_MONTHS: p_rev *= 1.6
         if rng.random() >= p_rev or rt > NOW: continue
-        text, sent = make_review(domain_of(pid), o['sp'], rating, late and rng.random() < 0.6, inc and rng.random() < 0.7)
-        reviews.append(dict(mi=o['mi'], pid=pid, iid=iid_, rating=rating, text=text, ts=rt, sent={'pos': '긍정', 'neu': '중립', 'neg': '부정'}[sent],
+        g_ = RG.make(domain_of(pid), o['sp'], rating, late and rng.random() < 0.6, inc and rng.random() < 0.7, products[pid]['name'], products[pid]['brand'], TAGS[prod_tag[pi]])
+        text = g_['text']
+        reviews.append(dict(mi=o['mi'], pid=pid, iid=iid_, rating=rating, text=text, ts=rt, sent=g_['label'], g=g_, late=late, inc=inc,
                             photo=rng.random() < (0.14 + (0.25 if (rt.year, rt.month) in REVIEW_BOOST_MONTHS else 0))))
 reviews.sort(key=lambda r: r['ts'])
 for i, r in enumerate(reviews): r['id'] = i + 1
@@ -675,3 +612,7 @@ st = dict(period=[str(START), str(END)], days=T, members=M, orders=len(ORDERS), 
           order_status=dict(Counter(o['status'] for o in ORDERS)), guest_orders=sum(1 for o in ORDERS if o['guest']))
 json.dump(st, open(A.stats_out, 'w'), ensure_ascii=False, indent=1, default=str)
 print(json.dumps({k: v for k, v in st.items() if k not in ('monthly',)}, ensure_ascii=False, default=str))
+
+# AI 학습용 CSV
+print('AI CSV:')
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ai_export.py'), encoding='utf-8').read())

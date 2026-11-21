@@ -6,7 +6,7 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
     # .env로 분리해 개발자별 DB 계정이 소스에 남지 않도록 한다.
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/pawcast}
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/pawcast}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD}
   mail:
@@ -29,6 +29,10 @@ petmall:
     allowed-origins:
       - http://127.0.0.1:5174
       - http://localhost:5174
+      - http://127.0.0.1:5175
+      - http://localhost:5175
+      - http://127.0.0.1:5176
+      - http://localhost:5176
       - http://127.0.0.1:5173
       - http://localhost:5173
   jwt:
@@ -50,3 +54,7 @@ oauth:
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
   internal-api-key: ${AI_INTERNAL_API_KEY:}
+
+file:
+  upload:
+    path: ./uploads/images

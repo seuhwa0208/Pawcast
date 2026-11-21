@@ -1,10 +1,18 @@
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.review.profanity_service import contains_prohibited_word
-from app.review.schemas import ReviewRequest, SentimentResponse
+from app.common.database import get_db_session
+from app.review.schemas import (
+    BestReviewProductResponse,
+    ReviewRequest,
+    SentimentResponse,
+    StoredSentimentResponse,
+)
+from app.review.service import analyze_and_store_review, get_best_review_products
 from app.review.sentiment_service import get_sentiment_analyzer
 
 router = APIRouter(prefix="/api/reviews", tags=["한국어 리뷰 감정 분석"])
@@ -13,6 +21,32 @@ SENTIMENT_RESPONSE_MAP = {
     "긍정": "POSITIVE",
     "부정": "NEGATIVE",
 }
+
+
+@router.get(
+    "/best-products",
+    response_model=list[BestReviewProductResponse],
+    response_model_by_alias=True,
+)
+async def best_review_products(
+    limit: int = Query(default=5, ge=1, le=20),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[BestReviewProductResponse]:
+    """평균 평점 상위 상품별 베스트 리뷰를 반환합니다."""
+    return await get_best_review_products(session, limit)
+
+
+@router.post(
+    "/{review_id}/analyze",
+    response_model=StoredSentimentResponse,
+    response_model_by_alias=True,
+)
+async def analyze_saved_review(
+    review_id: int,
+    session: AsyncSession = Depends(get_db_session),
+) -> StoredSentimentResponse:
+    """Spring이 저장한 리뷰를 Python이 DB에서 읽어 분석 결과를 직접 저장합니다."""
+    return await analyze_and_store_review(session, review_id)
 
 
 @router.post(

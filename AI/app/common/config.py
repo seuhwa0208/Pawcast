@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_ECHO: bool = False
     INTERNAL_API_KEY: str = ""
+    JWT_SECRET: str = ""
+    JWT_ISSUER: str = "pawcast"
+
+    # 로컬 데모 데이터와 재학습 조건 설정입니다.
+    USE_MOCK_DATA: bool = False
+    MOCK_RANDOM_SEED: int = 20261119
+    MOCK_SALES_MONTHS: int = 18
+    RETRAINING_ORDER_THRESHOLD: int = 100
+    RETRAINING_MINIMUM_DAYS: int = 7
     
     # 모델은 미리 내려받은 로컬 디렉터리에서만 불러옵니다.
     MODEL_PATH: Path = PROJECT_ROOT / "models" / "review" / "sentiment_model"
@@ -29,7 +38,8 @@ class Settings(BaseSettings):
     MAX_LENGTH: int = 256
     
     model_config = SettingsConfigDict(
-        env_file=PROJECT_ROOT / ".env",
+        # Spring JWT 검증값은 backend/.env에서 공유하고 AI/.env가 있으면 우선 적용합니다.
+        env_file=(PROJECT_ROOT.parent / "backend" / ".env", PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         # .env 파일에 정의되지 않은 여분의 값이 있어도 에러 없이 무시하도록 설정합니다.
         extra="ignore",

@@ -12,6 +12,8 @@ import com.project.pawcast.qna.entity.Qna;
 import com.project.pawcast.qna.entity.QnaSearchType;
 import com.project.pawcast.qna.entity.QnaType;
 import com.project.pawcast.qna.repository.QnaRepository;
+import com.project.pawcast.qnaanswer.entity.QnaAnswer;
+import com.project.pawcast.qnaanswer.repository.QnaAnswerRepository;
 import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +31,7 @@ public class QnaService {
     private final QnaRepository qnaRepository;
     private final MembersRepository membersRepository;
     private final ProductRepository productRepository;
+    private final QnaAnswerRepository qnaAnswerRepository;
     private final AuthorizationValidator validator;
 
     // 단순 조회
@@ -42,7 +46,14 @@ public class QnaService {
         QnaType qnaType;
         if (type == QnaSearchType.ALL) {qnaType = null;}
         else {qnaType = QnaType.valueOf(type.name());}
-        return qnaRepository.searchQnas(qnaType, keyword).stream().map(QnaResponse::from).toList();
+        String normalizedKeyword = keyword == null ? "" : keyword.strip().toLowerCase(Locale.ROOT);
+        return qnaRepository.searchQnas(qnaType).stream()
+                // # null 검색어를 JPQL LOWER 함수에 바인딩하지 않고 문자열 비교로 처리한다.
+                .filter(qna -> normalizedKeyword.isEmpty()
+                        || qna.getTitle().toLowerCase(Locale.ROOT).contains(normalizedKeyword)
+                        || qna.getContent().toLowerCase(Locale.ROOT).contains(normalizedKeyword))
+                .map(this::toResponse)
+                .toList();
     }
     
     // 단건 조회
@@ -52,18 +63,18 @@ public class QnaService {
         Qna qna =  qnaRepository.findByIdAndDeletedAtIsNull(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
         if (qna.isPrivate()) {throw new BusinessException(ErrorCode.FORBIDDEN);}
 
-        return QnaResponse.from(qna);
+        return toResponse(qna);
     }
     
     // 로그인한 회원의 문의 목록
     public List<QnaResponse> myQnaList(Long memberId){
-        return qnaRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(QnaResponse::from).toList();
+        return qnaRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(this::toResponse).toList();
     }
 
     // 본인 문의 상세 조회
     public QnaResponse myQna(Long qnaId, Long memberId) {
         Qna qna = qnaRepository.findByIdAndMember_Id(qnaId,memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
-        return QnaResponse.from(qna);
+        return toResponse(qna);
     }
     
     // 등록
@@ -73,7 +84,7 @@ public class QnaService {
         //회원 조회
         Members member =  membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         // 상품 조회 및 질문 타입 변경
-        QnaType type = QnaType.GENERAL;
+        QnaType type = request.type() == null ? QnaType.GENERAL : request.type();
         Product product =null;
         if(request.productId() != null){ product = productRepository.findById(request.productId())
                 .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
@@ -88,7 +99,7 @@ public class QnaService {
                 .isPrivate(request.isPrivate())
                 .build();
 
-        return QnaResponse.from(qnaRepository.save(qna));
+        return toResponse(qnaRepository.save(qna));
     }
     
     // 수정
@@ -99,7 +110,7 @@ public class QnaService {
         // 작성한 사람과 수정하는 사람이 일치하는지 검사
         Qna qna = findById(qnaId);
         if (!qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
-        QnaType type = QnaType.GENERAL;
+        QnaType type = request.type() == null ? QnaType.GENERAL : request.type();
         Product product = null;
         if (request.productId() != null) {
             product = productRepository.findById(request.productId())
@@ -112,7 +123,7 @@ public class QnaService {
         qna.setType(type);
         qna.setPrivate(request.isPrivate());
 
-        return QnaResponse.from(qna);
+        return toResponse(qna);
     }
     
     // 삭제
@@ -132,13 +143,20 @@ public class QnaService {
     public List<QnaResponse> getListQnaAdminAndManager(Long memberId){
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return qnaRepository.findAllForAdmin().stream().map(QnaResponse::from).toList();
+        return qnaRepository.findAllForAdmin().stream().map(this::toResponse).toList();
     }
 
     // 매니저 관리자 상세 조회
     public QnaResponse detailQnaAdminAndManager(Long qnaId, Long memberId){
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return QnaResponse.from(findById(qnaId));
+        return toResponse(findById(qnaId));
+    }
+
+    private QnaResponse toResponse(Qna qna) {
+        String answer = qnaAnswerRepository.findByQna(qna)
+                .map(QnaAnswer::getContent)
+                .orElse(null);
+        return QnaResponse.from(qna, answer);
     }
 }

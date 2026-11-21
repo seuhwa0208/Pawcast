@@ -18,6 +18,13 @@ const router = useRouter();
 const loginRequired = ref(false);
 const soldOutNotice = ref(false);
 const cartAdded = ref(false);
+// # DB의 이미지 경로가 없어졌거나 외부 이미지가 실패해도 빈 카드 대신 준비된 상품 이미지를 표시한다.
+function handleImageError(event) {
+  const fallback =
+    props.product.imageFallback || "/assets/products/generated/dry-food.png";
+  if (event.currentTarget.src.endsWith(fallback)) return;
+  event.currentTarget.src = fallback;
+}
 // 찜은 회원 전용 기능이므로 토큰 유무에 따라 실제 토글과 로그인 안내를 분기합니다.
 const handleWishlist = async (id) => {
   if (!accessToken.value) {
@@ -48,7 +55,11 @@ const goToLogin = () => {
   <article class="product-card" :class="{ 'sold-out-card': !product.stock }">
     <RouterLink v-if="product.stock" :to="`/products/${pet}/${product.id}`">
       <div class="product-image">
-        <img :src="product.image" :alt="product.name" />
+        <img
+          :src="product.image"
+          :alt="product.name"
+          @error="handleImageError"
+        />
         <div v-if="!product.stock" class="soldout">품절 상품</div>
       </div>
       <UiTag
@@ -56,7 +67,8 @@ const goToLogin = () => {
         :variant="pet === 'CAT' ? 'cat' : 'dog'"
       />
       <h3>{{ product.name }}</h3>
-      <p>★ {{ product.rating }} (리뷰 {{ product.reviewCount || 76 }}건)</p>
+      <!-- # 백엔드 집계값이 없으면 임의 리뷰 수 대신 0건으로 표시한다. -->
+      <p>★ {{ product.rating }} (리뷰 {{ product.reviewCount || 0 }}건)</p>
     </RouterLink>
     <div
       v-else
@@ -68,7 +80,11 @@ const goToLogin = () => {
       @keydown.enter="soldOutNotice = true"
     >
       <div class="product-image">
-        <img :src="product.image" :alt="product.name" />
+        <img
+          :src="product.image"
+          :alt="product.name"
+          @error="handleImageError"
+        />
         <div class="soldout">
           <strong>품절 상품</strong><small>현재 구매할 수 없습니다</small>
         </div>
@@ -78,10 +94,20 @@ const goToLogin = () => {
         :variant="pet === 'CAT' ? 'cat' : 'dog'"
       />
       <h3>{{ product.name }}</h3>
-      <p>★ {{ product.rating }} (리뷰 {{ product.reviewCount || 76 }}건)</p>
+      <!-- # 백엔드 집계값이 없으면 임의 리뷰 수 대신 0건으로 표시한다. -->
+      <p>★ {{ product.rating }} (리뷰 {{ product.reviewCount || 0 }}건)</p>
     </div>
     <div class="product-card-footer">
-      <strong>{{ product.price.toLocaleString() }}원</strong>
+      <div class="product-card-price">
+        <del v-if="product.discountRate"
+          >{{ product.originalPrice.toLocaleString() }}원</del
+        >
+        <strong
+          ><span v-if="product.discountRate" class="discount-rate"
+            >{{ product.discountRate }}%</span
+          >{{ product.price.toLocaleString() }}원</strong
+        >
+      </div>
       <div class="card-actions">
         <button
           type="button"

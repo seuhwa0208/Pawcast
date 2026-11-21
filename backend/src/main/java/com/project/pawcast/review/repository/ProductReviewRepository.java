@@ -21,7 +21,7 @@ public interface ProductReviewRepository
         FROM ProductReview r
         WHERE r.product.id = :productId
           AND r.isVisible = true
-        ORDER BY r.createdAt DESC, r.id DESC
+        ORDER BY r.rating DESC, r.createdAt ASC, r.id ASC
         """)
     List<ProductReview> findVisibleReviews(
             @Param("productId") Long productId
@@ -51,19 +51,17 @@ public interface ProductReviewRepository
                 other.rating > r.rating
                 OR (
                     other.rating = r.rating
-                    AND other.createdAt > r.createdAt
+                    AND other.createdAt < r.createdAt
                 )
                 OR (
                     other.rating = r.rating
                     AND other.createdAt = r.createdAt
-                    AND other.id > r.id
+                    AND other.id < r.id
                 )
             )
       )
     """)
-    List<ProductReview> findBestReviews(
-            @Param("productIds") List<Long> productIds
-    );
+    List<ProductReview> findBestReviews(@Param("productIds") List<Long> productIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM ProductReview r WHERE r.id = :id")

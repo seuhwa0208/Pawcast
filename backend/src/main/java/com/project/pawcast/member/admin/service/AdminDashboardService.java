@@ -59,6 +59,7 @@ public class AdminDashboardService {
 
         String truncUnit = switch (unit == null ? "month" : unit.toLowerCase()) {
             case "day" -> "day";
+            case "quarter" -> "quarter";
             case "year" -> "year";
             default -> "month";
         };
@@ -74,17 +75,23 @@ public class AdminDashboardService {
                 """.formatted(truncUnit, labelFormat(truncUnit), SALES_STATUSES, truncUnit, truncUnit);
         List<Map<String, Object>> trendRows = jdbc.queryForList(trendSql, params);
 
+        // 관리자 첫 화면은 하위 식품 분류가 아닌 쇼핑몰 3개 관(DOG/CAT/DEVICE)만 비교한다.
+        // 세부 사료·간식·식기 분류는 상품 관리와 다운로드 파일에서 별도로 제공한다.
         String categorySql = """
-                SELECT COALESCE(c.name, '기타') AS name,
+                SELECT CASE p.product_type
+                           WHEN 'DOG' THEN '강아지관'
+                           WHEN 'CAT' THEN '고양이관'
+                           WHEN 'DEVICE' THEN '식기·급수관'
+                           ELSE '기타'
+                       END AS name,
                        COALESCE(SUM(oi.total_price), 0) AS sales
                 FROM order_items oi
                 JOIN orders o ON o.id = oi.order_id
                 JOIN product_variants pv ON pv.id = oi.product_variant_id
                 JOIN products p ON p.id = pv.product_id
-                LEFT JOIN categories c ON c.id = p.category_id
                 WHERE o.created_at::date BETWEEN :start AND :end
                   AND o.status IN (%s)
-                GROUP BY COALESCE(c.name, '기타')
+                GROUP BY p.product_type
                 ORDER BY sales DESC
                 """.formatted(SALES_STATUSES);
         List<Map<String, Object>> categoryRows = jdbc.queryForList(categorySql, params);
@@ -131,10 +138,23 @@ public class AdminDashboardService {
         return response;
     }
 
-    public Map<String, Object> reforecastSales(Long adminId, LocalDate forecastDate) {
+    /** 주문 데이터가 실제로 존재하는 연도만 조회 조건에 제공한다. */
+    public List<Integer> getAvailableSalesYears(Long adminId) {
         Members admin = membersRepository.findById(adminId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(admin);
+        return jdbc.queryForList("""
+                SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS sales_year
+                FROM orders
+                WHERE created_at IS NOT NULL
+                ORDER BY sales_year DESC
+                """, new MapSqlParameterSource(), Integer.class);
+    }
+
+    public Map<String, Object> reforecastSales(Long adminId, LocalDate forecastDate) {
+        Members admin = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateAdmin(admin);
         SalesForecastClient.ForecastResponse result = salesForecastClient.retrain(forecastDate);
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("predictedSales", result.predicted_sales());
@@ -146,9 +166,21 @@ public class AdminDashboardService {
         return response;
     }
 
+    public SalesForecastClient.ExportFile exportSalesStatistics(
+            Long adminId, LocalDate startDate, LocalDate endDate, String format, String section) {
+        Members admin = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateManager(admin);
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        return salesForecastClient.export(startDate, endDate, format, section);
+    }
+
     private String labelFormat(String unit) {
         return switch (unit) {
             case "day" -> "YYYY-MM-DD";
+            case "quarter" -> "YYYY \"Q\"Q";
             case "year" -> "YYYY";
             default -> "YYYY-MM";
         };

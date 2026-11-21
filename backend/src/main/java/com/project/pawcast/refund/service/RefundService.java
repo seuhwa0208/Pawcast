@@ -75,6 +75,16 @@ public class RefundService {
         return RefundResponse.from(refund);
     }
 
+    // 매니저·관리자가 환불 신청 사유와 처리 상태를 확인할 수 있는 운영 목록입니다.
+    public List<RefundResponse> listRefundsForManager(Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+        return refundRepository.findAllForAdmin().stream()
+                .map(RefundResponse::from)
+                .toList();
+    }
+
     // 환불 기능 - 환불 요청 기능에 가깝다
     // 배송 완료 상태 -> 환불하기 -> 환불 정보가 생성(이유 적혀있음) -> 관리자가 결제 취소 누르면 -> 결제 취소
     @Transactional

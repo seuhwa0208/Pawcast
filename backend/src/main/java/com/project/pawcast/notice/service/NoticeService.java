@@ -34,10 +34,20 @@ public class NoticeService {
     
     // 목록 조회 및 검색 조회
     public List<NoticeResponse> getListNotice(NoticeSearchType type, String keyword){
-        NoticeType noticeType;
-        if (type == NoticeSearchType.ALL) {noticeType = null;}
-        else {noticeType = NoticeType.valueOf(type.name());}
-        return noticeRepository.searchNotices(noticeType, keyword).stream().map(NoticeResponse::from).toList();
+        boolean hasKeyword = keyword != null && !keyword.isBlank();
+        List<Notice> notices;
+
+        if (type == NoticeSearchType.ALL) {
+            notices = hasKeyword
+                    ? noticeRepository.searchAllByKeyword(keyword.strip())
+                    : noticeRepository.findByDeletedAtIsNullOrderByIsPinnedDescCreatedAtDesc();
+        } else {
+            NoticeType noticeType = NoticeType.valueOf(type.name());
+            notices = hasKeyword
+                    ? noticeRepository.searchByTypeAndKeyword(noticeType, keyword.strip())
+                    : noticeRepository.findByDeletedAtIsNullAndNoticeTypeOrderByIsPinnedDescCreatedAtDesc(noticeType);
+        }
+        return notices.stream().map(NoticeResponse::from).toList();
     }
 
     // 단건 조회

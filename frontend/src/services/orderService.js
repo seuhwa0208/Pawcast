@@ -1,5 +1,5 @@
 // 회원 주문 목록과 주문 상세 정보를 Spring 주문 API에서 조회합니다.
-import { springRequest } from "@/services/http/springClient";
+import { jsonBody, springRequest } from "@/services/http/springClient";
 
 export const orderService = {
   getMyOrders: ({ period = "6m", status, from, to } = {}) => {
@@ -10,7 +10,15 @@ export const orderService = {
     return springRequest(`/orders?${query.toString()}`);
   },
   getOrder: (orderId) => springRequest(`/orders/${orderId}`),
-  cancelOrder: (orderId) =>
-    springRequest(`/orders/${orderId}/cancel`, { method: "POST" }),
+  cancelOrder: (orderId, cancelReason) =>
+    springRequest(`/orders/${orderId}/cancel`, {
+      method: "POST",
+      body: jsonBody({ cancelReason }),
+    }),
   getRefund: (orderId) => springRequest(`/orders/${orderId}/refunds`),
+  requestRefund: (orderId, cancelReason) =>
+    springRequest(`/orders/${orderId}/refunds`, {
+      method: "POST",
+      body: jsonBody({ cancelReason }),
+    }),
 };

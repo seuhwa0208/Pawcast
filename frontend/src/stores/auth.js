@@ -15,9 +15,12 @@ const useAuthStore = defineStore("auth", () => {
   });
 
   function setAccessToken(token) {
+    const isNewLogin = Boolean(token) && token !== accessToken.value;
     accessToken.value = token || "";
     if (accessToken.value) {
       localStorage.setItem("powcast-access-token", accessToken.value);
+      if (isNewLogin)
+        sessionStorage.setItem("powcast-login-at", new Date().toISOString());
       return;
     }
     localStorage.removeItem("powcast-access-token");
