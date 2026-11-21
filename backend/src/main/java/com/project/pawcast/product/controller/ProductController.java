@@ -28,6 +28,7 @@ public class ProductController {
         return productService.detail(productId);
     }
 
+    // 베스트 리뷰 존재(1개라도 업데이트 되면 선정됨) / 별점 평점 높은 순 나열
     @GetMapping("/products/best-reviews")
     public List<ProductResponse> bestReviews(@Valid @ModelAttribute ProductSearchRequest request) {
         return productService.bestReviewProducts(request);

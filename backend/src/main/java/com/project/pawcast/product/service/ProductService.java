@@ -67,7 +67,7 @@ public class ProductService {
                 .toList();
     }
 
-    //
+    // 베스트 리뷰가 존재하면서 평점이 높은 순으로 나열
     public List<ProductResponse> bestReviewProducts(ProductSearchRequest request) {
         return searchProducts(request).stream()
                 .filter(product -> product.bestReview() != null)

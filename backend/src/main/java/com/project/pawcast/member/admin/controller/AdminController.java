@@ -4,6 +4,7 @@ import com.project.pawcast.member.admin.dto.MemberRoleRequest;
 import com.project.pawcast.member.admin.dto.MemberRoleResponse;
 import com.project.pawcast.member.admin.dto.MemberStatusRequest;
 import com.project.pawcast.member.admin.service.AdminService;
+import com.project.pawcast.member.dto.MemberListResponse;
 import com.project.pawcast.member.dto.MemberResponse;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.refund.service.RefundService;
@@ -21,14 +22,13 @@ public class AdminController {
     private final AdminService adminService;
     private final RefundService refundService;
     
-    // 회원 전체목록
+    // 회원 전체목록 - 강아지수 고양이수 반영
     @GetMapping
-    public List<MemberResponse> getMemberList(@AuthenticationPrincipal LoginMember member){
+    public List<MemberListResponse> getMemberList(@AuthenticationPrincipal LoginMember member){
         return adminService.getMemberList(member.getId());
     }
 
-    // 회원 상태 변경
-    @PatchMapping("/members/{userId}/status")
+
     public void changeMemberStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long userId, @RequestBody MemberStatusRequest request){
         adminService.changeMemberStatus(member.getId(),userId, request);
     }
