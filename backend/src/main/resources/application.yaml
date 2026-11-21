@@ -50,3 +50,7 @@ oauth:
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
   internal-api-key: ${AI_INTERNAL_API_KEY:}
+
+file:
+  upload:
+    path: ./uploads/images

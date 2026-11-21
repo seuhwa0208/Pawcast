@@ -61,9 +61,7 @@ public interface ProductReviewRepository
             )
       )
     """)
-    List<ProductReview> findBestReviews(
-            @Param("productIds") List<Long> productIds
-    );
+    List<ProductReview> findBestReviews(@Param("productIds") List<Long> productIds);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM ProductReview r WHERE r.id = :id")

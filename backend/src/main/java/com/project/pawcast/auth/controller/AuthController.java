@@ -79,5 +79,4 @@ public class AuthController {
     public void refreshToken(@RequestParam String refreshTokenValue, HttpServletRequest request){
         authService.refresh(refreshTokenValue, request);
     }
-
 }
