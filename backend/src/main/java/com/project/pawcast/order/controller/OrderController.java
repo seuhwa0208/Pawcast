@@ -4,6 +4,7 @@ import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
+import com.project.pawcast.order.dto.CancelOrderRequest;
 import com.project.pawcast.order.dto.OrderRequest;
 import com.project.pawcast.order.dto.OrderResponse;
 import com.project.pawcast.order.dto.OrderStatusRequest;
@@ -44,13 +45,18 @@ public class OrderController {
         return orderService.detailOrder(member.getId(),orderId,email,orderNumber);
     }
 
-    //주문 취소 - 소프트 삭제
-    @PostMapping("/{orderId}/cancel")
-    public void cancelOrder(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId){
-        orderService.cancelOrder(orderId, member.getId());
+    // 주문 정보 수정 - 배송지 수정
+    @PatchMapping("/{orderId}")
+    public OrderResponse updateOrder(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId,@Valid @RequestBody OrderRequest request){
+        return orderService.updateOrder(orderId, member.getId(),request);
     }
-    
-    
+
+    //주문 취소 - 상태 캔슬 및 결제 취소
+    @PostMapping("/{orderId}/cancel")
+    public void cancelOrder(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @RequestBody CancelOrderRequest request){
+        orderService.cancelOrder(orderId, member.getId(),request.cancelReason());
+    }
+
     // 취소 요청의 진행상태 및 환불 정보 조회 - 취소된 주문 정보 조회 - 제외
     //@GetMapping("/{orderId}/cancel/{cancelId}")
 

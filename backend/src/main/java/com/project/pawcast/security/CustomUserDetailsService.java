@@ -27,7 +27,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         return new LoginMember(
                 member.getId(),
                 member.getEmail(),
-                member.getPasswordHash(),
                 member.getName(),
                 member.getRole().name(),
                 member.getStatus() == Members.Status.ACTIVE);

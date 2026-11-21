@@ -14,7 +14,7 @@ import com.project.pawcast.payment.dto.TossCancelResponse;
 import com.project.pawcast.payment.entity.Payment;
 import com.project.pawcast.payment.entity.PaymentsStatus;
 import com.project.pawcast.payment.repository.PaymentRepository;
-import com.project.pawcast.refund.service.RefundService;
+import com.project.pawcast.product.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,14 +37,12 @@ public class PaymentService {
     private final InventoryService inventoryService;
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
-    private final RefundService refundService;
 
     // 결제
     @Transactional
-    public PaymentDtos.PaymentResponse approve(Long orderId, Long memberId, String paymentKey, String tossOrderId, Long amount) {
+    public PaymentDtos.PaymentResponse approve(Long orderId, Long memberId, String paymentKey, String orderNumber, Long amount) {
 
-        if (amount == null || amount < 0 || paymentKey == null || paymentKey.isBlank()
-                || tossOrderId == null || tossOrderId.isBlank()) {
+        if (amount == null || amount < 0 || paymentKey == null || paymentKey.isBlank() || orderNumber == null || orderNumber.isBlank()) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
 
@@ -56,14 +54,14 @@ public class PaymentService {
         // 3. 결제 대기 상태인지 확인
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);}
         // 4. 주문번호 검증
-        if (!order.getOrderNumber().equals(tossOrderId)) {throw new BusinessException(ErrorCode.INVALID_ORDER_NUMBER);}
+        if (!order.getOrderNumber().equals(orderNumber)) {throw new BusinessException(ErrorCode.INVALID_ORDER_NUMBER);}
         // 5. 결제 금액 검증
         BigDecimal expectedAmount = order.getFinalAmount();
         if (expectedAmount.compareTo(BigDecimal.valueOf(amount)) != 0) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_AMOUNT);}
         // 6. 중복 결제 확인
         if (paymentRepository.findByOrderId(orderId).isPresent()) {throw new BusinessException(ErrorCode.DUPLICATE_PAYMENT);}
         // 7. Toss 결제 승인 요청
-        Map<String, Object> tossResponse = tossPaymentClient.approve(paymentKey, tossOrderId, amount);
+        Map<String, Object> tossResponse = tossPaymentClient.approve(paymentKey, orderNumber, amount);
         // 입금 대기·실패 상태는 구매 완료로 처리하지 않습니다.
         if (tossResponse == null || !"DONE".equals(tossResponse.get("status"))) {
             throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);
@@ -135,12 +133,10 @@ public class PaymentService {
         Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
         return PaymentDtos.PaymentResponse.from(payment);
     }
-    
-    //결제 취소
+
+    //공통 기능 - 결제 취소
     @Transactional
-    public void cancelPayment(Long orderId, Long memberId, String cancelReason){
-        Order order = orderRepository.findByIdForUpdate(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);}
+    public String cancelPayment(Long orderId,String cancelReason){
         //결제 검사
         Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
         //결제 상태 검사
@@ -154,17 +150,10 @@ public class PaymentService {
 
         // 결제 상태 취소
         payment.setStatus(PaymentsStatus.CANCELLED);
-        order.setStatus(OrderStatus.CANCELLED);
-
-        // 환불 만듬
-        refundService.createRefund(payment,cancelReason, cancelInfo.transactionKey());
-        // 재고 복구
-        List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId())
-                .stream()
-                .sorted(Comparator.comparing(item -> item.getProductVariant().getId()))
-                .toList();
-        for (OrderItem item : items){
-            inventoryService.increaseStock(item.getProductVariant().getId(), item.getQuantity());
-        }
+        return cancelInfo.transactionKey();
     }
+    
+
+
+
 }

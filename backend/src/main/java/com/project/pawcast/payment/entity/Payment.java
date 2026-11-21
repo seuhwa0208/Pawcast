@@ -37,7 +37,7 @@ public class Payment {
     @Column(name = "payment_key", length = 255)
     private String paymentKey;
 
-    @Column(name = "idempotency_key", unique = true, nullable = false, length = 100)
+    @Column(name = "idempotency_key", unique = true, length = 100)
     private String idempotencyKey;
 
     @Column(nullable = false, precision = 12, scale = 0)

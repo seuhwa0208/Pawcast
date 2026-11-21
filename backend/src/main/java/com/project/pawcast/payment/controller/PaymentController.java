@@ -15,28 +15,15 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
-    // 결제 승인
+    // 결제 하기 - 승인
     @PostMapping("/confirm")
     public PaymentDtos.PaymentResponse approve(@PathVariable Long orderId, @AuthenticationPrincipal LoginMember member, @RequestBody @Valid PaymentDtos.PaymentRequest request) {
-
-        PaymentDtos.PaymentResponse response = paymentService.approve(
-                        orderId,
-                        member.getId(),
-                        request.paymentKey(),
-                        request.orderNumber(),
-                        request.amount()
-                );
-        return response;
+        return paymentService.approve(orderId, member.getId(), request.paymentKey(), request.orderNumber(), request.amount());
     }
+
     // 결제 조회
     @GetMapping
     public PaymentDtos.PaymentResponse detailPayment(@PathVariable Long orderId ,@AuthenticationPrincipal LoginMember member){
         return paymentService.detailPayment(orderId,member.getId());
-    }
-    
-    // 결제 취소
-    @PostMapping("/cancel")
-    public void cancelPayment(@PathVariable Long orderId, @AuthenticationPrincipal LoginMember member, String reason){
-        paymentService.cancelPayment(orderId,member.getId(),reason);
     }
 }
