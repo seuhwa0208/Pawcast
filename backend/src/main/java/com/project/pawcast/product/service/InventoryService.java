@@ -1,8 +1,7 @@
-package com.project.pawcast.payment.service;
+package com.project.pawcast.product.service;
 
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
-import com.project.pawcast.product.entity.ProductVariant;
 import com.project.pawcast.product.repository.ProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,25 +24,4 @@ public class InventoryService {
         int updated = productVariantRepository.increaseStock(productVariantId, quantity);
         if (updated == 0) {throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);}
     }
-/*
-    @Transactional
-    public void  decreaseStock(Long productVariantId, Integer quantity){
-        // 상품 세부 속성 검사
-        ProductVariant productVariant = productVariantRepository.findById(productVariantId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT));
-        // 재고 수량 검사
-        if (productVariant.getStock() < quantity) { throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);}
-        // 재고 저장
-        productVariant.setStock(productVariant.getStock() - quantity);
-    }
-
-    @Transactional
-    public void increaseStock(Long productVariantId, Integer quantity){
-        ProductVariant productVariant = productVariantRepository.findById(productVariantId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT));
-
-        productVariant.setStock(productVariant.getStock() + quantity);
-    }
-*/
-// 서브쿼리는 ProductVariantRepository에 있음
 }
