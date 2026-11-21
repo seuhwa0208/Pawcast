@@ -14,16 +14,24 @@ import com.project.pawcast.order.entity.OrderItem;
 import com.project.pawcast.order.entity.OrderStatus;
 import com.project.pawcast.order.repository.OrderItemRepository;
 import com.project.pawcast.order.repository.OrderRepository;
+import com.project.pawcast.payment.entity.Payment;
+import com.project.pawcast.payment.repository.PaymentRepository;
+import com.project.pawcast.payment.service.PaymentService;
 import com.project.pawcast.product.entity.ProductVariant;
 import com.project.pawcast.product.repository.ProductRepository;
 import com.project.pawcast.product.repository.ProductVariantRepository;
+import com.project.pawcast.product.service.InventoryService;
+import com.project.pawcast.refund.entity.Refund;
+import com.project.pawcast.refund.service.RefundService;
 import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,6 +46,10 @@ public class OrderService {
     private final ProductVariantRepository productVariantRepository;
     private final AuthorizationValidator validator;
     private final ProductRepository productRepository;
+    private final PaymentRepository paymentRepository;
+    private final PaymentService paymentService;
+    private final RefundService refundService;
+    private final InventoryService inventoryService;
 
     // 주문하기
     // 상품 검증 → 가격 계산 → 주문 생성 → 주문 상세 생성 → 재고 차감 → 결제 처리
@@ -154,7 +166,7 @@ public class OrderService {
         return orderRepository.findByIdAndMemberId(orderId, memberId).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
     }
 
-    // 수정 - 결제 완료 되면 수정 불가
+    // 수정 - 결제 완료 되면 수정 불가 - 배송지 수정
     @Transactional
     public OrderResponse updateOrder(Long orderId, Long memberId, OrderRequest request){
         Order order = findByIdAndMemberId(orderId, memberId);
@@ -180,22 +192,30 @@ public class OrderService {
 //        Order order = findByIdAndMemberId(orderId, memberId);
 //        order.setDeletedAt(LocalDateTime.now());
 //    }
-    
-    // 주문 취소
+
+    // 주문 취소하기 - 이용자가 직접함 - 회원정보 일치하는지 확인
+    // 결제 완료(배송 대기중 상태로 넘어가기 전에) -> 결제 취소 -> 환불 정보
     @Transactional
-    public void cancelOrder(Long orderId, Long memberId) {
-        // 주문 검사
-        Order order = findByIdAndMemberId(orderId, memberId);
-        
-        // 주문 상태 검사
-        if (order.getStatus() != OrderStatus.PAID && order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+    public void cancelOrder(Long orderId, Long memberId, String cancelReason){
+        Order order = orderRepository.findByIdForUpdate(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);}
+        Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
+        //결제 취소
+        String  providerRefundKey = paymentService.cancelPayment(orderId,cancelReason);
+        // 상품 상태 변경 - 취소함
+        order.setStatus(OrderStatus.CANCELLED);
+        // 환불 정보 만들고 -> 완료 날짜 새겨줘야함
+        refundService.createRefund(payment,cancelReason, providerRefundKey, Refund.RefundStatus.COMPLETED , LocalDateTime.now());
+        // 재고 검사
+        List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId())
+                .stream()
+                .sorted(Comparator.comparing(item -> item.getProductVariant().getId()))
+                .toList();
+        // 재고 증가 및 판매량 감소
+        for (OrderItem item : items){
+            inventoryService.increaseStock(item.getProductVariant().getId(), item.getQuantity());
+            productRepository.decreaseSalesCount(item.getProductVariant().getProduct().getId(), item.getQuantity());
         }
-        // 주문 상태 cancel 은 결제가 취소되면
-        // order.setStatus(OrderStatus.CANCELLED);
-        // 나머진 Payments에서
-        // 결제 취소 처리 -
-        // 재고 복구 처리 - 결제 완료 상태 PAID 였다면 재고 복구 해야함
     }
 
     // 취소 요청의 진행상태? 및 환불 정보 조회 - 취소된 목록X 취소된 하나의 정보 불러오는것

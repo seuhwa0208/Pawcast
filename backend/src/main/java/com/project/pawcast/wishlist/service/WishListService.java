@@ -26,7 +26,7 @@ public class WishListService {
 
     //단순 찜_ID와 멤버_ID로 배송지 조회
     public WishList findByIdAndMemberId(Long wishListId, Long memberId){
-        return wishListsRepository.findByIdAndMemberId(wishListId, memberId)
+        return wishListsRepository.findByIdAndMember_Id(wishListId, memberId)
                 .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_WISHLIST));
     }
 
@@ -50,8 +50,7 @@ public class WishListService {
     
     // 삭제
     @Transactional
-    public void deleteWishList(Long wishListId, Long memberId){
-        WishList wishList = findByIdAndMemberId(wishListId, memberId);
-        wishListsRepository.delete(wishList);
+    public void deleteWishList(Long productId, Long memberId){
+        wishListsRepository.deleteByMember_IdAndProduct_Id(memberId,productId);
     }
 }

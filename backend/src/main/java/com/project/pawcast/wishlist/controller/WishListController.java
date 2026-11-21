@@ -31,7 +31,7 @@ public class WishListController {
     
     // 찜 삭제
     @DeleteMapping("/{productId}")
-    public void deleteWishList(@AuthenticationPrincipal LoginMember member, @PathVariable Long wishListId){
-        wishListService.deleteWishList(wishListId, member.getId());
+    public void deleteWishList(@AuthenticationPrincipal LoginMember member, @PathVariable Long productId){
+        wishListService.deleteWishList(productId, member.getId());
     }
 }

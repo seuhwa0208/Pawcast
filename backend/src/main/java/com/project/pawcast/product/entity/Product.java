@@ -45,9 +45,11 @@ public class Product extends BaseTime {
     @Builder.Default
     private long wishCount = 0L;
 
+    @Builder.Default
     @Column(name = "review_count", nullable = false)
-    private long reviewCount;
+    private long reviewCount = 0L;
 
+    @Builder.Default
     @Column(name = "rating_sum", nullable = false)
-    private long ratingSum;
+    private long ratingSum = 0L;
 }

@@ -13,15 +13,13 @@ import java.util.List;
 public class LoginMember implements UserDetails {
     private final Long id;
     private final String email;
-    private final String password;
     private final String name;
     private final String role;
     private final boolean active;
 
-    public LoginMember(Long id, String email, String password, String name, String role, boolean active) {
+    public LoginMember(Long id, String email, String name, String role, boolean active) {
         this.id = id;
         this.email = email;
-        this.password = password;
         this.name = name;
         this.role = role;
         this.active = active;
@@ -29,7 +27,7 @@ public class LoginMember implements UserDetails {
 
     /** 토큰 인증용: 비밀번호 없이 만든다. */
     public static LoginMember ofToken(Long id, String email, String role) {
-        return new LoginMember(id, email, "", "", role, true);
+        return new LoginMember(id, email, "", role, true);
     }
 
     @Override
@@ -44,6 +42,6 @@ public class LoginMember implements UserDetails {
 
     @Override
     public String getUsername() {
-        return "";
+        return email;
     }
 }
