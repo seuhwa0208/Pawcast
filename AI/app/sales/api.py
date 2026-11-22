@@ -11,6 +11,7 @@ from app.common.database import get_db_session
 from app.sales.schemas import SalesDashboardResponse, SalesForecastResponse
 from app.sales.export_service import create_csv_file, create_excel_file, load_sales_export_frames
 from app.sales.service import create_sales_dashboard, retrain_sales_forecast
+from app.sales.inventory_service import forecast_inventory_shortage
 
 
 router = APIRouter(
@@ -40,6 +41,15 @@ async def retrain(
 ) -> SalesForecastResponse:
     """관리자 요청으로 판매 예측 베이스라인을 다시 계산한다."""
     return await retrain_sales_forecast(session, forecast_date)
+
+
+@router.get("/inventory-forecast")
+async def inventory_forecast(
+    limit: int = Query(default=5, ge=1, le=20),
+    session: AsyncSession = Depends(get_db_session),
+) -> dict:
+    """최근 실제 주문량과 현재 옵션 재고를 기준으로 입고 우선순위를 계산한다."""
+    return await forecast_inventory_shortage(session, limit)
 
 
 @router.get("/export")

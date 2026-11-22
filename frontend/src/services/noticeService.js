@@ -21,4 +21,6 @@ export const noticeService = {
     );
     return Array.isArray(response) ? response.map(toNotice) : [];
   },
+  detail: async (noticeId) =>
+    toNotice(await springRequest(`/notices/${noticeId}`), 0),
 };

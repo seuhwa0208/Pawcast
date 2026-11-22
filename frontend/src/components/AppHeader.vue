@@ -51,8 +51,15 @@ watch(
         ><RouterLink to="/dog">강아지관</RouterLink
         ><RouterLink to="/cat">고양이관</RouterLink
         ><RouterLink to="/tableware">식기·급수관</RouterLink
-        ><RouterLink to="/qna">Q&amp;A</RouterLink
-        ><RouterLink to="/notices">공지/이벤트</RouterLink>
+        ><RouterLink
+          :to="{ name: 'qna-list' }"
+          :class="{ 'router-link-active': route.path.startsWith('/qna') }"
+          >Q&amp;A</RouterLink
+        ><RouterLink
+          :to="{ name: 'notice-list' }"
+          :class="{ 'router-link-active': route.path.startsWith('/notices') }"
+          >공지/이벤트</RouterLink
+        >
       </nav>
       <div class="account">
         <template v-if="accessToken">

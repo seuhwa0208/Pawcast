@@ -70,11 +70,8 @@ async function loadProduct() {
     const detail = await productService.detail(props.id);
     product.value = normalizeDetail(detail);
     try {
-      const reviewSummary = await reviewService.getProductReviews(props.id);
-      // # 백엔드가 별점 높은 순·동점 작성일 빠른 순으로 정렬해 전달한다.
-      reviews.value = Array.isArray(reviewSummary.reviews)
-        ? reviewSummary.reviews
-        : [];
+      // FastAPI가 별점·AI 긍정도·최신 작성일·리뷰 ID 순으로 정렬합니다.
+      reviews.value = await reviewService.getRankedProductReviews(props.id);
     } catch (reviewError) {
       // # 리뷰 API 오류가 상품 상세 페이지 전체를 막지 않도록 리뷰 영역만 빈 상태로 둔다.
       reviews.value = [];
@@ -472,11 +469,12 @@ const purchaseGuide = [
           </div>
           <strong>★ {{ product.rating }}</strong>
         </header>
-        <!-- # 첫 번째 항목은 최고 별점·가장 이른 작성일 기준의 베스트 리뷰입니다. -->
+        <!-- 첫 번째 항목은 별점·AI 긍정도·최신 작성일·리뷰 ID 기준의 베스트 리뷰입니다. -->
         <section v-if="reviews.length" class="review-list">
           <article class="best-review">
             <small>BEST REVIEW</small
             ><b>★ {{ reviews[0].rating }} · {{ reviews[0].writerName }}</b>
+            <small>AI 긍정 {{ reviews[0].positivePercentage }}%</small>
             <p>{{ reviews[0].content }}</p>
           </article>
           <button
@@ -490,6 +488,7 @@ const purchaseGuide = [
           <ol v-if="showAllReviews" class="review-items">
             <li v-for="review in reviews.slice(1)" :key="review.id">
               <b>★ {{ review.rating }} · {{ review.writerName }}</b>
+              <small>AI 긍정 {{ review.positivePercentage }}%</small>
               <p>{{ review.content }}</p>
             </li>
           </ol>

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     MOCK_SALES_MONTHS: int = 18
     RETRAINING_ORDER_THRESHOLD: int = 100
     RETRAINING_MINIMUM_DAYS: int = 7
+
+    # 재고 예측은 주문 이력의 최근 N일 판매 속도와 현재 옵션 재고를 함께 사용한다.
+    # 발주 리드타임/안전재고 정책이 확정되기 전에는 이 값을 운영 기준으로 명시한다.
+    INVENTORY_FORECAST_LOOKBACK_DAYS: int = 28
+    INVENTORY_FORECAST_LEAD_DAYS: int = 7
+    INVENTORY_FORECAST_SAFETY_DAYS: int = 14
     
     # 모델은 미리 내려받은 로컬 디렉터리에서만 불러옵니다.
     MODEL_PATH: Path = PROJECT_ROOT / "models" / "review" / "sentiment_model"

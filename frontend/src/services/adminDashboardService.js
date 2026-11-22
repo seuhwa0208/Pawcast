@@ -18,8 +18,9 @@ export const adminDashboardService = {
   },
   async downloadStatistics({ startDate, endDate, format, section }) {
     const query = new URLSearchParams({
-      start_date: startDate,
-      end_date: endDate,
+      // 브라우저는 Spring Controller의 camelCase 요청 파라미터에 맞춰 전송합니다.
+      startDate,
+      endDate,
       format,
       section,
     });

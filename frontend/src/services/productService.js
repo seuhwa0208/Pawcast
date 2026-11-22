@@ -99,8 +99,8 @@ export const productService = {
     const { body: response } = await aiRequest(
       `/api/reviews/best-products?limit=${limit}`,
     );
-    return Array.isArray(response)
-      ? response.map((product) => toProductCard(product, pet))
-      : [];
+    return (Array.isArray(response) ? response : []).map((product) =>
+      toProductCard(product, pet),
+    );
   },
 };

@@ -74,7 +74,7 @@ public class ReviewService {
         if (reviewRepository.existsByOrderItemId(orderItem.getId())) {
             throw new BusinessException(ErrorCode.DUPLICATE_REVIEW);
         }
-        
+
         // 리뷰 욕설 필터링 기능
         profanityFilter.containsProhibitedWord(request.content());
 
@@ -101,7 +101,6 @@ public class ReviewService {
                         review.getRating()
                 )
         );
-
         return response;
     }
 
@@ -176,9 +175,6 @@ public class ReviewService {
     ) {
         ProductReview review = findOwnedReview(reviewId, memberId);
 
-        // 수정된 리뷰 본문도 Python을 호출하지 않고 Java 사전으로 검증
-        profanityFilter.containsProhibitedWord(request.content());
-
         int oldRating = review.getRating();
         Long productId = review.getProduct().getId();
 
@@ -219,7 +215,6 @@ public class ReviewService {
                     )
             );
         }
-
         return response;
     }
 

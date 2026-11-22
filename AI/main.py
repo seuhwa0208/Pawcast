@@ -16,7 +16,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title="PAWCAST AI Review Analyzer",
-    description="스프링 부트 연동을 위한 AI 감정 분석 및 욕설 필터링 서버",
+    description="Vue가 직접 호출하는 리뷰 감정 분석 및 관리자 AI 분석 서버",
     version="1.0.0",
     lifespan=lifespan,
 )

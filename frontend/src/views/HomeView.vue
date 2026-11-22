@@ -662,6 +662,11 @@ onBeforeUnmount(() => {
           class="review-product"
         >
           <ProductCard :product="p" :pet="p.pet" />
+          <div v-if="p.bestReview" class="review-highlight">
+            <b>AI BEST REVIEW · 긍정 {{ p.bestReview.positivePercentage }}%</b>
+            <p>{{ p.bestReview.content }}</p>
+            <small>★ {{ p.bestReview.rating }} · {{ p.bestReview.writerName }}</small>
+          </div>
         </article>
       </div>
     </section>

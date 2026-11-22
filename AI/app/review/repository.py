@@ -190,3 +190,117 @@ async def find_best_review_products(
         {"limit": limit},
     )
     return [dict(row) for row in result.mappings().all()]
+
+
+async def find_ranked_product_reviews(
+    session: AsyncSession,
+    product_id: int,
+) -> list[dict]:
+    """별점·AI 긍정도·최신 작성일·리뷰 ID 순으로 상품 리뷰를 조회합니다."""
+    result = await session.execute(
+        text(
+            """
+            SELECT
+                pr.id,
+                pr.rating,
+                pr.content,
+                m.name AS writer_name,
+                pr.created_at,
+                rs.sentiment,
+                ROUND(
+                    CASE
+                        WHEN rs.sentiment = 'POSITIVE' THEN rs.confidence * 100
+                        WHEN rs.sentiment = 'NEGATIVE' THEN (1 - rs.confidence) * 100
+                        ELSE 0
+                    END,
+                    2
+                ) AS positive_percentage
+            FROM product_reviews pr
+            JOIN members m ON m.id = pr.member_id
+            LEFT JOIN review_sentiments rs ON rs.review_id = pr.id
+            WHERE pr.product_id = :product_id
+              AND pr.is_visible = TRUE
+            ORDER BY
+                pr.rating DESC,
+                CASE
+                    WHEN rs.sentiment = 'POSITIVE' THEN rs.confidence
+                    WHEN rs.sentiment = 'NEGATIVE' THEN 1 - rs.confidence
+                    ELSE 0
+                END DESC,
+                pr.created_at DESC,
+                pr.id DESC
+            """
+        ),
+        {"product_id": product_id},
+    )
+    return [dict(row) for row in result.mappings().all()]
+
+
+async def summarize_sentiments(
+    session: AsyncSession,
+    limit: int,
+) -> dict:
+    """저장된 AI 분석 결과만 집계해 전체 비율과 부정 리뷰 상품을 반환한다."""
+    overall_result = await session.execute(
+        text(
+            """
+            SELECT
+                COUNT(rs.id) AS analyzed_count,
+                COUNT(*) FILTER (WHERE rs.sentiment = 'POSITIVE') AS positive_count,
+                COUNT(*) FILTER (WHERE rs.sentiment = 'NEGATIVE') AS negative_count
+            FROM product_reviews pr
+            JOIN review_sentiments rs ON rs.review_id = pr.id
+            WHERE pr.is_visible = TRUE
+            """
+        )
+    )
+    overall = dict(overall_result.mappings().one())
+    analyzed_count = int(overall["analyzed_count"] or 0)
+    positive_count = int(overall["positive_count"] or 0)
+    negative_count = int(overall["negative_count"] or 0)
+
+    products_result = await session.execute(
+        text(
+            """
+            SELECT
+                p.id AS product_id,
+                p.name AS product_name,
+                COUNT(rs.id) AS analyzed_count,
+                COUNT(*) FILTER (WHERE rs.sentiment = 'NEGATIVE') AS negative_count
+            FROM products p
+            JOIN product_reviews pr ON pr.product_id = p.id AND pr.is_visible = TRUE
+            JOIN review_sentiments rs ON rs.review_id = pr.id
+            GROUP BY p.id, p.name
+            HAVING COUNT(*) FILTER (WHERE rs.sentiment = 'NEGATIVE') > 0
+            ORDER BY
+                (COUNT(*) FILTER (WHERE rs.sentiment = 'NEGATIVE'))::numeric / COUNT(rs.id) DESC,
+                COUNT(*) FILTER (WHERE rs.sentiment = 'NEGATIVE') DESC,
+                p.id ASC
+            LIMIT :limit
+            """
+        ),
+        {"limit": limit},
+    )
+    negative_products = []
+    for row in products_result.mappings().all():
+        item = dict(row)
+        count = int(item["analyzed_count"] or 0)
+        negatives = int(item["negative_count"] or 0)
+        negative_products.append(
+            {
+                "productId": int(item["product_id"]),
+                "productName": str(item["product_name"]),
+                "analyzedCount": count,
+                "negativeCount": negatives,
+                "negativeRate": round(negatives / count * 100, 1) if count else 0,
+            }
+        )
+
+    return {
+        "analyzedCount": analyzed_count,
+        "positiveCount": positive_count,
+        "negativeCount": negative_count,
+        "positiveRate": round(positive_count / analyzed_count * 100, 1) if analyzed_count else 0,
+        "negativeRate": round(negative_count / analyzed_count * 100, 1) if analyzed_count else 0,
+        "negativeProducts": negative_products,
+    }

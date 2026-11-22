@@ -6,6 +6,10 @@ import { aiRequest } from "@/services/http/aiClient";
 export const reviewService = {
   // # 상품 상세의 실제 공개 리뷰 목록·평점 요약을 Spring API에서 조회한다.
   getProductReviews: (productId) => springRequest(`/products/${productId}/reviews`),
+  getRankedProductReviews: async (productId) => {
+    const { body } = await aiRequest(`/api/reviews/products/${productId}/ranked`);
+    return Array.isArray(body) ? body : [];
+  },
   create: async (payload) => {
     const review = await springRequest("/reviews", {
       method: "POST",

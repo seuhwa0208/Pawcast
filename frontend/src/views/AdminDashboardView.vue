@@ -40,12 +40,13 @@ const loginYear = loginAt.getFullYear();
 const toIsoDate = (date) => date.toISOString().slice(0, 10);
 const periodUnit = ref("month");
 const selectedYear = ref(String(loginYear));
+const selectedDay = ref(toIsoDate(loginAt));
 const selectedMonth = ref(String(loginAt.getMonth() + 1));
 const selectedQuarter = ref(String(Math.floor(loginAt.getMonth() / 3) + 1));
 const availableYears = ref([]);
 const fromDate = ref(`${loginYear}-01-01`);
 const toDate = ref(`${loginYear}-12-31`);
-const selectedCategories = ref(["DOG", "CAT", "ALL"]);
+const appliedFilters = ref({ unit: "month", from: fromDate.value, to: toDate.value });
 const appliedAt = ref("초기 화면 데이터");
 const dashboard = ref(null);
 const loading = ref(false);
@@ -95,6 +96,7 @@ const totalSales = computed(() => summary.value.totalSales);
 const totalOrders = computed(() => summary.value.totalOrders);
 const totalRefund = computed(() => summary.value.refundAmount);
 const averageOrder = computed(() => summary.value.averageOrderAmount);
+const appliedUnit = computed(() => appliedFilters.value.unit);
 
 const formatWon = (value) => `${Math.round(value).toLocaleString()}원`;
 const loginTimestamp = computed(() => new Intl.DateTimeFormat("ko-KR", { year:"numeric", month:"2-digit", day:"2-digit", weekday:"short", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false }).format(loginAt));
@@ -102,7 +104,7 @@ const loginTimestamp = computed(() => new Intl.DateTimeFormat("ko-KR", { year:"n
 function syncPeriodRange() {
   const year = Number(selectedYear.value || loginYear);
   if (periodUnit.value === "day") {
-    fromDate.value = toIsoDate(loginAt);
+    fromDate.value = selectedDay.value || toIsoDate(loginAt);
     toDate.value = fromDate.value;
   } else if (periodUnit.value === "month") {
     const month = Number(selectedMonth.value);
@@ -113,16 +115,15 @@ function syncPeriodRange() {
     fromDate.value = toIsoDate(new Date(year, month, 1));
     toDate.value = toIsoDate(new Date(year, month + 3, 0));
   } else {
-    const years = availableYears.value.length ? availableYears.value : [year];
-    fromDate.value = `${Math.min(...years)}-01-01`;
-    toDate.value = `${Math.max(...years)}-12-31`;
+    fromDate.value = `${year}-01-01`;
+    toDate.value = `${year}-12-31`;
   }
 }
 
 // # 조회 조건을 실제 매출 API에 전달하고 응답이 도착한 뒤 ECharts 옵션을 갱신한다.
 async function applyFilters() {
-  if (!selectedCategories.value.length)
-    selectedCategories.value = ["DOG", "CAT", "ALL"];
+  // 선택값을 조회 버튼에서만 확정해, 화면의 지표·차트와 조건이 어긋나지 않게 한다.
+  syncPeriodRange();
   loading.value = true;
   error.value = "";
   try {
@@ -131,8 +132,12 @@ async function applyFilters() {
       year: selectedYear.value,
       from: fromDate.value,
       to: toDate.value,
-      categories: selectedCategories.value,
     });
+    appliedFilters.value = {
+      unit: periodUnit.value,
+      from: fromDate.value,
+      to: toDate.value,
+    };
     appliedAt.value = `${new Date().toLocaleTimeString("ko-KR", {
       hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
     })} 조회`;
@@ -250,8 +255,8 @@ async function downloadStatistics() {
   exportMessage.value = "";
   try {
     await adminDashboardService.downloadStatistics({
-      startDate: fromDate.value,
-      endDate: toDate.value,
+      startDate: appliedFilters.value.from,
+      endDate: appliedFilters.value.to,
       format: exportFormat.value,
       section: exportSection.value,
     });
@@ -271,9 +276,11 @@ watch(dashboard, async () => {
 onMounted(async () => {
   try {
     const years = await adminDashboardService.getSalesYears();
-    availableYears.value = Array.isArray(years) && years.length ? years : [loginYear];
+    availableYears.value = Array.isArray(years) && years.length
+      ? [...new Set(years.map(Number))].sort((a, b) => b - a)
+      : [loginYear];
     if (!availableYears.value.includes(loginYear)) availableYears.value.unshift(loginYear);
-    selectedYear.value = String(availableYears.value[0]);
+    selectedYear.value = String(availableYears.value[0] || loginYear);
   } catch {
     availableYears.value = [loginYear];
   }
@@ -289,7 +296,7 @@ onMounted(async () => {
     chartResizeObserver.observe(categoryChartElement.value);
 });
 
-watch([periodUnit, selectedYear, selectedMonth, selectedQuarter], syncPeriodRange);
+watch([periodUnit, selectedYear, selectedDay, selectedMonth, selectedQuarter], syncPeriodRange);
 
 onBeforeUnmount(() => {
   chartResizeObserver?.disconnect();
@@ -333,35 +340,32 @@ onBeforeUnmount(() => {
             <span>{{ item.label }}</span>
           </label>
         </fieldset>
-        <label v-if="periodUnit === 'month' || periodUnit === 'quarter'" class="select-filter"><span>기준 연도</span><select v-model="selectedYear"><option v-for="year in availableYears" :key="year" :value="String(year)">{{ year }}년</option></select></label>
-        <label v-if="periodUnit === 'month'" class="select-filter"><span>조회 월</span><select v-model="selectedMonth"><option v-for="month in 12" :key="month" :value="String(month)">{{ month }}월</option></select></label>
-        <label v-if="periodUnit === 'quarter'" class="select-filter"><span>조회 분기</span><select v-model="selectedQuarter"><option v-for="quarter in 4" :key="quarter" :value="String(quarter)">{{ quarter }}분기</option></select></label>
-        <div v-if="periodUnit === 'year'" class="available-year-list"><span>비교 연도</span><b v-for="year in availableYears" :key="year">{{ year }}</b></div>
-        <div class="date-filter"><span>{{ periodUnit === 'day' ? '로그인 기준 일자' : '조회 기간' }}</span><b>{{ fromDate }}</b><i v-if="periodUnit !== 'day'">~</i><b v-if="periodUnit !== 'day'">{{ toDate }}</b></div>
-        <fieldset class="category-filter">
-          <legend>카테고리</legend>
-          <label
-            ><input
-              v-model="selectedCategories"
-              type="checkbox"
-              value="DOG"
-            />강아지</label
-          >
-          <label
-            ><input
-              v-model="selectedCategories"
-              type="checkbox"
-              value="CAT"
-            />고양이</label
-          >
-          <label
-            ><input
-              v-model="selectedCategories"
-              type="checkbox"
-              value="ALL"
-            />식기·급수</label
-          >
-        </fieldset>
+        <label class="select-filter">
+          <span>기준 연도</span>
+          <select v-model="selectedYear">
+            <option v-for="year in availableYears" :key="year" :value="String(year)">{{ year }}년</option>
+          </select>
+        </label>
+        <label v-if="periodUnit === 'day'" class="select-filter period-value">
+          <span>조회 일자</span>
+          <input v-model="selectedDay" type="date" />
+        </label>
+        <label v-else-if="periodUnit === 'month'" class="select-filter period-value">
+          <span>조회 월</span>
+          <select v-model="selectedMonth">
+            <option v-for="month in 12" :key="month" :value="String(month)">{{ month }}월</option>
+          </select>
+        </label>
+        <label v-else-if="periodUnit === 'quarter'" class="select-filter period-value">
+          <span>조회 분기</span>
+          <select v-model="selectedQuarter">
+            <option v-for="quarter in 4" :key="quarter" :value="String(quarter)">{{ quarter }}분기</option>
+          </select>
+        </label>
+        <div v-else class="select-filter period-value year-range">
+          <span>조회 기간</span>
+          <b>{{ selectedYear }}년 전체</b>
+        </div>
         <button
           type="button"
           class="filter-submit"
@@ -442,11 +446,11 @@ onBeforeUnmount(() => {
             <div>
               <h2>
                 {{
-                  periodUnit === "day"
+                  appliedUnit === "day"
                     ? "일별"
-                    : periodUnit === "month"
+                    : appliedUnit === "month"
                       ? "월별"
-                      : periodUnit === "quarter"
+                      : appliedUnit === "quarter"
                         ? "분기별"
                         : "연도별"
                 }}
@@ -462,6 +466,13 @@ onBeforeUnmount(() => {
         <article class="admin-panel category-share-panel">
           <header><h2>카테고리별 매출 비중</h2></header>
           <div ref="categoryChartElement" class="echart category-echart" />
+          <ul v-if="visibleCategories.length" class="category-summary-legend" aria-label="카테고리별 매출 범례">
+            <li v-for="(row, index) in visibleCategories" :key="row.key">
+              <i :class="`category-color-${index}`" aria-hidden="true" />
+              <span>{{ row.name }}</span>
+              <b>{{ formatWon(row.sales) }}</b>
+            </li>
+          </ul>
         </article>
       </section>
 
@@ -681,7 +692,7 @@ onBeforeUnmount(() => {
 }
 .admin-filter-panel {
   display: grid;
-  grid-template-columns: auto 110px minmax(290px, 1fr) auto 70px;
+  grid-template-columns: auto 122px minmax(160px, 1fr) 70px;
   align-items: end;
   gap: 14px;
   border: 1px solid #e2d5c8;
@@ -738,13 +749,15 @@ onBeforeUnmount(() => {
   color: #fff;
 }
 .select-filter select,
-.date-filter input {
+.select-filter input {
   height: 36px;
   border: 1px solid #dbc9ba;
   border-radius: 7px;
-  background: #fff;
+  background: #fffdfb;
   padding: 0 9px;
   color: #4b3427;
+  font: inherit;
+  font-size: 12px;
 }
 .select-filter {
   display: block;
@@ -752,44 +765,20 @@ onBeforeUnmount(() => {
 .select-filter select {
   width: 100%;
 }
-.date-filter {
+.period-value {
+  min-width: 160px;
+}
+.year-range b {
   display: flex;
   align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-}
-.date-filter b { display: inline-flex; align-items: center; min-height: 38px; border: 1px solid #decbbb; border-radius: 7px; padding: 0 11px; background: #fffdfb; color: #5c4030; font-size: 13px; font-weight: 700; }
-.available-year-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.available-year-list > span { width: 100%; color: #7a5a42; font-size: 11px; font-weight: 800; }
-.available-year-list b { border-radius: 999px; background: #f1e5d8; padding: 6px 9px; color: #865737; font-size: 12px; }
-.date-filter > span {
-  width: 100%;
-  margin: 0;
-}
-.date-filter input {
-  min-width: 130px;
-}
-.date-filter i {
-  font-style: normal;
-}
-.category-filter {
-  display: flex;
-  gap: 10px;
-  padding-bottom: 8px !important;
-}
-.category-filter legend {
-  width: 100%;
-}
-.category-filter label {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 800;
-}
-.category-filter input {
-  accent-color: #95643d;
+  height: 36px;
+  box-sizing: border-box;
+  border: 1px solid #dbc9ba;
+  border-radius: 7px;
+  background: #fffdfb;
+  padding: 0 10px;
+  color: #5c4030;
+  font-size: 12px;
 }
 .filter-submit {
   height: 36px;
@@ -921,11 +910,25 @@ onBeforeUnmount(() => {
   height: 300px;
 }
 .category-echart {
-  height: 300px;
+  height: 260px;
 }
 .category-share-panel {
   text-align: center;
 }
+.category-summary-legend {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 4px 8px 0;
+  list-style: none;
+  text-align: left;
+}
+.category-summary-legend li { display: grid; grid-template-columns: 10px 1fr auto; align-items: center; gap: 7px; color: #765d4d; font-size: 11px; }
+.category-summary-legend i { width: 9px; height: 9px; border-radius: 50%; }
+.category-summary-legend b { color: #5d3c2b; }
+.category-color-0 { background: #9b653e; }
+.category-color-1 { background: #9eaf7c; }
+.category-color-2 { background: #efd7ad; }
 .ai-forecast-panel {
   margin-top: 12px;
   border-color: #d5c49e;
@@ -1019,10 +1022,6 @@ onBeforeUnmount(() => {
   .export-controls {
     grid-template-columns: 1fr;
   }
-  .category-filter,
-  .date-filter {
-    grid-column: span 2;
-  }
   .admin-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1050,10 +1049,6 @@ onBeforeUnmount(() => {
   }
   .admin-filter-panel {
     grid-template-columns: 1fr;
-  }
-  .category-filter,
-  .date-filter {
-    grid-column: auto;
   }
   .admin-kpi-grid {
     grid-template-columns: 1fr;

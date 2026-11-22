@@ -1,6 +1,6 @@
 <!-- 공지/이벤트의 검색·고정 글 분리·페이지네이션·상세 열람을 처리하는 게시판입니다. -->
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { noticeService } from "@/services/noticeService";
 const route = useRoute(),
@@ -15,13 +15,28 @@ onMounted(async () => {
   try {
     loadError.value = "";
     notices.value = await noticeService.list();
-    selected.value =
-      notices.value.find((item) => item.id === Number(route.query.id)) || null;
+    await selectFromRoute(route.params.id);
   } catch (error) {
     notices.value = [];
     loadError.value = error.message || "공지사항을 불러오지 못했습니다.";
   }
 });
+async function selectFromRoute(noticeId) {
+  if (!noticeId) {
+    selected.value = null;
+    return;
+  }
+  try {
+    loadError.value = "";
+    selected.value = await noticeService.detail(noticeId);
+  } catch (error) {
+    selected.value = null;
+    loadError.value = error.message || "공지사항 상세를 불러오지 못했습니다.";
+  }
+}
+function openNotice(item) {
+  router.push({ name: "notice-detail", params: { id: item.id } });
+}
 const filtered = computed(() =>
   notices.value
     .filter(
@@ -34,6 +49,9 @@ const filtered = computed(() =>
 );
 const pinned = computed(() => filtered.value.filter((item) => item.pinned)),
   normal = computed(() => filtered.value.filter((item) => !item.pinned));
+const noticeCountLabel = computed(() =>
+  filter.value === "전체" ? "전체" : filter.value,
+);
 const pageCount = computed(() =>
     Math.max(1, Math.ceil(normal.value.length / 10)),
   ),
@@ -54,8 +72,9 @@ function chooseFilter(value) {
 }
 function closeDetail() {
   selected.value = null;
-  if (route.query.id) router.replace("/notices");
+  router.push({ name: "notice-list" });
 }
+watch(() => route.params.id, (noticeId) => selectFromRoute(noticeId));
 </script>
 <template>
   <main class="container notice-page">
@@ -85,11 +104,14 @@ function closeDetail() {
         </label>
         <button class="notice-search">검색</button>
       </div>
+      <p v-if="!loadError" class="notice-count">
+        {{ noticeCountLabel }} <b>{{ filtered.length }}건</b>
+      </p>
       <p v-if="loadError" class="empty-data-notice">
         {{ loadError }} 서버 연결 상태를 확인해주세요.
       </p>
       <div v-if="pinned.length" class="pinned-notices">
-        <button v-for="item in pinned" :key="item.id" @click="selected = item">
+        <button v-for="item in pinned" :key="item.id" @click="openNotice(item)">
           <span class="pin-mark">고정</span>
           <span
             class="notice-type"
@@ -106,7 +128,7 @@ function closeDetail() {
         <button
           v-for="item in visibleItems"
           :key="item.id"
-          @click="selected = item"
+          @click="openNotice(item)"
         >
           <span>{{ item.id }}</span
           ><span

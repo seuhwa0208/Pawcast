@@ -1,5 +1,6 @@
 """DB 리뷰 조회, 모델 분석, 저장과 베스트 리뷰 응답을 연결합니다."""
 
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -9,12 +10,14 @@ from starlette.concurrency import run_in_threadpool
 from app.common.config import settings
 from app.review.repository import (
     find_best_review_products,
+    find_ranked_product_reviews,
     find_visible_review,
     save_sentiment,
 )
 from app.review.schemas import (
     BestReviewProductResponse,
     BestReviewResponse,
+    RankedReviewResponse,
     StoredSentimentResponse,
 )
 from app.review.sentiment_service import get_sentiment_analyzer
@@ -56,6 +59,7 @@ async def analyze_and_store_review(
         confidence=confidence,
         positivePercentage=round(float(result["positive_score"]) * 100, 2),
         modelName=analyzer.model_name,
+        analyzedAt=datetime.now().astimezone(),
     )
 
 
@@ -87,6 +91,25 @@ async def get_best_review_products(
                 createdAt=row["best_review_created_at"],
                 positivePercentage=float(row["positive_percentage"] or 0),
             ),
+        )
+        for row in rows
+    ]
+
+
+async def get_ranked_product_reviews(
+    session: AsyncSession,
+    product_id: int,
+) -> list[RankedReviewResponse]:
+    rows = await find_ranked_product_reviews(session, product_id)
+    return [
+        RankedReviewResponse(
+            id=row["id"],
+            rating=row["rating"],
+            content=row["content"],
+            writerName=row["writer_name"],
+            createdAt=row["created_at"],
+            sentiment=row["sentiment"],
+            positivePercentage=float(row["positive_percentage"] or 0),
         )
         for row in rows
     ]

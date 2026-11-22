@@ -33,9 +33,20 @@ public interface QnaRepository extends JpaRepository<Qna, Long> {
     List<Qna> findAllForAdmin();
 
     @Query("""
-    SELECT q FROM Qna q WHERE q.deletedAt IS NULL
-      AND (:type IS NULL OR q.type = :type)
-      ORDER BY q.createdAt DESC
-    """)
-    List<Qna> searchQnas(@Param("type") QnaType type);
+        SELECT q
+        FROM Qna q
+        WHERE q.deletedAt IS NULL
+          AND (:type IS NULL OR q.type = :type)
+          AND (
+              :keyword IS NULL
+              OR :keyword = ''
+              OR q.title LIKE CONCAT('%', :keyword, '%')
+              OR q.content LIKE CONCAT('%', :keyword, '%')
+          )
+        ORDER BY q.createdAt DESC
+        """)
+    List<Qna> searchQnas(
+            @Param("type") QnaType type,
+            @Param("keyword") String keyword
+    );
 }

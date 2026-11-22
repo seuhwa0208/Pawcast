@@ -2,12 +2,14 @@ package com.project.pawcast.order.dto;
 
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.order.entity.Order;
+import com.project.pawcast.order.entity.OrderItem;
 import com.project.pawcast.order.entity.OrderStatus;
 import com.project.pawcast.pets.dto.PetsResponse;
 import com.project.pawcast.pets.entity.Pets;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record OrderResponse(
         Long orderId,
@@ -25,9 +27,10 @@ public record OrderResponse(
         String delivery_address1,
         String delivery_address2,
         String delivery_message,
-        LocalDateTime created_at
+        LocalDateTime created_at,
+        List<OrderItemResponse> items
 ) {
-    public static OrderResponse from(Order order) {
+    public static OrderResponse from(Order order, List<OrderItem> orderItems) {
         return new OrderResponse(
                 order.getId(),
                 order.getMember(),
@@ -44,7 +47,8 @@ public record OrderResponse(
                 order.getDeliveryAddress1(),
                 order.getDeliveryAddress2(),
                 order.getDeliveryMessage(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                orderItems.stream().map(OrderItemResponse::from).toList()
         );
     }
 }

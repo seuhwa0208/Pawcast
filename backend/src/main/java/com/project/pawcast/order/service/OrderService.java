@@ -65,18 +65,18 @@ public class OrderService {
 
         // 상품 옵션 조회 -> 재고 여부와 판매 가능한 상태, 재고가 주문수량 이상인지 검사
         // 상품 옵션을 ID 오름차순으로 정렬 → FOR UPDATE 로 락
-            // 상품 옵션 ID를 오름차순 정렬
+        // 상품 옵션 ID를 오름차순 정렬
         List<Long> variantIds = request.items().stream().map(OrderItemRequest::productVariantId).sorted().toList();
-            //오름차순 정렬 순으로 상품 옵션 가져옴
+        //오름차순 정렬 순으로 상품 옵션 가져옴
         List<ProductVariant> variants = productVariantRepository.findAllByIdForUpdate(variantIds);
-            // DB에서 검색한 옵션값과 방금 받은 Id 값(중복제거) 비교해서 제대로 요청된 옵션인지 확인
+        // DB에서 검색한 옵션값과 방금 받은 Id 값(중복제거) 비교해서 제대로 요청된 옵션인지 확인
         if (variants.size() != variantIds.stream().distinct().count()) {throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);}
-            // 주문한 상품을 비교해서 중복된 상품을 막음 -> 하나로 주문해라
+        // 주문한 상품을 비교해서 중복된 상품을 막음 -> 하나로 주문해라
         if (variantIds.size() != variantIds.stream().distinct().count()) {throw new BusinessException(ErrorCode.INVALID_ORDER_REQUEST);}
 
         // 상품 가격 계산 / orderItem에는 가격*수량 금액을 / Order에는 총 금액
-            // Map으로 변경 / options.stream().filter(found -> found.getId().equals(item.optionId())).findFirst()...
-            // 위처럼 list도 되지만 매번 stream().filter를 사용하게됨
+        // Map으로 변경 / options.stream().filter(found -> found.getId().equals(item.optionId())).findFirst()...
+        // 위처럼 list도 되지만 매번 stream().filter를 사용하게됨
         Map<Long, ProductVariant> variantMap = variants.stream().collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
 
 
@@ -85,7 +85,7 @@ public class OrderService {
         // 현재 가격 정책에는 별도 주문 할인이 없습니다.
         BigDecimal discountAmount = BigDecimal.ZERO;
 
-            // request에 들은 아이템 만큼 orderItem이 반복
+        // request에 들은 아이템 만큼 orderItem이 반복
         for (OrderItemRequest item : request.items()) {
             ProductVariant variant = variantMap.get(item.productVariantId());
             // 옵션 확인
@@ -98,7 +98,7 @@ public class OrderService {
 
             // 옵션별 상품 금액 / 가격 * 수량 = totalPrice
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
-            
+
             // 모든 주문 금액 총액 계산
             totalAmount = totalAmount.add(itemTotal);
 
@@ -113,11 +113,11 @@ public class OrderService {
                     .build();
 
             orderItems.add(orderItem);
-            }// for문 끝 / OrderItem 주문 상품 목록 끝
+        }// for문 끝 / OrderItem 주문 상품 목록 끝
         // 최종금액 및 배달비 및 할인 금액 계산 / for문 위에 있음
-            //배달비
+        //배달비
         BigDecimal shippingFee = totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0 ? BigDecimal.ZERO : BigDecimal.valueOf(3000);
-            // 최종 금액 / 총액 + 배달비
+        // 최종 금액 / 총액 + 배달비
         BigDecimal finalAmount = totalAmount.add(shippingFee);
 
         //Order를 생성하고 ->
@@ -143,24 +143,32 @@ public class OrderService {
         // orderItem들 order 값 저장
         for (OrderItem item : orderItems) {item.setOrder(order);}
         orderItemRepository.saveAll(orderItems);
-        return OrderResponse.from(order);
+        return OrderResponse.from(order,orderItems);
     }
 
     // 주문 내역(목록) 조회
     public List<OrderResponse> listOrder(Long memberId){
-        return orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(OrderResponse::from).toList();
+        // 회원 아이디로 주문 정보 조회(N개)
+        List<Order> orders = orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId);
+        // 주문 정보로 주문 아이디 추출
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        // 주문 아이디로 주문 아이템들 추출
+        List<OrderItem> items = orderIds.isEmpty() ? List.of() : orderItemRepository.findByOrder_IdIn(orderIds);
+        // 주문 아이디와 주문 아이템들로 다시 묶어줌
+        Map<Long, List<OrderItem>> itemMap = items.stream().collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
     }
 
     // 주문 정보(상세) 조회( 회원 비회원 - 이메일과 주문번호)
     public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber){
         // 회원은 - 회원 아이디로 조회 / 비회원은 이메일 + 주문번호
         if (memberId != null){return OrderResponse.from(orderRepository.findByIdAndMemberId(orderId, memberId)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));}
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));}
         // 비회원
         return OrderResponse.from(orderRepository.findByEmailAndOrderNumber(email, orderNumber)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));
     }
-    
+
     // 공통 - orderId 와 memberId로 조회
     public Order findByIdAndMemberId(Long orderId, Long memberId){
         return orderRepository.findByIdAndMemberId(orderId, memberId).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
@@ -183,7 +191,7 @@ public class OrderService {
         order.setDeliveryAddress2(request.deliveryAddress2());
         order.setDeliveryMessage(request.deliveryMessage());
 
-        return OrderResponse.from(orderRepository.save(order));
+        return OrderResponse.from(orderRepository.save(order),orderItemRepository.findAllByOrder_Id(orderId));
     }
 
     // 삭제 - 소프트삭제 - 삭제할 이유는 보관 기간이 만료되어서 삭제 될때말곤 없어서 필요없는 기능임
@@ -226,7 +234,19 @@ public class OrderService {
         // 권한 검사
         Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(OrderResponse::from).toList();
+
+        // 전체 주문 조회
+        List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
+
+        // 주문 ID 목록 추출
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+
+        // 주문 상품 일괄 조회 및 그룹화
+        Map<Long, List<OrderItem>> itemMap = orderIds.isEmpty() ? Map.of() : orderItemRepository.findByOrder_IdIn(orderIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+
+        // Response 변환
+        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
     }
 
     // 주문 상태 변경 (관리자 및 매니저) 및 배송 완료되면 판매량 증가 + 1
