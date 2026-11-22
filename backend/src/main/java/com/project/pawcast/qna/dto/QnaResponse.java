@@ -3,6 +3,8 @@ package com.project.pawcast.qna.dto;
 import com.project.pawcast.qna.entity.Qna;
 import com.project.pawcast.qna.entity.QnaType;
 
+import java.time.LocalDateTime;
+
 public record QnaResponse(
         Long qnaId,
         Long memberId,
@@ -12,7 +14,8 @@ public record QnaResponse(
         QnaType type,
         String title,
         String content,
-        boolean isPrivate
+        boolean isPrivate,
+        LocalDateTime createdAt
 ) {
     public static QnaResponse from(Qna qna) {
         return new QnaResponse(
@@ -24,7 +27,8 @@ public record QnaResponse(
                 qna.getType(),
                 qna.getTitle(),
                 qna.getContent(),
-                qna.isPrivate()
+                qna.isPrivate(),
+                qna.getCreatedAt()
         );
     }
 }
