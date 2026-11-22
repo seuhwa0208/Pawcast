@@ -1,5 +1,6 @@
 package com.project.pawcast.auth.service;
 
+import com.project.pawcast.auth.dto.EmailRequest;
 import com.project.pawcast.auth.entity.EmailVerification;
 import com.project.pawcast.auth.repository.EmailVerificationRepository;
 import com.project.pawcast.common.email.EmailService;
@@ -30,11 +31,11 @@ public class EmailVerificationService {
     // 만료시간은 보낸 시간 값 + 5분? 10분?
 
     @Transactional
-    public void sendVerifyEmail(String email){
+    public void sendVerifyEmail(EmailRequest request){
         
         //이메일 보내기전 이미 이 이메일로 가입된 회원이 있는지 검사
-        if(membersRepository.existsByEmail(email)){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
-        emailVerificationRepo.deleteByEmail(email);
+        if(membersRepository.existsByEmail(request.email())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
+        emailVerificationRepo.deleteByEmail(request.email());
 
         //이메일 코드 발생 및 변환
         String verifyCode = String.format("%06d", secureRandom.nextInt(1000000));
@@ -42,7 +43,7 @@ public class EmailVerificationService {
         
         //이메일 보내기전 테이블에 저장
         EmailVerification emailVerification = new EmailVerification();
-        emailVerification.setEmail(email);
+        emailVerification.setEmail(request.email());
         emailVerification.setVerificationCode(encodeCode);
         LocalDateTime dateNow = LocalDateTime.now();
         emailVerification.setCreatedAt(dateNow);
@@ -50,6 +51,6 @@ public class EmailVerificationService {
         emailVerificationRepo.save(emailVerification);
 
         //이메일 보내기
-        emailService.sendEmail(email,"회원가입 이메일 인증 번호","인증번호는 " + verifyCode + "입니다.");
+        emailService.sendEmail(request.email(),"회원가입 이메일 인증 번호","인증번호는 " + verifyCode + "입니다.");
     }
 }

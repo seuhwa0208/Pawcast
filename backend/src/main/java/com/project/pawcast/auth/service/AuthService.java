@@ -41,8 +41,8 @@ public class AuthService {
         return membersRepository.existsByUserId(userId);
     }
 
-    public boolean checkEmail(String email){
-        return membersRepository.existsByEmail(email);
+    public boolean checkEmail(EmailRequest email){
+        return membersRepository.existsByEmail(email.email());
     }
     
     // 이메일로 회원 정보 불러오기
@@ -64,8 +64,8 @@ public class AuthService {
     // 이메일 보내기전에 이 이메일로 가입된 회원정보가 있나 확인하고 있으면 막고, 없으면 인증정보 파기후 다시 생성 - 이메일인증서비스에서 파기하고 새로만듬
     // 여기선 코드 검사하고 성공하면 완료시간만 업데이트하면 될듯?
     @Transactional
-    public boolean checkVerifyEmail(String email, String checkCode){
-        EmailVerification emailVerification = checkVerificationEmail(email);
+    public boolean checkVerifyEmail(EmailRequest request, String checkCode){
+        EmailVerification emailVerification = checkVerificationEmail(request.email());
 
         // 인증 완료된 이메일인지 확인
         if(emailVerification.getVerifiedAt() != null) {throw new BusinessException(ErrorCode.VERIFICATION_COMPLETED_EMAIL);}
