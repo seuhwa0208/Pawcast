@@ -27,20 +27,20 @@ public class AuthController {
 
     // 이메일 중복 확인: 인증번호 발송 전에 가입 가능 여부를 명확히 안내한다.
     @PostMapping("/email-availability")
-    public Map<String, Boolean> checkEmail(@RequestParam String email){
-        return Map.of("available", !authService.checkEmail(email));
+    public Map<String, Boolean> checkEmail(@Valid @RequestBody EmailRequest request){
+        return Map.of("available", !authService.checkEmail(request));
     }
 
     // 이메일 인증 (이메일 발송)(버튼)
     @PostMapping("/email-verify")
-    public void sendVerifyEmail(@RequestParam String email){
-        emailVerificationService.sendVerifyEmail(email);
+    public void sendVerifyEmail(@Valid @RequestBody EmailRequest request){
+        emailVerificationService.sendVerifyEmail(request);
     }
 
     // 이메일 검증(이메일 확인)
     @PostMapping("/email-verify/confirm")
-    public boolean checkVerifyEmail(@RequestParam String email, @RequestParam String checkCode){
-        return authService.checkVerifyEmail(email, checkCode);
+    public boolean checkVerifyEmail(@Valid @RequestBody EmailRequest request, @RequestParam String checkCode){
+        return authService.checkVerifyEmail(request, checkCode);
     }
 
     // 회원 가입
