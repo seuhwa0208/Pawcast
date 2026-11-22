@@ -123,7 +123,7 @@ public class QnaService {
         Qna qna = findById(qnaId);
         // 똑같은 사람인지 검사
         Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        if (!"ADMIN".equals(member.getRole()) && !qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
+        if (member.getRole() != Members.Role.ADMIN && !qna.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.FORBIDDEN_ACCESS);}
         qna.setDeletedAt(LocalDateTime.now());
     }
 

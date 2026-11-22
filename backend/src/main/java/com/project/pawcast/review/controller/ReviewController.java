@@ -2,7 +2,6 @@ package com.project.pawcast.review.controller;
 
 import com.project.pawcast.review.dto.*;
 import com.project.pawcast.review.service.ReviewService;
-import com.project.pawcast.review.service.ReviewWriteService;
 import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +14,6 @@ import org.springframework.web.bind.annotation.*;
 public class ReviewController {
 
     private final ReviewService reviewService;
-    private final ReviewWriteService reviewWriteService;
 
     // 상품별 공개 리뷰 목록 조회
     @GetMapping("/products/{productId}/reviews")
@@ -32,13 +30,13 @@ public class ReviewController {
     // 리뷰 등록
     @PostMapping("/reviews")
     public ReviewResponse createReview(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody ReviewCreateRequest request) {
-        return reviewWriteService.createReview(member.getId(), request);
+        return reviewService.createReview(member.getId(), request);
     }
 
     // 리뷰 수정
     @PatchMapping("/reviews/{reviewId}")
     public ReviewResponse updateReview(@AuthenticationPrincipal LoginMember member, @PathVariable Long reviewId, @Valid @RequestBody ReviewUpdateRequest request) {
-        return reviewWriteService.updateReview(reviewId, member.getId(), request);
+        return reviewService.updateReview(reviewId, member.getId(), request);
     }
 
     // 리뷰 삭제

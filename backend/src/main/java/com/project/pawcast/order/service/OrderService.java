@@ -143,22 +143,30 @@ public class OrderService {
         // orderItem들 order 값 저장
         for (OrderItem item : orderItems) {item.setOrder(order);}
         orderItemRepository.saveAll(orderItems);
-        return OrderResponse.from(order);
+        return OrderResponse.from(order,orderItems);
     }
 
     // 주문 내역(목록) 조회
     public List<OrderResponse> listOrder(Long memberId){
-        return orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(OrderResponse::from).toList();
+        // 회원 아이디로 주문 정보 조회(N개)
+        List<Order> orders = orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId);
+        // 주문 정보로 주문 아이디 추출
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        // 주문 아이디로 주문 아이템들 추출
+        List<OrderItem> items = orderIds.isEmpty() ? List.of() : orderItemRepository.findByOrder_IdIn(orderIds);
+        // 주문 아이디와 주문 아이템들로 다시 묶어줌
+        Map<Long, List<OrderItem>> itemMap = items.stream().collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
     }
 
     // 주문 정보(상세) 조회( 회원 비회원 - 이메일과 주문번호)
     public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber){
         // 회원은 - 회원 아이디로 조회 / 비회원은 이메일 + 주문번호
         if (memberId != null){return OrderResponse.from(orderRepository.findByIdAndMemberId(orderId, memberId)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));}
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));}
         // 비회원
         return OrderResponse.from(orderRepository.findByEmailAndOrderNumber(email, orderNumber)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)));
+                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));
     }
     
     // 공통 - orderId 와 memberId로 조회
@@ -183,7 +191,7 @@ public class OrderService {
         order.setDeliveryAddress2(request.deliveryAddress2());
         order.setDeliveryMessage(request.deliveryMessage());
 
-        return OrderResponse.from(orderRepository.save(order));
+        return OrderResponse.from(orderRepository.save(order),orderItemRepository.findAllByOrder_Id(orderId));
     }
 
     // 삭제 - 소프트삭제 - 삭제할 이유는 보관 기간이 만료되어서 삭제 될때말곤 없어서 필요없는 기능임
@@ -226,7 +234,19 @@ public class OrderService {
         // 권한 검사
         Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
-        return orderRepository.findAllByOrderByCreatedAtDesc().stream().map(OrderResponse::from).toList();
+
+        // 전체 주문 조회
+        List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
+
+        // 주문 ID 목록 추출
+        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+
+        // 주문 상품 일괄 조회 및 그룹화
+        Map<Long, List<OrderItem>> itemMap = orderIds.isEmpty() ? Map.of() : orderItemRepository.findByOrder_IdIn(orderIds).stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+
+        // Response 변환
+        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
     }
 
     // 주문 상태 변경 (관리자 및 매니저) 및 배송 완료되면 판매량 증가 + 1
