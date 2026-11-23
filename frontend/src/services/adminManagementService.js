@@ -22,8 +22,11 @@ export const adminManagementService = {
   approveRefund: (refundId) =>
     springRequest(`/admin/refunds/${refundId}/approve`, { method: "PATCH" }),
   getProducts: () => springRequest("/admin/products"),
-  createProduct: (payload) =>
-    springRequest("/admin/products", { method: "POST", body: jsonBody(payload) }),
+  createProduct: (formData) =>
+  springRequest("/admin/products", {
+    method: "POST",
+    body: formData,
+  }),
   getBestProducts: () => springRequest("/products/best-sales"),
   getWorstProducts: () => springRequest("/products/worst-sales"),
   getManagedQnas: () => springRequest("/qna/manage"),
@@ -31,6 +34,11 @@ export const adminManagementService = {
   createQnaAnswer: (qnaId, content) =>
     springRequest(`/inquiries/${qnaId}`, {
       method: "POST",
+      body: jsonBody({ content }),
+    }),
+  updateQnaAnswer: (qnaId, content) =>
+    springRequest(`/inquiries/${qnaId}`, {
+      method: "PUT",
       body: jsonBody({ content }),
     }),
   getNotices: () => springRequest("/notices"),

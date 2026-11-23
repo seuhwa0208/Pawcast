@@ -124,12 +124,19 @@ public class AdminDashboardService {
         trend.put("sales", trendRows.stream().map(row -> row.get("sales")).toList());
         trend.put("orders", trendRows.stream().map(row -> row.get("orders")).toList());
 
+        // # 매출 분석: 화면에서 임의로 5%를 더하던 값을 없애고 FastAPI의 실제 판매 예측을 사용한다.
         Map<String, Object> forecast = new LinkedHashMap<>();
-        forecast.put("predictedSales", totalSales.multiply(BigDecimal.valueOf(1.05)).setScale(0, RoundingMode.HALF_UP));
-        forecast.put("growthRate", 5.0);
-        forecast.put("insight", ((Number) totals.get("total_orders")).longValue() == 0
-                ? "선택 기간의 결제 데이터가 없습니다."
-                : "최근 매출 흐름을 기준으로 한 단순 예상치입니다.");
+        try {
+            SalesForecastClient.ForecastResponse forecastResult = salesForecastClient.retrain(end.plusDays(1));
+            forecast.put("predictedSales", forecastResult.predicted_sales());
+            forecast.put("growthRate", forecastResult.growth_rate());
+            forecast.put("insight", forecastResult.insight());
+        } catch (BusinessException exception) {
+            // 매출 집계 자체는 DB에서 계속 제공하고, AI 서버 미기동은 임의 수치 대신 명확히 알린다.
+            forecast.put("predictedSales", null);
+            forecast.put("growthRate", null);
+            forecast.put("insight", "AI 판매 예측 서버에 연결하지 못했습니다. AI 서버 실행과 내부 API 키 설정을 확인해 주세요.");
+        }
         forecast.put("topProducts", topProducts);
 
         Map<String, Object> response = new LinkedHashMap<>();

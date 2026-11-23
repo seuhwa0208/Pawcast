@@ -19,6 +19,12 @@
   margin: 0 auto;
   padding: clamp(28px, 3vw, 52px) clamp(24px, 4vw, 72px) 56px;
 }
+
+.admin-layout-content table th,
+.admin-layout-content table td {
+  text-align: center !important;
+  vertical-align: middle;
+}
 @media (max-width: 760px) {
   .admin-overview,
   .admin-dashboard,

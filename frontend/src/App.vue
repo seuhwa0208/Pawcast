@@ -5,17 +5,27 @@ import { useRoute, useRouter } from "vue-router";
 import AppHeader from "@/components/AppHeader.vue";
 import AppFooter from "@/components/AppFooter.vue";
 import GlobalErrorModal from "@/components/GlobalErrorModal.vue";
+import PetRegistrationPrompt from "@/components/PetRegistrationPrompt.vue";
 import { useAuthSession } from "@/stores/auth";
 import { petService } from "@/services/petService";
 
 const route = useRoute();
 const router = useRouter();
-const { accessToken, setAccessToken } = useAuthSession();
+const { accessToken, currentUserId, clearAuthSession } = useAuthSession();
 const errorOpen = ref(false);
 const errorContent = reactive({ title: "", message: "", details: [] });
 const usesAdminLayout = computed(() => Boolean(route.meta.adminLayout));
 const petPromptOpen = ref(false);
 let checkedPetToken = "";
+
+function petPromptStorageKey() {
+  return `powcast-pet-prompt-hidden-until:${currentUserId.value}`;
+}
+
+function isPetPromptDeferred() {
+  const hiddenUntil = Number(localStorage.getItem(petPromptStorageKey()) || 0);
+  return Number.isFinite(hiddenUntil) && hiddenUntil > Date.now();
+}
 
 const errorTitles = {
   MEMBER_BLOCKED: "임시 차단된 계정입니다",
@@ -31,7 +41,7 @@ function handleApiError(event) {
   const detail = event.detail || {};
   if (detail.status === 401) {
     const sessionExpired = Boolean(accessToken.value);
-    setAccessToken("");
+    clearAuthSession();
     router.push({ path: "/login", query: { redirect: route.fullPath } });
     if (sessionExpired) {
       errorContent.title = "로그인이 만료되었습니다";
@@ -65,23 +75,35 @@ onBeforeUnmount(() =>
 async function checkPetRegistration(token) {
   // 관리자는 쇼핑·반려동물 추천 대상이 아니므로 PETS API를 호출하지 않습니다.
   const isOperator = ["ADMIN", "MANAGER"].includes(sessionStorage.getItem("powcast-user-role"));
-  if (!token || token === checkedPetToken || route.meta.requiresManager || route.meta.requiresAdmin || isOperator) {
+  if (!token || !currentUserId.value || token === checkedPetToken || route.meta.requiresManager || route.meta.requiresAdmin || isOperator) {
     if (isOperator) petPromptOpen.value = false;
     return;
   }
   checkedPetToken = token;
   try {
     const pets = await petService.getPets();
-    if (Array.isArray(pets) && pets.length === 0) petPromptOpen.value = true;
+    petPromptOpen.value = Array.isArray(pets) && pets.length === 0 && !isPetPromptDeferred();
   } catch {
     // 공통 API 오류 처리기가 서버·인증 오류를 안내합니다.
   }
 }
 
-watch(accessToken, checkPetRegistration, { immediate: true });
+watch([accessToken, currentUserId], ([token], previous = []) => {
+  const previousUserId = previous[1];
+  if (currentUserId.value !== previousUserId) checkedPetToken = "";
+  checkPetRegistration(token);
+}, { immediate: true });
 
 function goToPetRegistration() {
   router.push("/mypage/pets");
+}
+
+function deferPetRegistration(days) {
+  const safeDays = [7, 30].includes(days) ? days : 7;
+  localStorage.setItem(
+    petPromptStorageKey(),
+    String(Date.now() + safeDays * 24 * 60 * 60 * 1000),
+  );
 }
 </script>
 <template>
@@ -95,12 +117,10 @@ function goToPetRegistration() {
       :message="errorContent.message"
       :details="errorContent.details"
     />
-    <GlobalErrorModal
+    <PetRegistrationPrompt
       v-model="petPromptOpen"
-      title="반려동물 정보를 등록해주세요"
-      message="우리 아이에게 맞는 상품 추천을 위해 반려동물 정보를 먼저 등록해주세요."
-      confirm-label="등록하러 가기"
-      @confirm="goToPetRegistration"
+      @register="goToPetRegistration"
+      @defer="deferPetRegistration"
     />
   </div>
 </template>

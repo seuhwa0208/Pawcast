@@ -74,6 +74,8 @@ export function toProductCard(product, pet = "") {
     categoryId: product.categoryId,
     productType: product.productType,
     mainIngredient: product.mainIngredient,
+    // 식기·급수 상품은 백엔드가 재질을 제공하면 목록 필터에 그대로 사용한다.
+    material: product.material || "",
     lifeStage: product.lifeStage,
   };
 }

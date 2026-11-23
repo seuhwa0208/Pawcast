@@ -16,16 +16,23 @@ import ClaimManagementView from "@/views/ClaimManagementView.vue";
 import PetManagementView from "@/views/PetManagementView.vue";
 import CheckoutView from "@/views/CheckoutView.vue";
 import PaymentResultView from "@/views/PaymentResultView.vue";
+import GuestOrderLookupView from "@/views/GuestOrderLookupView.vue";
 import ErrorView from "@/views/ErrorView.vue";
 import { useAuthSession } from "@/stores/auth";
 import AdminLayout from "@/layouts/AdminLayout.vue";
 
 // 용량이 큰 ECharts는 관리자 경로에 들어왔을 때만 내려받도록 화면을 지연 로딩합니다.
-const AdminDashboardView = () => import("@/views/AdminDashboardView.vue");
-const AdminOverviewView = () => import("@/views/AdminOverviewView.vue");
-const AdminOperationsView = () => import("@/views/AdminOperationsView.vue");
-const AdminProductCreateView = () => import("@/views/AdminProductCreateView.vue");
-const AdminDemoView = () => import("@/views/AdminDemoView.vue");
+const AdminOverviewView = () => import("@/views/admin/AdminOverviewView.vue");
+const AdminSalesAnalyticsView = () =>
+  import("@/views/admin/AdminSalesAnalyticsView.vue");
+const AdminOrdersView = () => import("@/views/admin/AdminOrdersView.vue");
+const AdminProductsView = () => import("@/views/admin/AdminProductsView.vue");
+const AdminProductCreateView = () =>
+  import("@/views/admin/AdminProductCreateView.vue");
+const AdminMembersView = () => import("@/views/admin/AdminMembersView.vue");
+const AdminNoticesView = () => import("@/views/admin/AdminNoticesView.vue");
+const AdminQnaView = () => import("@/views/admin/AdminQnaView.vue");
+const AdminSupportView = () => import("@/views/admin/AdminSupportView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -77,6 +84,11 @@ const router = createRouter({
       name: "payment-result",
       component: PaymentResultView,
     },
+    {
+      path: "/guest-orders",
+      name: "guest-order-lookup",
+      component: GuestOrderLookupView,
+    },
     { path: "/qna", name: "qna-list", component: QnaView },
     { path: "/qna/:id(\\d+)", name: "qna-detail", component: QnaView },
     { path: "/notices", name: "notice-list", component: NoticeView },
@@ -107,23 +119,35 @@ const router = createRouter({
           path: "dashboard",
           name: "admin-dashboard",
           component: AdminOverviewView,
+          alias: "overview",
         },
 
         // 매출 분석
         {
           path: "sales",
           name: "admin-sales",
-          component: AdminDashboardView,
+          component: AdminSalesAnalyticsView,
+        },
+
+        // 주문·배송 관리: 주문 조회, 배송 상태 변경, 환불 승인
+        {
+          path: "orders",
+          name: "admin-orders",
+          component: AdminOrdersView,
+        },
+
+        // 상품 관리: 실제 상품 목록과 베스트·워스트 판매 성과
+        {
+          path: "products",
+          name: "admin-products",
+          component: AdminProductsView,
         },
 
         // 회원 관리 (ADMIN 전용)
         {
           path: "members",
           name: "admin-members",
-          component: AdminOperationsView,
-          props: {
-            section: "members",
-          },
+          component: AdminMembersView,
           meta: {
             requiresAdmin: true,
           },
@@ -136,20 +160,18 @@ const router = createRouter({
           component: AdminProductCreateView,
         },
 
-        // 주문, 상품, QnA, 공지사항 관리
+        // 공지사항 관리: 등록·수정·삭제·고정 처리
         {
-          path: ":section(orders|products|qna|notices)",
-          name: "admin-operations",
-          component: AdminOperationsView,
-          props: true,
+          path: "notices",
+          name: "admin-notices",
+          component: AdminNoticesView,
         },
 
-        // 카테고리 및 설정
+        // QnA 관리: 답변 대기 우선 정렬과 답변 등록·수정
         {
-          path: ":tool(category|settings)",
-          name: "admin-demo",
-          component: AdminDemoView,
-          props: true,
+          path: "qna",
+          name: "admin-qna",
+          component: AdminQnaView,
         },
       ],
     },  

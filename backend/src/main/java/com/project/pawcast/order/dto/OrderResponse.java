@@ -10,6 +10,7 @@ import com.project.pawcast.pets.entity.Pets;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public record OrderResponse(
         Long orderId,
@@ -32,6 +33,14 @@ public record OrderResponse(
 ) {
     // Order 엔티티와 주문 항목 목록을 응답 DTO로 변환
     public static OrderResponse from(Order order, List<OrderItem> orderItems) {
+        return from(order, orderItems, Map.of());
+    }
+
+    public static OrderResponse from(
+            Order order,
+            List<OrderItem> orderItems,
+            Map<Long, String> mainImagesByProductId
+    ) {
         return new OrderResponse(
                 order.getId(),
                 order.getMember(),
@@ -49,7 +58,14 @@ public record OrderResponse(
                 order.getDeliveryAddress2(),
                 order.getDeliveryMessage(),
                 order.getCreatedAt(),
-                orderItems.stream().map(OrderItemResponse::from).toList()
+                orderItems.stream()
+                        .map(item -> OrderItemResponse.from(
+                                item,
+                                mainImagesByProductId.get(
+                                        item.getProductVariant().getProduct().getId()
+                                )
+                        ))
+                        .toList()
         );
     }
 }

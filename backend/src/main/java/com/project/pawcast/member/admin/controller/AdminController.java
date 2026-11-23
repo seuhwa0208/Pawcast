@@ -26,6 +26,7 @@ public class AdminController {
     }
 
 
+    @PatchMapping("/members/{userId}/status")
     public void changeMemberStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long userId, @RequestBody MemberStatusRequest request){
         adminService.changeMemberStatus(member.getId(),userId, request);
     }

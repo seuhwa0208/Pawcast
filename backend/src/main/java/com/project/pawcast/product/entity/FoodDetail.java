@@ -34,4 +34,18 @@ public class FoodDetail {
 
     @Column(name = "ingredient_description", columnDefinition = "text")
     private String ingredientDescription;
+
+    public void update(
+            String foodKind,
+            String foodForm,
+            String mainIngredient,
+            String lifeStage,
+            String ingredientDescription
+    ) {
+        this.foodKind = foodKind;
+        this.foodForm = foodForm;
+        this.mainIngredient = mainIngredient;
+        this.lifeStage = lifeStage;
+        this.ingredientDescription = ingredientDescription;
+    }
 }

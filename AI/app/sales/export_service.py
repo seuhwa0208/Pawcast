@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 from io import BytesIO
+import json
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
@@ -11,13 +13,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.sales.service import retrain_sales_forecast
 
 
-SECTION_NAMES = {
-    "summary": "매출요약",
-    "categories": "카테고리요약",
-    "daily": "일별매출",
-    "products": "상품통계",
-    "reviews": "리뷰감정",
-    "forecast": "판매예측",
+SCHEMA_PATH = Path(__file__).resolve().parents[3] / "shared" / "export-schemas" / "sales.json"
+
+
+def _load_export_schema() -> dict:
+    """Vue와 동일한 JSON 정의로 파일명·시트명·열 헤더를 통일한다."""
+    with SCHEMA_PATH.open(encoding="utf-8") as schema_file:
+        return json.load(schema_file)
+
+
+EXPORT_SCHEMA = _load_export_schema()
+SECTION_SCHEMA = {
+    section["key"]: section
+    for section in EXPORT_SCHEMA["sections"]
+    if section["key"] != "all"
 }
 
 
@@ -260,17 +269,29 @@ def _csv_bytes(frame: pd.DataFrame) -> bytes:
     return frame.to_csv(index=False).encode("utf-8-sig")
 
 
+def _format_export_frame(key: str, frame: pd.DataFrame) -> pd.DataFrame:
+    """스키마에 정의된 열을 먼저 정렬·한글화하고, 새 데이터 열도 빠뜨리지 않는다."""
+    columns = SECTION_SCHEMA[key].get("columns", {})
+    ordered_columns = [column for column in columns if column in frame.columns]
+    remaining_columns = [column for column in frame.columns if column not in ordered_columns]
+    return frame.loc[:, ordered_columns + remaining_columns].rename(columns=columns)
+
+
 def create_csv_file(
     frames: dict[str, pd.DataFrame], section: str
 ) -> tuple[bytes, str, str]:
     """한 항목은 CSV, 전체 항목은 여러 CSV가 들어 있는 ZIP으로 만듭니다."""
     if section != "all":
-        return _csv_bytes(frames[section]), f"sales_{section}.csv", "text/csv; charset=utf-8"
+        frame = _format_export_frame(section, frames[section])
+        return _csv_bytes(frame), f"{EXPORT_SCHEMA['fileNamePrefix']}_{section}.csv", "text/csv; charset=utf-8"
     output = BytesIO()
     with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         for key, frame in frames.items():
-            archive.writestr(f"sales_{key}.csv", _csv_bytes(frame))
-    return output.getvalue(), "sales_statistics_csv.zip", "application/zip"
+            archive.writestr(
+                f"{EXPORT_SCHEMA['fileNamePrefix']}_{key}.csv",
+                _csv_bytes(_format_export_frame(key, frame)),
+            )
+    return output.getvalue(), f"{EXPORT_SCHEMA['fileNamePrefix']}_statistics_csv.zip", "application/zip"
 
 
 def create_excel_file(
@@ -281,12 +302,12 @@ def create_excel_file(
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         for key, frame in selected.items():
-            sheet_name = SECTION_NAMES[key]
-            frame.to_excel(writer, sheet_name=sheet_name, index=False)
+            sheet_name = SECTION_SCHEMA[key]["sheetName"]
+            _format_export_frame(key, frame).to_excel(writer, sheet_name=sheet_name, index=False)
             worksheet = writer.sheets[sheet_name]
             worksheet.freeze_panes = "A2"
             worksheet.auto_filter.ref = worksheet.dimensions
             for cells in worksheet.columns:
                 width = min(max(len(str(cell.value or "")) for cell in cells) + 2, 45)
                 worksheet.column_dimensions[cells[0].column_letter].width = width
-    return output.getvalue(), "sales_statistics.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return output.getvalue(), f"{EXPORT_SCHEMA['fileNamePrefix']}_statistics.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -1,6 +1,6 @@
 <!-- 주문 현황과 회원 활동을 요약하고 비밀번호 재확인 흐름을 여는 마이페이지 대시보드입니다. -->
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthSession } from "@/stores/auth";
 import { useCart } from "@/stores/cart";
@@ -10,6 +10,7 @@ import { cartService } from "@/services/cartService";
 import { reviewService } from "@/services/reviewService";
 import { verifyMyPassword } from "@/services/memberService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
+import PaginationBar from "@/components/PaginationBar.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -22,6 +23,9 @@ const verifyOpen = ref(false);
 const orders = ref([]);
 const ordersLoading = ref(false);
 const ordersError = ref("");
+const selectedPeriodMonths = ref(6);
+const orderPage = ref(1);
+const orderPageSize = 4;
 const selectedOrder = ref(null);
 const orderDetailOpen = ref(false);
 const expandedOrderIds = ref([]);
@@ -31,6 +35,8 @@ const reviewItem = ref(null);
 const reviewRating = ref(5);
 const reviewContent = ref("");
 const reviewSubmitting = ref(false);
+const reviewImageInput = ref(null);
+const reviewImages = ref([]);
 const cancelOpen = ref(false);
 const cancelOrderTarget = ref(null);
 const cancelReason = ref("");
@@ -51,20 +57,71 @@ const statusLabels = {
   PAYMENT_COMPLETED: "결제 완료",
   PENDING_PAYMENT: "결제 대기",
   PAID: "결제 완료",
-  PREPARING: "상품 준비중",
+  PREPARING: "배송 준비",
   SHIPPING: "배송중",
   DELIVERED: "배송 완료",
   CONFIRMED: "구매 확정",
   CANCELLED: "주문 취소",
 };
+const orderPeriodOptions = [
+  { value: 3, label: "최근 3개월" },
+  { value: 6, label: "최근 6개월" },
+  { value: 12, label: "최근 1년" },
+  { value: 24, label: "최근 2년" },
+  { value: 0, label: "전체 기간" },
+];
+const fallbackOrderImage = "/assets/products/generated/dry-food.png";
+function orderDateValue(order) {
+  const raw = order.createdAt || order.created_at || order.orderDate;
+  const date = raw ? new Date(raw) : null;
+  return date && !Number.isNaN(date.valueOf()) ? date : null;
+}
+function orderImageSrc(item) {
+  const value = item?.image || item?.imageUrl;
+  if (!value || /^[A-Za-z]:\\/.test(value)) return fallbackOrderImage;
+  if (/^https?:\/\//.test(value) || value.startsWith("/")) return value;
+  return `/${value.replace(/^\.\//, "")}`;
+}
+function replaceBrokenOrderImage(event) {
+  const image = event.currentTarget;
+  if (image.dataset.fallbackApplied) return;
+  image.dataset.fallbackApplied = "true";
+  image.src = fallbackOrderImage;
+}
+const filteredOrders = computed(() => {
+  const months = Number(selectedPeriodMonths.value);
+  if (!months) return orders.value;
+  const boundary = new Date();
+  boundary.setMonth(boundary.getMonth() - months);
+  boundary.setHours(0, 0, 0, 0);
+  return orders.value.filter((order) => {
+    const createdAt = orderDateValue(order);
+    return createdAt && createdAt >= boundary;
+  });
+});
+const totalOrderPages = computed(() =>
+  Math.max(1, Math.ceil(filteredOrders.value.length / orderPageSize)),
+);
+const paginatedOrders = computed(() => {
+  const start = (orderPage.value - 1) * orderPageSize;
+  return filteredOrders.value.slice(start, start + orderPageSize);
+});
+function changeOrderPeriod() {
+  orderPage.value = 1;
+}
 const orderCards = computed(() =>
-  orders.value.map((order) => {
+  paginatedOrders.value.map((order) => {
     const orderItems = order.items || order.orderItems || [];
     const firstItem = orderItems[0] || {};
     return {
       ...order,
       id: order.orderId ?? order.id,
-      orderItems,
+      orderItems: orderItems.map((item) => ({
+        ...item,
+        id: item.id ?? item.orderItemId,
+        variantId: item.variantId ?? item.productVariantId,
+        image: item.image || item.imageUrl || "/assets/products/generated/dry-food.png",
+      })),
       firstItem,
       displayStatus: statusLabels[order.status] || order.status,
       displayDate: String(
@@ -77,7 +134,7 @@ const orderCards = computed(() =>
   }),
 );
 const statusCounts = computed(() =>
-  orders.value.reduce((counts, order) => {
+  filteredOrders.value.reduce((counts, order) => {
     counts[order.status] = (counts[order.status] || 0) + 1;
     return counts;
   }, {}),
@@ -91,7 +148,7 @@ async function loadOrders() {
   try {
     ordersLoading.value = true;
     ordersError.value = "";
-    const result = await orderService.getMyOrders({ period: "6m" });
+    const result = await orderService.getMyOrders();
     const serverOrders = Array.isArray(result)
       ? result
       : result.content || result.items || result.orders || [];
@@ -145,7 +202,37 @@ function openReview(item) {
   reviewItem.value = item;
   reviewRating.value = 5;
   reviewContent.value = "";
+  clearReviewImages();
   reviewOpen.value = true;
+}
+function clearReviewImages() {
+  reviewImages.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
+  reviewImages.value = [];
+  if (reviewImageInput.value) reviewImageInput.value.value = "";
+}
+function closeReview() {
+  if (reviewSubmitting.value) return;
+  reviewOpen.value = false;
+  clearReviewImages();
+}
+function onReviewImagesChange(event) {
+  for (const file of Array.from(event.target.files || [])) {
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["jpg", "jpeg", "png", "webp"].includes(extension) || file.size === 0 || file.size > 5 * 1024 * 1024) {
+      showActionMessage("리뷰 이미지는 JPG, JPEG, PNG, WebP 형식이며 장당 5MB 이하여야 합니다.");
+      continue;
+    }
+    if (reviewImages.value.length >= 5) {
+      showActionMessage("리뷰 이미지는 최대 5장까지 등록할 수 있습니다.");
+      break;
+    }
+    reviewImages.value.push({ file, previewUrl: URL.createObjectURL(file) });
+  }
+  if (reviewImageInput.value) reviewImageInput.value.value = "";
+}
+function removeReviewImage(index) {
+  const [item] = reviewImages.value.splice(index, 1);
+  if (item) URL.revokeObjectURL(item.previewUrl);
 }
 async function submitReview() {
   if (!reviewContent.value.trim()) {
@@ -158,8 +245,9 @@ async function submitReview() {
       orderItemId: reviewItem.value.id,
       rating: reviewRating.value,
       content: reviewContent.value.trim(),
+      images: reviewImages.value.map((item) => item.file),
     });
-    reviewOpen.value = false;
+    closeReview();
     showActionMessage("리뷰가 등록되었습니다.");
   } catch (error) {
     showActionMessage(error.message || "리뷰를 등록하지 못했습니다.");
@@ -167,6 +255,7 @@ async function submitReview() {
     reviewSubmitting.value = false;
   }
 }
+onBeforeUnmount(clearReviewImages);
 function notifyDirectPaymentPending() {
   showActionMessage("바로 결제는 주문·PG 요청 형식 확정 후 연결됩니다.");
 }
@@ -239,16 +328,22 @@ async function verifyPassword() {
               <h2>주문·배송 조회</h2>
               <p>최근 6개월 동안의 주문 내역입니다.</p>
             </div>
-            <span>최근 6개월</span>
+            <label class="order-period-select">
+              <span>조회 기간</span>
+              <select v-model.number="selectedPeriodMonths" @change="changeOrderPeriod">
+                <option v-for="period in orderPeriodOptions" :key="period.value" :value="period.value">
+                  {{ period.label }}
+                </option>
+              </select>
+            </label>
           </header>
           <div class="delivery-steps">
             <article
               v-for="(step, index) in [
-                { key: 'PAYMENT_COMPLETED', label: '결제 완료' },
-                { key: 'PREPARING', label: '상품 준비중' },
+                { key: 'PAID', label: '결제 완료' },
+                { key: 'PREPARING', label: '배송 준비' },
                 { key: 'SHIPPING', label: '배송중' },
                 { key: 'DELIVERED', label: '배송 완료' },
-                { key: 'CONFIRMED', label: '구매 확정' },
               ]"
               :key="step.key"
             >
@@ -298,8 +393,9 @@ async function verifyPassword() {
                     :aria-label="`${item.productName || '주문 상품'} 상세보기`"
                   >
                     <img
-                      :src="item.imageUrl || item.image"
+                      :src="orderImageSrc(item)"
                       :alt="item.productName || '주문 상품'"
+                      @error="replaceBrokenOrderImage"
                     />
                   </RouterLink>
                   <div class="order-info">
@@ -352,12 +448,18 @@ async function verifyPassword() {
               </button>
             </article>
           </div>
+          <PaginationBar
+            v-if="filteredOrders.length"
+            v-model:page="orderPage"
+            :total-pages="totalOrderPages"
+            label="주문 내역 페이지"
+          />
           <p
             v-else
             class="dashboard-order-state"
             :class="{ error: ordersError }"
           >
-            {{ ordersError || "최근 6개월 주문 내역이 없습니다." }}
+            {{ ordersError || "선택한 기간의 주문 내역이 없습니다." }}
           </p>
         </section>
       </div>
@@ -513,8 +615,9 @@ async function verifyPassword() {
                 @click="orderDetailOpen = false"
               >
                 <img
-                  :src="item.imageUrl || item.image"
+                  :src="orderImageSrc(item)"
                   :alt="item.productName"
+                  @error="replaceBrokenOrderImage"
                 />
               </RouterLink>
               <div>
@@ -611,7 +714,7 @@ async function verifyPassword() {
       <div
         v-if="reviewOpen"
         class="common-modal-backdrop"
-        @click.self="reviewOpen = false"
+        @click.self="closeReview"
       >
         <form
           class="common-modal review-write-modal"
@@ -621,7 +724,7 @@ async function verifyPassword() {
             type="button"
             class="common-modal-close"
             aria-label="닫기"
-            @click="reviewOpen = false"
+            @click="closeReview"
           >
             ×
           </button>
@@ -659,8 +762,18 @@ async function verifyPassword() {
               placeholder="상품에 대한 리뷰를 남겨쥬세요."
             ></textarea>
           </label>
+          <section class="review-image-upload">
+            <div class="review-image-upload-head">
+              <div><b>사진 첨부</b><small>선택 · 최대 5장 / 장당 5MB</small></div>
+              <label class="review-image-upload-button" for="review-images">사진 선택</label>
+              <input id="review-images" ref="reviewImageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple @change="onReviewImagesChange" />
+            </div>
+            <ul v-if="reviewImages.length" class="review-image-preview-list">
+              <li v-for="(image,index) in reviewImages" :key="image.previewUrl"><img :src="image.previewUrl" :alt="image.file.name" /><button type="button" :aria-label="`${image.file.name} 삭제`" @click="removeReviewImage(index)">×</button></li>
+            </ul>
+          </section>
           <div class="common-modal-actions">
-            <button type="button" class="secondary" @click="reviewOpen = false">
+            <button type="button" class="secondary" @click="closeReview">
               취소
             </button>
             <button class="primary" :disabled="reviewSubmitting">

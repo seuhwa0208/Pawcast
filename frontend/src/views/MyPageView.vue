@@ -3,12 +3,12 @@
 import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthSession } from "@/stores/auth";
-import { getMyProfile, updateMyProfile, withdrawMember } from "@/services/memberService";
+import { changeMemberPassword, getMyProfile, updateMyProfile, withdrawMember } from "@/services/memberService";
 import { addressService } from "@/services/addressService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const router = useRouter();
-const { currentUserId, setAccessToken } = useAuthSession();
+const { currentUserId, setAccessToken, clearAuthSession } = useAuthSession();
 const profile = reactive({
   username: "",
   userId: currentUserId.value,
@@ -17,6 +17,13 @@ const profile = reactive({
   marketing: false,
 });
 const profileSavedOpen = ref(false);
+const passwordMessage = ref("");
+const passwordChanging = ref(false);
+const passwordForm = reactive({
+  password: "",
+  newPassword: "",
+  newPasswordCheck: "",
+});
 const addressFormOpen = ref(false);
 const addressError = ref("");
 const withdrawOpen = ref(false);
@@ -47,12 +54,32 @@ async function saveProfile() {
   )
     return;
   await updateMyProfile({
-    username: profile.username,
-    email: profile.email,
+    name: profile.username,
     tel: profile.tel.replace(/\D/g, ""),
     isAgreedMarketing: profile.marketing,
   });
   profileSavedOpen.value = true;
+}
+async function savePassword() {
+  passwordMessage.value = "";
+  if (!passwordForm.password || !passwordForm.newPassword || !passwordForm.newPasswordCheck) {
+    passwordMessage.value = "현재 비밀번호와 새 비밀번호를 모두 입력해주세요.";
+    return;
+  }
+  if (passwordForm.newPassword !== passwordForm.newPasswordCheck) {
+    passwordMessage.value = "새 비밀번호와 확인 값이 일치하지 않습니다.";
+    return;
+  }
+  try {
+    passwordChanging.value = true;
+    await changeMemberPassword({ ...passwordForm });
+    clearAuthSession();
+    await router.replace({ path: "/login", query: { passwordChanged: "1" } });
+  } catch (error) {
+    passwordMessage.value = error.message || "비밀번호를 변경하지 못했습니다.";
+  } finally {
+    passwordChanging.value = false;
+  }
 }
 function loadPostcodeScript() {
   if (window.daum?.Postcode || window.kakao?.Postcode) return Promise.resolve();
@@ -221,23 +248,34 @@ onMounted(async () => {
               <div>
                 <b>비밀번호 관리</b>
                 <p>
-                  비밀번호 변경이 필요한 경우 관리자에게 초기화를 요청해주세요.
-                  처리 완료 후 임시 비밀번호가 가입 이메일로 발송됩니다.
+                  현재 비밀번호를 확인한 뒤 새 비밀번호로 직접 변경할 수 있습니다.
+                  변경 후에는 보안을 위해 다시 로그인해야 합니다.
                 </p>
               </div>
-              <div>
-                <button
-                  type="button"
-                  @click="
-                    router.push({
-                      path: '/password-reset',
-                      query: { email: profile.email, userId: profile.userId },
-                    })
-                  "
-                >
-                  관리자에게 초기화 요청
+              <div class="password-change-fields">
+                <input
+                  v-model="passwordForm.password"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="현재 비밀번호"
+                />
+                <input
+                  v-model="passwordForm.newPassword"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="새 비밀번호 (8~20자)"
+                />
+                <input
+                  v-model="passwordForm.newPasswordCheck"
+                  type="password"
+                  autocomplete="new-password"
+                  placeholder="새 비밀번호 확인"
+                />
+                <button type="button" :disabled="passwordChanging" @click="savePassword">
+                  {{ passwordChanging ? "변경 중..." : "비밀번호 변경" }}
                 </button>
               </div>
+              <p v-if="passwordMessage" class="password-message">{{ passwordMessage }}</p>
             </section>
             <div class="marketing-row">
               <div>

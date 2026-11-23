@@ -978,6 +978,22 @@
 .card-actions .wishlist-button.active svg {
   fill: #805737;
 }
+.card-actions .card-cart-button.active,
+.card-actions .card-cart-button.active:hover {
+  color: #805737;
+  background: transparent;
+}
+.card-actions .card-cart-button.active svg {
+  stroke-width: 2.2;
+}
+.card-actions .card-cart-button .cart-basket-fill {
+  fill: transparent;
+  stroke: none;
+}
+.card-actions .card-cart-button.active .cart-basket-fill {
+  fill: currentColor;
+  stroke: currentColor;
+}
 .nav-inner nav {
   height: auto;
   align-self: stretch;
@@ -1040,8 +1056,9 @@
   overflow: hidden;
   border-bottom: 1px solid #ead2ad;
   background-color: #fff3d8;
-  background-image: url("/assets/상단배경배너_v2.png");
+  background-image: url("/assets/banner_single_border.png");
   background-position: center;
+  /* 원본 배너 비율을 유지해 넓은 데스크톱에서 상품 이미지가 과도하게 커지지 않도록 한다. */
   background-size: 1440px 148px;
   background-repeat: no-repeat;
 }
@@ -3757,9 +3774,9 @@
   -webkit-text-fill-color: #4f4742;
 }
 .password-management {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(420px, 1.6fr);
   align-items: center;
-  justify-content: space-between;
   grid-column: 1/-1;
   gap: 24px;
   margin: 5px 0;
@@ -3778,10 +3795,15 @@
   font-size: 11px;
   line-height: 1.6;
 }
-.password-management > div:last-child {
-  display: flex;
-  flex-shrink: 0;
+.password-change-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 112px;
   gap: 8px;
+}
+.password-change-fields input {
+  min-width: 0;
+  height: 40px;
+  font-size: 12px;
 }
 .password-management button {
   height: 38px;
@@ -3798,6 +3820,17 @@
   border: 1px solid #b99070;
   background: #fff;
   color: #704b34;
+}
+.password-change-fields button:disabled {
+  background: #c6b5a6;
+  cursor: not-allowed;
+}
+.password-message {
+  grid-column: 2;
+  margin: -8px 0 0 !important;
+  color: #a45542 !important;
+  font-size: 12px !important;
+  font-weight: 800;
 }
 .marketing-row {
   display: flex;
@@ -4117,10 +4150,16 @@
   }
   .password-management {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
-  .password-management > div:last-child {
-    display: grid;
+  .password-change-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .password-change-fields input:first-child {
+    grid-column: 1/-1;
+  }
+  .password-message {
+    grid-column: 1;
   }
   .password-management button {
     width: 100%;
@@ -4277,9 +4316,35 @@
   color: #7b695e;
   font-size: 12px;
 }
+.order-period-select {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #8d7869;
+  font-size: 12px;
+  font-weight: 800;
+}
+.order-period-select select {
+  min-width: 118px;
+  height: 38px;
+  border: 1px solid #dec8b6;
+  border-radius: 9px;
+  background: #fffaf5;
+  padding: 0 28px 0 11px;
+  color: #634431;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .order-period-select {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
 .delivery-steps {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   margin-top: 18px;
   border-radius: 16px;
   background: #fff6e8;
@@ -4648,6 +4713,18 @@
   resize: vertical;
 }
 
+.review-image-upload { margin-top: 15px; border: 1px solid #ead8c9; border-radius: 10px; background: #fffaf5; padding: 12px; }
+.review-image-upload-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.review-image-upload-head b, .review-image-upload-head small { display: block; text-align: left; }
+.review-image-upload-head b { color: #5b4438; font-size: 12px; }
+.review-image-upload-head small { margin-top: 2px; color: #9a7c67; font-size: 10px; }
+.review-image-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+.review-image-upload-button { margin: 0 !important; border: 1px solid #b9835d; border-radius: 7px; background: #fff; padding: 7px 9px; color: #815037 !important; font-size: 11px !important; font-weight: 900; cursor: pointer; }
+.review-image-preview-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin: 11px 0 0; padding: 0; list-style: none; }
+.review-image-preview-list li { position: relative; min-width: 0; }
+.review-image-preview-list img { display: block; width: 100%; aspect-ratio: 1; border: 1px solid #e4d1c0; border-radius: 7px; object-fit: cover; }
+.review-image-preview-list button { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border: 0; border-radius: 50%; background: #654333; color: #fff; font-weight: 900; cursor: pointer; }
+
 @media (max-width: 720px) {
   .order-product-row,
   .order-detail-product {
@@ -4868,17 +4945,20 @@
   right: 0;
   bottom: 0;
   display: flex;
-  gap: 20px;
+  gap: 25px;
   margin: 0;
   padding: 0;
   color: #a39489;
-  font-size: 11px;
+  font-size: 14px;
+  font-weight: 700;
   list-style: none;
 }
 .checkout-steps li + li::before {
   content: "›";
-  margin-right: 20px;
+  margin-right: 25px;
   color: #c7b9ae;
+  font-size: 18px;
+  line-height: 0;
 }
 .checkout-steps li.on {
   color: #563d30;
@@ -5028,6 +5108,25 @@
   padding: 0 11px;
   color: #4f3a30;
 }
+.guest-order-form .delivery-message-select {
+  appearance: none;
+  cursor: pointer;
+  padding-right: 40px;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, transparent 50%, #825b42 50%),
+    linear-gradient(135deg, #825b42 50%, transparent 50%);
+  background-position: calc(100% - 18px) 18px, calc(100% - 13px) 18px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.guest-order-form .delivery-message-select:focus,
+.guest-order-form .delivery-message-custom:focus {
+  outline: 2px solid rgba(150, 100, 63, 0.18);
+  border-color: #a76e43;
+}
+.guest-order-form .delivery-message-custom {
+  margin-top: 2px;
+}
 .guest-order-form label > small,
 .checkout-orderer-form label > small {
   color: #9a8c83;
@@ -5082,6 +5181,16 @@
   border-color: #9a6842;
   background: #9a6842;
   color: #fff;
+}
+.payment-method-grid label.payment-method-tosspay.on {
+  border-color: #0064ff;
+  background: #0064ff;
+  color: #fff;
+}
+.payment-method-grid label.payment-method-kakaopay.on {
+  border-color: #fee500;
+  background: #fee500;
+  color: #3c1e1e;
 }
 .payment-method-grid input {
   position: absolute;
@@ -5273,6 +5382,14 @@
   grid-template-columns: 1fr 1fr;
   gap: 9px;
   margin-top: 26px;
+}
+.payment-result-guest-actions {
+  grid-template-columns: 1fr 1fr;
+}
+.payment-result-actions .payment-result-lookup {
+  grid-column: 1 / -1;
+  background: #95643d;
+  color: #fff;
 }
 .payment-result-actions button {
   min-height: 43px;
@@ -5579,7 +5696,7 @@
   }
   .delivery-steps {
     overflow-x: auto;
-    grid-template-columns: repeat(5, 90px);
+    grid-template-columns: repeat(4, minmax(90px, 1fr));
   }
   .order-list > article > div {
     grid-template-columns: 1fr;
@@ -6699,6 +6816,10 @@ button.qna-row:hover:not(:disabled) {
   font-weight: 900;
   cursor: pointer;
 }
+.pet-management-card > header button:disabled {
+  background: #c6b5a6;
+  cursor: not-allowed;
+}
 .pet-management-list {
   display: grid;
   gap: 14px;
@@ -6706,7 +6827,7 @@ button.qna-row:hover:not(:disabled) {
 }
 .pet-management-list article {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) 110px;
+  grid-template-columns: 150px minmax(0, 1fr) 110px;
   align-items: center;
   gap: 20px;
   border: 1px solid #eadfd5;
@@ -6729,9 +6850,9 @@ button.qna-row:hover:not(:disabled) {
   font-weight: 900;
 }
 .pet-management-list h3 {
-  margin: 5px 0 6px;
+  margin: 0 0 7px;
   color: #493328;
-  font-size: 18px;
+  font-size: 23px;
 }
 .pet-management-list p {
   margin: 0 0 7px;
@@ -6743,6 +6864,42 @@ button.qna-row:hover:not(:disabled) {
   margin-top: 3px;
   color: #9a897e;
   font-size: 10px;
+}
+.pet-management-list .pet-identity > span {
+  display: inline-flex;
+  margin: 0;
+  border-radius: 999px;
+  background: #fff0cf;
+  padding: 5px 9px;
+  color: #9a632c;
+  font-size: 13px;
+  font-weight: 900;
+}
+.pet-management-list .pet-meta {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(100px, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+.pet-management-list .pet-meta > div {
+  min-width: 0;
+  border-left: 1px solid #eaded4;
+  padding-left: 14px;
+}
+.pet-management-list .pet-meta dt {
+  margin-bottom: 7px;
+  color: #9a897e;
+  font-size: 12px;
+  font-weight: 800;
+}
+.pet-management-list .pet-meta dd {
+  overflow: hidden;
+  margin: 0;
+  color: #533a2c;
+  font-size: 16px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pet-management-actions {
   display: grid;
@@ -6774,34 +6931,123 @@ button.qna-row:hover:not(:disabled) {
   color: #a45542;
 }
 .pet-form-modal {
+  width: min(680px, calc(100vw - 40px));
+  max-width: 680px;
+  padding: 38px 42px;
   text-align: left;
 }
 .pet-form-modal h2 {
+  margin: 0;
+  color: #3f2c21;
+  font-size: 28px;
   text-align: center;
 }
 .pet-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin: 24px 0;
+  gap: 20px;
+  margin: 30px 0 22px;
 }
 .pet-form-grid label {
   display: grid;
-  gap: 7px;
+  gap: 9px;
   color: #5b4436;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 900;
 }
 .pet-form-grid input,
 .pet-form-grid select {
   width: 100%;
-  height: 44px;
+  height: 50px;
   border: 1px solid #dfd2c5;
   border-radius: 9px;
   background: #fff;
-  padding: 0 12px;
+  padding: 0 14px;
   color: #4d382b;
   font: inherit;
+}
+.pet-form-grid .pet-type-select {
+  appearance: none;
+  cursor: pointer;
+  background-color: #fff;
+  background-image: linear-gradient(45deg, transparent 50%, #815938 50%), linear-gradient(135deg, #815938 50%, transparent 50%);
+  background-position: calc(100% - 20px) 21px, calc(100% - 14px) 21px;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 42px;
+}
+.pet-form-grid .pet-type-select:focus {
+  outline: 0;
+  border-color: #a8734e;
+  box-shadow: 0 0 0 3px rgb(168 115 78 / 12%);
+}
+.pet-allergy-field {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 9px;
+  color: #5b4436;
+  font-size: 15px;
+  font-weight: 900;
+}
+.pet-allergy-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.pet-allergy-options label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  cursor: pointer;
+}
+.pet-allergy-options input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.pet-allergy-options span {
+  border: 1px solid #dec8b6;
+  border-radius: 999px;
+  background: #fff;
+  padding: 8px 12px;
+  color: #735543;
+  font-size: 13px;
+  font-weight: 800;
+}
+.pet-allergy-options input:checked + span {
+  border-color: #95643d;
+  background: #95643d;
+  color: #fff;
+}
+.pet-allergy-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pet-allergy-tags button {
+  border: 1px solid #d9b893;
+  border-radius: 999px;
+  background: #fff7eb;
+  padding: 7px 11px;
+  color: #704b33;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pet-allergy-tags span {
+  margin-left: 4px;
+  color: #a45542;
+}
+.pet-form-error {
+  margin: -8px 0 18px;
+  color: #a45542;
+  font-size: 14px;
+  font-weight: 800;
+}
+.pet-form-modal .common-modal-actions button {
+  min-height: 52px;
+  font-size: 16px;
 }
 @media (max-width: 600px) {
   .pet-management-card > header {
@@ -6809,18 +7055,29 @@ button.qna-row:hover:not(:disabled) {
     flex-direction: column;
   }
   .pet-management-list article {
-    grid-template-columns: 70px 1fr;
-  }
-  .pet-management-list .pet-avatar {
-    width: 64px;
-    height: 64px;
+    grid-template-columns: 1fr;
   }
   .pet-management-actions {
     grid-column: 1/-1;
     grid-template-columns: 1fr 1fr;
   }
+  .pet-management-list .pet-meta {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pet-management-list .pet-meta > div:nth-child(odd) {
+    border-left: 0;
+    padding-left: 0;
+  }
   .pet-form-grid {
     grid-template-columns: 1fr;
+  }
+  .pet-form-modal {
+    width: min(100vw - 28px, 680px);
+    padding: 30px 22px;
+  }
+  .pet-form-modal h2 {
+    font-size: 23px;
   }
 }
 .back-list-button {
@@ -7904,6 +8161,8 @@ button.qna-row:hover:not(:disabled) {
 .password-request-complete .login-submit {
   display: grid;
   place-items: center;
+  margin-right: auto;
+  margin-left: auto;
   margin-top: 28px;
   text-decoration: none;
 }

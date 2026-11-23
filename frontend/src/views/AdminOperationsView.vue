@@ -3,10 +3,19 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { adminManagementService } from "@/services/adminManagementService";
-import AdminSidebar from "@/components/AdminSidebar.vue";
+
+const props = defineProps({
+  // # 주문·상품·회원·공지·QnA 하위 화면이 담당할 기능을 명시적으로 전달한다.
+  section: {
+    type: String,
+    default: "",
+  },
+});
+
 const route = useRoute();
 const section = computed(
     () =>
+      props.section ||
       route.params.section ||
       (route.path === "/admin/members" ? "members" : ""),
   ),
@@ -18,6 +27,8 @@ const section = computed(
   error = ref(""),
   search = ref(""),
   statusFilter = ref("ALL"),
+  currentPage = ref(1),
+  PAGE_SIZE = 10,
   viewMode = ref("card");
 // # 브라우저 prompt 대신 사이트 공통 모달에서 QnA 답변을 작성한다.
 const qnaAnswerOpen = ref(false),
@@ -109,6 +120,15 @@ const filteredRows = computed(() =>
 const columns = computed(() =>
   filteredRows.value.length ? Object.keys(filteredRows.value[0]) : [],
 );
+const pageCount = computed(() =>
+  Math.max(1, Math.ceil(filteredRows.value.length / PAGE_SIZE)),
+);
+const pagedRows = computed(() =>
+  filteredRows.value.slice(
+    (currentPage.value - 1) * PAGE_SIZE,
+    currentPage.value * PAGE_SIZE,
+  ),
+);
 function exportCsv() {
   const data = [
     columns.value,
@@ -181,13 +201,17 @@ async function submitQnaAnswer() {
     qnaAnswerSubmitting.value = false;
   }
 }
+watch([search, statusFilter, section], () => {
+  currentPage.value = 1;
+});
+watch(pageCount, (count) => {
+  if (currentPage.value > count) currentPage.value = count;
+});
 watch(section, load);
 onMounted(load);
 </script>
 <template>
-  <div class="admin-operations">
-    <AdminSidebar />
-    <main>
+  <main class="admin-operations">
       <header>
         <small>ADMIN MANAGEMENT</small>
         <h1>{{ titles[section] }}</h1>
@@ -197,25 +221,31 @@ onMounted(load);
         <input
           v-model="search"
           placeholder="주문번호·상품명·회원명 검색"
-        /><select v-model="statusFilter">
+        />
+        <select v-model="statusFilter">
           <option value="ALL">전체 상태</option>
           <option value="PREPARING">상품 준비</option>
           <option value="SHIPPING">배송 중</option>
           <option value="DELIVERED">배송 완료</option>
-          <option value="PENDING">답변 대기</option></select
-        ><button
+          <option value="PENDING">답변 대기</option>
+        </select>
+        <button
           v-if="section === 'members'"
           :class="{ selected: viewMode === 'card' }"
           @click="viewMode = 'card'"
         >
-          카드형</button
-        ><button
+          카드형
+        </button>
+        <button
           v-if="section === 'members'"
           :class="{ selected: viewMode === 'list' }"
           @click="viewMode = 'list'"
         >
-          리스트형</button
-        ><button class="export" @click="exportCsv">엑셀용 CSV 다운로드</button>
+          리스트형
+        </button>
+        <button class="export" @click="exportCsv">
+          엑셀용 CSV 다운로드
+        </button>
       </section>
       <p v-if="loading" class="loading">
         실제 운영 데이터를 불러오는 중입니다.
@@ -223,16 +253,28 @@ onMounted(load);
       <p v-if="error" class="error">{{ error }}</p>
       <section v-if="section === 'products'" class="product-sales-highlights">
         <article>
-          <header><small>BEST 3</small><h2>판매 상위 상품</h2></header>
+          <header>
+            <small>BEST 3</small>
+            <h2>판매 상위 상품</h2>
+          </header>
           <ol v-if="productHighlights.best.length">
-            <li v-for="product in productHighlights.best" :key="product.id"><b>{{ product.name }}</b><span>판매 {{ Number(product.salesCount || 0).toLocaleString() }}건</span></li>
+            <li v-for="product in productHighlights.best" :key="product.id">
+              <b>{{ product.name }}</b>
+              <span>판매 {{ Number(product.salesCount || 0).toLocaleString() }}건</span>
+            </li>
           </ol>
           <p v-else>판매 성과 API에서 상품 데이터를 기다리고 있습니다.</p>
         </article>
         <article>
-          <header><small>WORST 3</small><h2>판매 하위 상품</h2></header>
+          <header>
+            <small>WORST 3</small>
+            <h2>판매 하위 상품</h2>
+          </header>
           <ol v-if="productHighlights.worst.length">
-            <li v-for="product in productHighlights.worst" :key="product.id"><b>{{ product.name }}</b><span>판매 {{ Number(product.salesCount || 0).toLocaleString() }}건</span></li>
+            <li v-for="product in productHighlights.worst" :key="product.id">
+              <b>{{ product.name }}</b>
+              <span>판매 {{ Number(product.salesCount || 0).toLocaleString() }}건</span>
+            </li>
           </ol>
           <p v-else>판매 성과 API에서 상품 데이터를 기다리고 있습니다.</p>
         </article>
@@ -256,7 +298,7 @@ onMounted(load);
           </thead>
           <tbody>
             <tr
-              v-for="(row, index) in filteredRows"
+              v-for="(row, index) in pagedRows"
               :key="row.id || row.orderId || index"
             >
               <td v-for="key in columns" :key="key">
@@ -300,20 +342,21 @@ onMounted(load);
         </table>
         <article
           v-else
-          v-for="(row, index) in filteredRows"
+          v-for="(row, index) in pagedRows"
           :key="row.memberId || index"
         >
-          <b>{{ row.name || row.memberName }}</b
-          ><span>{{ row.email }}</span
-          ><em>{{ row.status }}</em
-          ><label
-            >역할
+          <b>{{ row.name || row.memberName }}</b>
+          <span>{{ row.email }}</span>
+          <em>{{ row.status }}</em>
+          <label>
+            역할
             <select :value="row.role" @change="changeMemberRole(row, $event)">
               <option value="USER">사용자</option>
               <option value="MANAGER">매니저</option>
-            </select></label
-          ><label
-            >상태
+            </select>
+          </label>
+          <label>
+            상태
             <select
               :value="row.status"
               @change="changeMemberStatus(row, $event)"
@@ -321,11 +364,27 @@ onMounted(load);
               <option value="ACTIVE">활성화</option>
               <option value="INACTIVE">비활성화</option>
               <option value="KICKED">차단</option>
-            </select></label
-          >
-          >
+            </select>
+          </label>
         </article>
       </div>
+      <nav
+        v-if="section === 'qna' && pageCount > 1"
+        class="admin-list-pagination"
+        aria-label="QnA 관리 목록 페이지"
+      >
+        <button type="button" :disabled="currentPage === 1" @click="currentPage = 1">처음</button>
+        <button type="button" :disabled="currentPage === 1" @click="currentPage -= 1">이전</button>
+        <button
+          v-for="number in pageCount"
+          :key="number"
+          type="button"
+          :class="{ active: currentPage === number }"
+          @click="currentPage = number"
+        >{{ number }}</button>
+        <button type="button" :disabled="currentPage === pageCount" @click="currentPage += 1">다음</button>
+        <button type="button" :disabled="currentPage === pageCount" @click="currentPage = pageCount">마지막</button>
+      </nav>
       <p v-else>검색 조건에 맞는 데이터가 없습니다.</p>
       <section v-if="section === 'orders'" class="admin-refund-requests">
         <header>
@@ -373,7 +432,6 @@ onMounted(load);
           </table>
         </div>
       </section>
-    </main>
     <Teleport to="body">
       <div
         v-if="qnaAnswerOpen"
@@ -421,16 +479,18 @@ onMounted(load);
         </form>
       </div>
     </Teleport>
-  </div>
+  </main>
 </template>
 <style scoped>
 .admin-operations {
   background: #f7f5f2;
   color: #3d281b;
-}
-.admin-operations main {
+  box-sizing: border-box;
+  width: 100%;
   min-width: 0;
-  overflow: auto;
+  min-height: 100dvh;
+  padding: 34px;
+  overflow-x: auto;
 }
 .admin-operations header small {
   color: #a66838;
@@ -443,9 +503,62 @@ onMounted(load);
 .admin-operations header p {
   color: #917866;
 }
-.product-sales-highlights { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:22px 0; }
-.product-sales-highlights article { border:1px solid #e8d8ca; border-radius:14px; background:#fffdfb; padding:18px; }
-.product-sales-highlights h2 { margin:5px 0 12px; font-size:18px; }.product-sales-highlights small { color:#a66838; font-weight:900; letter-spacing:.08em; }
-.product-sales-highlights ol { display:grid; gap:8px; margin:0; padding:0; list-style:none; }.product-sales-highlights li { display:flex; justify-content:space-between; gap:12px; border-top:1px solid #f0e4d9; padding-top:9px; }.product-sales-highlights li span,.product-sales-highlights article>p { color:#927562; font-size:13px; }
-@media (max-width:760px){.product-sales-highlights{grid-template-columns:1fr;}}
+/* 상품 판매 성과 카드 */
+.product-sales-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.product-sales-highlights article {
+  min-width: 0;
+  border: 1px solid #e8d8ca;
+  border-radius: 14px;
+  background: #fffdfb;
+  padding: 18px;
+}
+
+.product-sales-highlights h2 {
+  margin: 5px 0 12px;
+  font-size: 18px;
+}
+
+.product-sales-highlights small {
+  color: #a66838;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.product-sales-highlights ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.product-sales-highlights li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #f0e4d9;
+  padding-top: 9px;
+}
+
+.product-sales-highlights li span,
+.product-sales-highlights article > p {
+  color: #927562;
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .admin-operations {
+    padding: 22px 16px;
+  }
+
+  .product-sales-highlights {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

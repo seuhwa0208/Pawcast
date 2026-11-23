@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 /** 관리 화면 전용의 다중 구간 매출 집계와 AI 재학습 진입점입니다. */
@@ -28,6 +29,12 @@ public class AdminDashboardController {
             @RequestParam(required = false) LocalDate from,
             @RequestParam(required = false) LocalDate to) {
         return adminDashboardService.getSalesDashboard(member.getId(), unit, year, from, to);
+    }
+
+    /** 주문 데이터가 존재하는 연도만 반환해 관리자 매출 조회 선택지를 DB와 동기화한다. */
+    @GetMapping("/sales/years")
+    public List<Integer> salesYears(@AuthenticationPrincipal LoginMember member) {
+        return adminDashboardService.getAvailableSalesYears(member.getId());
     }
 
     @PostMapping("/sales/retrain")

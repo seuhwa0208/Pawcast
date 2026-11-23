@@ -92,20 +92,38 @@ onMounted(async () => {
         <dt v-if="orderEmail">주문 이메일</dt>
         <dd v-if="orderEmail">{{ orderEmail }}</dd>
       </dl>
-      <div v-if="state !== 'loading'" class="payment-result-actions">
+      <div
+        v-if="state === 'success' && isGuestOrder"
+        class="payment-result-actions payment-result-guest-actions"
+      >
+        <button
+          type="button"
+          class="secondary"
+          @click="copyOrderNumber"
+        >
+          주문번호 복사
+        </button>
+        <button type="button" class="secondary" @click="router.push('/')">
+          홈으로 이동
+        </button>
+        <button
+          type="button"
+          class="payment-result-lookup"
+          @click="router.push({ path: '/guest-orders', query: { email: orderEmail, orderNumber } })"
+        >
+          비회원 주문 조회
+        </button>
+      </div>
+      <div
+        v-else-if="state !== 'loading'"
+        class="payment-result-actions"
+      >
         <button
           v-if="state === 'success' && memberOrder"
           type="button"
           @click="router.push('/mypage#orders')"
         >
           주문 내역 보기
-        </button>
-        <button
-          v-else-if="state === 'success' && isGuestOrder"
-          type="button"
-          @click="copyOrderNumber"
-        >
-          주문번호 복사
         </button>
         <button v-else type="button" @click="router.push('/checkout')">
           결제 다시 시도

@@ -54,6 +54,8 @@ const agreed = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
 const paymentMethod = ref("CARD");
+const deliveryMessageOption = ref("문 앞에 놓아주세요.");
+const customDeliveryMessage = ref("");
 const buyerEmail = ref(member.value?.email || "");
 const ordererName = ref(member.value?.username || "");
 const ordererPhone = ref(member.value?.tel || "");
@@ -119,7 +121,16 @@ function initializeGuestOrder() {
     address2: "",
     deliveryMessage: "문 앞에 놓아주세요.",
   });
+  deliveryMessageOption.value = "문 앞에 놓아주세요.";
+  customDeliveryMessage.value = "";
 }
+
+watch([deliveryMessageOption, customDeliveryMessage], () => {
+  addressForm.deliveryMessage =
+    deliveryMessageOption.value === "CUSTOM"
+      ? customDeliveryMessage.value.trim()
+      : deliveryMessageOption.value;
+});
 
 function formatPhoneNumber(value) {
   const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
@@ -195,9 +206,26 @@ function loadTossSdk() {
   });
 }
 
+// Toss customerKey는 영문·숫자 및 -._=@ 만 허용하고 2~50자여야 한다.
+// 회원 아이디가 한글이거나 비어 있어도 결제창을 열 수 있도록 안전한 키를 만든다.
+function createTossCustomerKey() {
+  const rawMemberKey = String(userId.value || "member");
+  const storageKey = `powcast-toss-customer-key:${rawMemberKey}`;
+  const savedKey = localStorage.getItem(storageKey);
+  if (savedKey) return savedKey;
+  const safeMemberKey = rawMemberKey
+    .replace(/[^A-Za-z0-9\-._=@]/g, "")
+    .slice(0, 24) || "member";
+
+  const customerKey = `powcast_${safeMemberKey}_${crypto.randomUUID()}`.slice(0, 50);
+  localStorage.setItem(storageKey, customerKey);
+  return customerKey;
+}
+
 // 서버가 확정한 주문번호와 금액을 받은 뒤에만 PG 결제창을 실행합니다.
 async function requestPayment() {
   errorMessage.value = "";
+  let paymentWindowOpened = false;
   if (!checkoutItems.value.length) {
     router.push("/cart");
     return;
@@ -262,27 +290,42 @@ async function requestPayment() {
       }),
     );
     const TossPayments = await loadTossSdk();
-    const customerKey = `powcast-${userId.value}-${String(Date.now())}`;
-    const payment = TossPayments(TOSS_CLIENT_KEY).payment({ customerKey });
-    const card = ["TOSSPAY", "KAKAOPAY"].includes(paymentMethod.value)
-      ? { flowMode: "DIRECT", easyPay: paymentMethod.value }
-      : { flowMode: "DEFAULT" };
-    await payment.requestPayment({
-      method: paymentMethod.value === "TRANSFER" ? "TRANSFER" : "CARD",
-      amount: { currency: "KRW", value: finalAmount.value },
-      orderId: String(orderNumber),
-      orderName: orderName.value,
-      customerName: selectedAddress.value.recipient,
-      customerEmail: buyerEmail.value,
-      successUrl: `${window.location.origin}/payment/result?status=success`,
-      failUrl: `${window.location.origin}/payment/result?status=fail`,
-      ...(paymentMethod.value === "TRANSFER" ? {} : { card }),
+    // test_gck/live_gck 키는 구형 payment()가 아니라 widgets() 흐름에 사용합니다.
+    const tossPayments = TossPayments(TOSS_CLIENT_KEY);
+    const widgets = tossPayments.widgets({
+      customerKey: isMember.value
+        ? createTossCustomerKey()
+        : TossPayments.ANONYMOUS,
     });
+    await widgets.setAmount({
+      currency: "KRW",
+      value: Number(finalAmount.value),
+    });
+    const paymentWindow = await widgets.renderPaymentWindow({
+      orderName: orderName.value,
+    });
+    paymentWindowOpened = true;
+    paymentWindow.on("paymentRequest", () =>
+      widgets.requestPayment({
+        orderId: String(orderNumber),
+        orderName: orderName.value,
+        customerName: selectedAddress.value.recipient,
+        customerEmail: buyerEmail.value,
+        customerMobilePhone: String(ordererPhone.value).replace(/\D/g, ""),
+        successUrl: `${window.location.origin}/payment/result?status=success`,
+        failUrl: `${window.location.origin}/payment/result?status=fail`,
+      }),
+    );
+    paymentWindow.on("cancel", () => {
+      submitting.value = false;
+    });
+    return;
   } catch (error) {
     errorMessage.value =
       error.message || "결제를 시작하지 못했습니다. 백엔드 연결을 확인해주세요.";
   } finally {
-    submitting.value = false;
+    // 결제창이 열린 뒤에는 사용자의 취소 이벤트에서만 버튼 상태를 되돌립니다.
+    if (!paymentWindowOpened) submitting.value = false;
   }
 }
 
@@ -431,7 +474,7 @@ onMounted(() => {
                 required
               />
             </label>
-            <label class="address-search-field">
+            <label class="address-search-field wide">
               우편번호
               <span>
                 <input v-model="addressForm.zipcode" readonly required />
@@ -450,7 +493,7 @@ onMounted(() => {
             </label>
             <label class="wide">
               배송 요청사항
-              <select v-model="addressForm.deliveryMessage">
+              <select v-model="deliveryMessageOption" class="delivery-message-select">
                 <option value="문 앞에 놓아주세요.">문 앞에 놓아주세요.</option>
                 <option value="경비실에 맡겨주세요.">
                   경비실에 맡겨주세요.
@@ -459,7 +502,15 @@ onMounted(() => {
                   배송 전에 연락해주세요.
                 </option>
                 <option value="">요청사항 없음</option>
+                <option value="CUSTOM">직접 입력</option>
               </select>
+              <input
+                v-if="deliveryMessageOption === 'CUSTOM'"
+                v-model.trim="customDeliveryMessage"
+                class="delivery-message-custom"
+                maxlength="255"
+                placeholder="배송 요청사항을 직접 입력해주세요."
+              />
             </label>
           </div>
         </section>
@@ -475,7 +526,10 @@ onMounted(() => {
                 ['TRANSFER', '계좌이체'],
               ]"
               :key="method[0]"
-              :class="{ on: paymentMethod === method[0] }"
+              :class="[
+                { on: paymentMethod === method[0] },
+                `payment-method-${method[0].toLowerCase()}`,
+              ]"
             >
               <input
                 v-model="paymentMethod"
@@ -486,7 +540,7 @@ onMounted(() => {
             </label>
           </div>
           <p class="payment-method-note">
-            선택한 결제수단은 토스페이먼츠 결제창에서 안전하게 처리됩니다.
+            결제수단은 토스페이먼츠 결제창에서 최종 선택 및 안전하게 처리됩니다.
           </p>
         </section>
       </div>

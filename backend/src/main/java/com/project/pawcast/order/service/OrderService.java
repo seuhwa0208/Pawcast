@@ -20,6 +20,7 @@ import com.project.pawcast.payment.service.PaymentService;
 import com.project.pawcast.product.entity.ProductVariant;
 import com.project.pawcast.product.repository.ProductRepository;
 import com.project.pawcast.product.repository.ProductVariantRepository;
+import com.project.pawcast.product.repository.ProductImageRepository;
 import com.project.pawcast.product.service.InventoryService;
 import com.project.pawcast.refund.entity.Refund;
 import com.project.pawcast.refund.service.RefundService;
@@ -44,6 +45,7 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
     private final AuthorizationValidator validator;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
@@ -156,7 +158,7 @@ public class OrderService {
                 .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
 
         return orders.stream()
-                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .map(order -> toOrderResponse(order, itemMap.getOrDefault(order.getId(), List.of())))
                 .toList();
     }
 
@@ -165,12 +167,21 @@ public class OrderService {
         if (memberId != null) {
             Order order = orderRepository.findByIdAndMemberId(orderId, memberId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-            return OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(orderId));
+            return toOrderResponse(order, orderItemRepository.findAllByOrder_Id(orderId));
         }
 
-        Order guestOrder = orderRepository.findByEmailAndOrderNumber(email, orderNumber)
+        return detailGuestOrder(email, orderNumber);
+    }
+
+    // 비회원 주문은 주문번호와 결제 시 입력한 이메일이 모두 일치할 때만 조회한다.
+    public OrderResponse detailGuestOrder(String email, String orderNumber) {
+        Order guestOrder = orderRepository.findGuestOrderByEmailAndOrderNumber(
+                        email.trim(), orderNumber.trim())
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        return OrderResponse.from(guestOrder, orderItemRepository.findAllByOrder_Id(guestOrder.getId()));
+        return toOrderResponse(
+                guestOrder,
+                orderItemRepository.findAllByOrder_Id(guestOrder.getId())
+        );
     }
 
     // 회원 소유 주문 단건 조회 공통 메서드
@@ -247,8 +258,26 @@ public class OrderService {
                 .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
 
         return orders.stream()
-                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .map(order -> toOrderResponse(order, itemMap.getOrDefault(order.getId(), List.of())))
                 .toList();
+    }
+
+    // 주문 이력에서도 현재 상품의 대표 이미지를 함께 반환해 프론트가 깨진 경로를 만들지 않도록 한다.
+    private OrderResponse toOrderResponse(Order order, List<OrderItem> orderItems) {
+        List<Long> productIds = orderItems.stream()
+                .map(item -> item.getProductVariant().getProduct().getId())
+                .distinct()
+                .toList();
+        Map<Long, String> mainImages = productIds.isEmpty()
+                ? Map.of()
+                : productImageRepository.findAllByProductIdInOrderByMainDescSortOrderAscIdAsc(productIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                image -> image.getProduct().getId(),
+                                image -> image.getImagePath(),
+                                (first, ignored) -> first
+                        ));
+        return OrderResponse.from(order, orderItems, mainImages);
     }
 
     // 관리자/매니저용 주문 상태 변경 (최초 배송 완료 전환 시 상품 판매량 반영)

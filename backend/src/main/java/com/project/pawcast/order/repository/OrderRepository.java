@@ -17,9 +17,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findAllByMember_IdOrderByCreatedAtDesc(Long memberId);
     List<Order> findAllByOrderByCreatedAtDesc();
     Optional<Order> findByIdAndMemberId(Long orderId, Long memberId);
-    @Query("SELECT o FROM Order o WHERE o.recipientEmail = :email AND o.orderNumber = :orderNumber")
-    Optional<Order> findByEmailAndOrderNumber(@Param("email") String email,
-                                             @Param("orderNumber") String orderNumber);
+    @Query("SELECT o FROM Order o WHERE o.member IS NULL AND LOWER(o.recipientEmail) = LOWER(:email) AND o.orderNumber = :orderNumber")
+    Optional<Order> findGuestOrderByEmailAndOrderNumber(@Param("email") String email,
+                                                         @Param("orderNumber") String orderNumber);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT o FROM Order o WHERE o.id = :id")

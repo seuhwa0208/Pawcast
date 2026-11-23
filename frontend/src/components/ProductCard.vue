@@ -1,7 +1,7 @@
 
 <!-- 상품 요약, 품절 분기, 찜 권한 확인, 장바구니 추가를 묶은 재사용 카드입니다. -->
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useCart } from "@/stores/cart";
 import { useWishlist } from "@/stores/wishlist";
@@ -15,7 +15,7 @@ const props = defineProps({
     product: Object,
     pet: String,
 });
-const { add } = useCart();
+const { add, items } = useCart();
 const { isFavorite, toggle } = useWishlist();
 const { accessToken } = useAuthSession();
 const router = useRouter();
@@ -25,6 +25,17 @@ const soldOutNotice = ref(false);
 const cartAdded = ref(false);
 const cartError = ref("");
 const isAdding = ref(false);
+
+// 비회원 로컬 장바구니와 회원 장바구니 모두 같은 variantId로 관리됩니다.
+// 현재 옵션이 이미 담겨 있으면 아이콘 색상과 안내 문구를 즉시 바꿉니다.
+const isInCart = computed(() => {
+    const variantId = Number(props.product.variantId);
+
+    return Number.isSafeInteger(variantId) &&
+        items.value.some(
+            (item) => Number(item.variantId) === variantId
+        );
+});
 
 // 이미지 로딩 실패 시 대체 이미지를 표시합니다.
 function handleImageError(event) {
@@ -194,11 +205,20 @@ function goToLogin() {
                 <button
                     type="button"
                     class="card-cart-button"
+                    :class="{ active: isInCart }"
                     :disabled="!product.stock || isAdding"
-                    aria-label="장바구니 담기"
+                    :aria-label="
+                        isInCart
+                            ? '장바구니에 담긴 상품'
+                            : '장바구니 담기'
+                    "
                     @click="handleCart"
                 >
                     <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                            class="cart-basket-fill"
+                            d="M6.8 8h12.5l-1.6 5.3a1 1 0 0 1-1 .7H9.1a1 1 0 0 1-1-.7Z"
+                        />
                         <path
                             d="M3 4h2l2.1 9.2a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L20.3 7H6"
                         />

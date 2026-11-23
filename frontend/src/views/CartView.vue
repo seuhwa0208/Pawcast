@@ -1,4 +1,3 @@
-
 <!-- 회원·비회원 장바구니와 회원 전용 위시리스트를 관리합니다. -->
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
@@ -7,8 +6,7 @@ import { useCart } from "@/stores/cart";
 import { useAuthSession } from "@/stores/auth";
 import ProductCard from "@/components/ProductCard.vue";
 import { wishlistService } from "@/services/wishlistService";
-import { toProductCard } from "@/services/productService";
-import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import { productService, toProductCard } from "@/services/productService";
 
 const route = useRoute();
 const router = useRouter();
@@ -24,7 +22,6 @@ const activeTab = ref(
 );
 
 const wishlistItems = ref([]);
-const loginRequired = ref(false);
 const errorMessage = ref("");
 const processingKeys = ref([]);
 
@@ -38,11 +35,35 @@ async function loadWishlist() {
     try {
         const response = await wishlistService.list();
 
-        wishlistItems.value = Array.isArray(response)
-            ? response.map((item) =>
-                toProductCard(item.product || item)
-            )
-            : [];
+        wishlistItems.value = await Promise.all(
+            (Array.isArray(response) ? response : []).map(async (item) => {
+                const product = item.product || item;
+                const detail = await productService.detail(product.id);
+
+                const variants =
+                    detail.productType === "DEVICE"
+                        ? detail.deviceVariants
+                        : detail.foodVariants;
+
+                const available = (variants || []).filter(
+                    (v) => v.status === "ON_SALE" && v.stock > 0,
+                );
+
+                // 구매 가능한 옵션 중 가장 저렴한 옵션
+                const cheapest = [...available].sort(
+                    (a, b) => Number(a.price) - Number(b.price),
+                )[0];
+
+                return toProductCard({
+                    ...detail,
+                    price: cheapest?.price,
+                    imagePath:
+                        detail.images?.find((image) => image.main)?.imagePath ||
+                        detail.images?.[0]?.imagePath,
+                    soldOut: !available.length,
+                });
+            }),
+        );
     } catch (error) {
         console.error("위시리스트 조회 실패:", error);
         wishlistItems.value = [];
@@ -65,26 +86,10 @@ function selectTab(tab) {
     }
 }
 
-// 비회원은 주문하기 전에 로그인
+// 회원·비회원 모두 주문·결제 화면으로 이동합니다.
+// 비회원은 다음 화면에서 이메일과 배송지를 직접 입력합니다.
 function moveToCheckout() {
-    if (!accessToken.value) {
-        loginRequired.value = true;
-        return;
-    }
-
     router.push("/checkout");
-}
-
-// 로그인 페이지 이동
-function goToLogin() {
-    loginRequired.value = false;
-
-    router.push({
-        path: "/login",
-        query: {
-            redirect: "/checkout",
-        },
-    });
 }
 
 // 수량 변경
@@ -462,9 +467,4 @@ onMounted(() => {
             </RouterLink>
         </section>
     </main>
-
-    <LoginRequiredModal
-        v-model="loginRequired"
-        @login="goToLogin"
-    />
 </template>

@@ -3,9 +3,29 @@
 import { reactive, ref } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 
+function hasExpiredJwt(token) {
+    if (!token) return true;
+
+    try {
+        const payload = token.split(".")[1];
+        const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+        const { exp } = JSON.parse(atob(normalized));
+        return !exp || exp * 1000 <= Date.now();
+    } catch {
+        return true;
+    }
+}
+
+const savedAccessToken = localStorage.getItem("powcast-access-token") || "";
+if (savedAccessToken && hasExpiredJwt(savedAccessToken)) {
+    localStorage.removeItem("powcast-access-token");
+    sessionStorage.removeItem("powcast-refresh-token");
+    sessionStorage.removeItem("powcast-user-role");
+}
+
 const useAuthStore = defineStore("auth", () => {
     const accessToken = ref(
-        localStorage.getItem("powcast-access-token") || ""
+        hasExpiredJwt(savedAccessToken) ? "" : savedAccessToken
     );
 
     const refreshToken = ref(

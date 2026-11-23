@@ -6,7 +6,7 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
     # .env로 분리해 개발자별 DB 계정이 소스에 남지 않도록 한다.
-    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/pawcast}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/pawcast}
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD}
   mail:
@@ -29,10 +29,6 @@ petmall:
     allowed-origins:
       - http://127.0.0.1:5174
       - http://localhost:5174
-      - http://127.0.0.1:5175
-      - http://localhost:5175
-      - http://127.0.0.1:5176
-      - http://localhost:5176
       - http://127.0.0.1:5173
       - http://localhost:5173
   jwt:
@@ -51,6 +47,8 @@ oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID}
 
+# 리뷰 등록 시 감성 분석은 서버 트랜잭션에서 처리하므로 기존 AI 주소 설정을 유지한다.
+# 매출 예측·재학습·통계 다운로드는 Vue가 FastAPI에 직접 요청한다.
 ai:
   base-url: ${AI_BASE_URL:http://localhost:8000}
   internal-api-key: ${AI_INTERNAL_API_KEY:}

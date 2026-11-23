@@ -34,27 +34,16 @@ async function logout() {
     isLoggingOut.value = true;
 
     try {
-        if (!refreshToken.value) {
-            throw new Error(
-                "Refresh Token이 존재하지 않습니다."
-            );
+        // Refresh Token이 있을 때만 서버 저장 토큰을 무효화한다.
+        // 브라우저 세션 종료는 서버 응답과 관계없이 반드시 진행한다.
+        if (refreshToken.value) {
+            await authService.logout(refreshToken.value);
         }
-
-        // 백엔드에 Refresh Token 무효화 요청
-        await authService.logout(refreshToken.value);
-
-        // 프론트엔드 인증 정보 삭제
-        clearAuthSession();
-
-        // 메인 페이지 이동
-        await router.push("/");
     } catch (error) {
         console.error("로그아웃 처리 실패:", error);
-
-        alert(
-            "로그아웃 처리에 실패했습니다. 다시 시도해 주세요."
-        );
     } finally {
+        clearAuthSession();
+        await router.push("/");
         isLoggingOut.value = false;
     }
 }

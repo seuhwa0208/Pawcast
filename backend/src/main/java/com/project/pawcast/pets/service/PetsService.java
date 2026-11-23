@@ -54,7 +54,7 @@ public class PetsService {
                 .build();
         return PetsResponse.from(petsRepository.save(pets));
     }
-    
+
     // 수정
     @Transactional
     public PetsResponse updatePets(Long petId, Long memberId, PetsRequest request){
@@ -71,7 +71,7 @@ public class PetsService {
 
         return PetsResponse.from(pets);
     }
-    
+
     // 삭제
     @Transactional
     public void deletePets(Long petsId, Long memberId){

@@ -1,5 +1,5 @@
 // 배송 완료 주문 항목을 구매 인증 근거로 사용해 상품 리뷰를 등록합니다.
-import { jsonBody, springRequest } from "@/services/http/springClient";
+import { springRequest } from "@/services/http/springClient";
 import { aiRequest } from "@/services/http/aiClient";
 
 // 구매 인증 리뷰는 주문 항목 ID를 기준으로 생성합니다.
@@ -10,10 +10,18 @@ export const reviewService = {
     const { body } = await aiRequest(`/api/reviews/products/${productId}/ranked`);
     return Array.isArray(body) ? body : [];
   },
-  create: async (payload) => {
+  create: async ({ images = [], ...payload }) => {
+    const formData = new FormData();
+    formData.append(
+      "request",
+      new Blob([JSON.stringify({ ...payload, images: [] })], {
+        type: "application/json",
+      }),
+    );
+    images.forEach((file) => formData.append("images", file, file.name));
     const review = await springRequest("/reviews", {
       method: "POST",
-      body: jsonBody(payload),
+      body: formData,
     });
     try {
       const { body } = await aiRequest(`/api/reviews/${review.id}/analyze`, {

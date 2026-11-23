@@ -1,6 +1,18 @@
-// 관리자 화면은 Spring Boot를 단일 진입점으로 사용한다.
-// AI 서버는 재학습·파일 생성 시 Spring 서버가 내부 키로 호출한다.
+// 매출 원본 집계는 Spring, AI 예측·재학습·파일 생성은 FastAPI에 직접 요청한다.
 import { springRequest } from "@/services/http/springClient";
+import { aiRequest } from "@/services/http/aiClient";
+
+function buildAiSalesQuery({ startDate, endDate, unit, format, section }) {
+  const query = new URLSearchParams();
+
+  if (startDate) query.set("start_date", startDate);
+  if (endDate) query.set("end_date", endDate);
+  if (unit) query.set("unit", unit);
+  if (format) query.set("format", format);
+  if (section) query.set("section", section);
+
+  return query.toString();
+}
 
 export const adminDashboardService = {
   getSalesYears: () => springRequest("/admin/dashboard/sales/years"),
@@ -13,24 +25,25 @@ export const adminDashboardService = {
     });
     return springRequest(`/admin/dashboard/sales?${query.toString()}`);
   },
+  async getAiSalesDashboard({ from, to, unit }) {
+    const query = buildAiSalesQuery({
+      startDate: from,
+      endDate: to,
+      unit,
+    });
+    const { body } = await aiRequest(`/api/sales/dashboard?${query}`);
+    return body;
+  },
   async retrainSalesModel(forecastDate) {
-    return springRequest(`/admin/ai/sales/retrain?forecastDate=${forecastDate}`, { method: "POST" });
+    const { body } = await aiRequest(
+      `/api/sales/retrain?forecast_date=${encodeURIComponent(forecastDate)}`,
+      { method: "POST" },
+    );
+    return body;
   },
   async downloadStatistics({ startDate, endDate, format, section }) {
-    const query = new URLSearchParams({
-      // 브라우저는 Spring Controller의 camelCase 요청 파라미터에 맞춰 전송합니다.
-      startDate,
-      endDate,
-      format,
-      section,
-    });
-    const token = localStorage.getItem("powcast-access-token") || "";
-    const baseUrl = (import.meta.env.VITE_SPRING_BASE_URL || "").replace(/\/$/, "");
-    const response = await fetch(`${baseUrl}/api/admin/dashboard/sales/export?${query.toString()}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!response.ok) throw new Error("통계 파일을 생성하지 못했습니다.");
-    const blob = await response.blob();
+    const query = buildAiSalesQuery({ startDate, endDate, format, section });
+    const { body: blob, response } = await aiRequest(`/api/sales/export?${query}`);
     const disposition = response.headers.get("content-disposition") || "";
     const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
       || `pawcast-statistics.${format === "csv" ? "zip" : "xlsx"}`;
