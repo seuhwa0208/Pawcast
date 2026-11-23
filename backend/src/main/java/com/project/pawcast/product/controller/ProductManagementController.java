@@ -5,8 +5,11 @@ import com.project.pawcast.product.service.ProductService;
 import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 @RestController
@@ -28,16 +31,19 @@ public class ProductManagementController {
         return productService.managementDetail(id(member),productId);
     }
 
-    @PostMapping("/products") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    public ProductDetailResponse create(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody ProductCreateRequest request) {
-        return productService.create(id(member),request);
+    @PostMapping(value = "/products", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    public ProductDetailResponse create(@AuthenticationPrincipal LoginMember member,
+                                        @Valid @RequestPart("request") ProductCreateRequest request,
+                                        @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return productService.create(id(member),request,images);
     }
 
-    @PatchMapping("/products/{productId}")
+    @PatchMapping( value = "/products/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProductDetailResponse update(@AuthenticationPrincipal LoginMember member,
                                         @PathVariable Long productId,
-                                        @Valid @RequestBody ProductUpdateRequest request) {
-        return productService.update(id(member),productId,request);
+                                        @Valid @RequestPart("request") ProductUpdateRequest request,
+                                        @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return productService.update(id(member),productId,request, images);
     }
 
     @PostMapping("/products/{productId}/variants")

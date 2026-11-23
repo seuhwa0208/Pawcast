@@ -81,8 +81,9 @@ public enum ErrorCode {
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "조회 시작일은 종료일보다 늦을 수 없습니다."),
     ALREADY_EXISTS_REFUND(HttpStatus.CONFLICT,"이미 환불 요청이 존재합니다."),
     INVALID_REFUND_STATUS(HttpStatus.BAD_REQUEST,"유효하지 않은 환불 상태 입니다."),
-    CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.");
+    CHECK_PASSWORD_ERROR(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다."),
 
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR,"이미지 업로드에 실패했습니다.");
 
     private final HttpStatus status;
     private final String message;
