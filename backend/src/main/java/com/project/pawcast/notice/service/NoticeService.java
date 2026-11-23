@@ -28,41 +28,46 @@ public class NoticeService {
     private final AuthorizationValidator authorizationValidator;
 
     // 단순 id 조회 - 범용
-    public Notice findById(Long id){
-        return noticeRepository.findById(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
+    public Notice findById(Long id) {
+        return noticeRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE));
     }
-    
-    // 목록 조회 및 검색 조회
-    public List<NoticeResponse> getListNotice(NoticeSearchType type, String keyword){
+
+    // 목록 조회 및 검색 조회 (유형 및 공백/키워드 조건 분기 처리)
+    public List<NoticeResponse> getListNotice(NoticeSearchType type, String keyword) {
         boolean hasKeyword = keyword != null && !keyword.isBlank();
+        String trimmedKeyword = hasKeyword ? keyword.strip() : null;
         List<Notice> notices;
 
-        if (type == NoticeSearchType.ALL) {
+        // type이 null이거나 ALL인 경우 전체 공지 기준으로 조회
+        if (type == null || type == NoticeSearchType.ALL) {
             notices = hasKeyword
-                    ? noticeRepository.searchAllByKeyword(keyword.strip())
+                    ? noticeRepository.searchAllByKeyword(trimmedKeyword)
                     : noticeRepository.findByDeletedAtIsNullOrderByIsPinnedDescCreatedAtDesc();
         } else {
+            // NoticeSearchType과 동일한 이름의 NoticeType enum으로 매핑
             NoticeType noticeType = NoticeType.valueOf(type.name());
             notices = hasKeyword
-                    ? noticeRepository.searchByTypeAndKeyword(noticeType, keyword.strip())
+                    ? noticeRepository.searchByTypeAndKeyword(noticeType, trimmedKeyword)
                     : noticeRepository.findByDeletedAtIsNullAndNoticeTypeOrderByIsPinnedDescCreatedAtDesc(noticeType);
         }
+
         return notices.stream().map(NoticeResponse::from).toList();
     }
 
-    // 단건 조회
-    // URL로 삭제처리된 글 접근 막기
-    public NoticeResponse detailNotice(Long id){
-        return NoticeResponse.from(noticeRepository.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_NOTICE)));
+    // 단건 조회 (소프트 딜리트된 게시글 접근 차단)
+    public NoticeResponse detailNotice(Long id) {
+        return NoticeResponse.from(
+                noticeRepository.findByIdAndDeletedAtIsNull(id)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_NOTICE))
+        );
     }
-    
-    // 여기부터는 권한 필요 - USER만 아니면 됨
-    // 등록
+
+    // 공지사항 등록 (매니저/어드민 권한 필요)
     @Transactional
-    public NoticeResponse createNotice(Long memberId, NoticeRequest request){
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        //권한 검사 - 매니저 및 어드민
+    public NoticeResponse createNotice(Long memberId, NoticeRequest request) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(member);
 
         Notice notice = Notice.builder()
@@ -76,11 +81,11 @@ public class NoticeService {
         return NoticeResponse.from(noticeRepository.save(notice));
     }
 
-    // 수정
+    // 공지사항 수정 (매니저/어드민 권한 필요)
     @Transactional
-    public NoticeResponse updateNotice(Long noticeId, Long memberId, NoticeRequest request){
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        // 권한 검사 - 매니저 및 어드민
+    public NoticeResponse updateNotice(Long noticeId, Long memberId, NoticeRequest request) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(member);
 
         Notice notice = findById(noticeId);
@@ -94,12 +99,13 @@ public class NoticeService {
         return NoticeResponse.from(notice);
     }
 
-    // 삭제
+    // 공지사항 소프트 딜리트 (매니저/어드민 권한 필요)
     @Transactional
-    public void deleteNotice(Long noticeId, Long memberId){
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        // 권한 검사 - 매니저 및 어드민
+    public void deleteNotice(Long noticeId, Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(member);
+
         Notice notice = findById(noticeId);
         notice.setDeletedAt(LocalDateTime.now());
     }

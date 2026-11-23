@@ -2,8 +2,8 @@ package com.project.pawcast.member.admin.service;
 
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
-import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.admin.client.SalesForecastClient;
+import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
 import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +40,9 @@ public class AdminDashboardService {
         int selectedYear = year == null ? LocalDate.now().getYear() : year;
         LocalDate start = from == null ? LocalDate.of(selectedYear, 1, 1) : from;
         LocalDate end = to == null ? LocalDate.of(selectedYear, 12, 31) : to;
-        if (end.isBefore(start)) throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        if (end.isBefore(start)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("start", start)

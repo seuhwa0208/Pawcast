@@ -3,13 +3,14 @@ package com.project.pawcast.member.admin.client;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDate;
+import java.util.Optional;
 
 @Component
 public class SalesForecastClient {
@@ -29,12 +30,15 @@ public class SalesForecastClient {
         try {
             ForecastResponse response = restClient.post()
                     .uri(uriBuilder -> uriBuilder.path("/api/sales/retrain")
-                            .queryParam("forecast_date", forecastDate).build())
+                            .queryParamIfPresent("forecast_date", Optional.ofNullable(forecastDate))
+                            .build())
                     .contentType(MediaType.APPLICATION_JSON)
                     .header("Internal-Api-Key", internalApiKey)
                     .retrieve()
                     .body(ForecastResponse.class);
-            if (response == null) throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
+            if (response == null) {
+                throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
+            }
             return response;
         } catch (RestClientException exception) {
             throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
@@ -46,18 +50,27 @@ public class SalesForecastClient {
         try {
             return restClient.get()
                     .uri(uriBuilder -> uriBuilder.path("/api/sales/export")
-                            .queryParam("start_date", startDate)
-                            .queryParam("end_date", endDate)
-                            .queryParam("format", format)
-                            .queryParam("section", section)
+                            .queryParamIfPresent("start_date", Optional.ofNullable(startDate))
+                            .queryParamIfPresent("end_date", Optional.ofNullable(endDate))
+                            .queryParamIfPresent("format", Optional.ofNullable(format))
+                            .queryParamIfPresent("section", Optional.ofNullable(section))
                             .build())
                     .header("Internal-Api-Key", internalApiKey)
-                    .exchange((request, response) -> new ExportFile(
-                            response.getBody().readAllBytes(),
-                            response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION),
-                            response.getHeaders().getContentType() == null
-                                    ? MediaType.APPLICATION_OCTET_STREAM_VALUE
-                                    : response.getHeaders().getContentType().toString()));
+                    .exchange((request, response) -> {
+                        if (!response.getStatusCode().is2xxSuccessful()) {
+                            throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
+                        }
+                        byte[] content = response.getBody() != null
+                                ? response.getBody().readAllBytes()
+                                : new byte[0];
+                        String disposition = response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+                        String contentType = response.getHeaders().getContentType() == null
+                                ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+                                : response.getHeaders().getContentType().toString();
+                        return new ExportFile(content, disposition, contentType);
+                    });
+        } catch (BusinessException exception) {
+            throw exception;
         } catch (Exception exception) {
             throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
         }
