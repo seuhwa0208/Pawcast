@@ -6,7 +6,7 @@ import { useAuthSession } from "@/stores/auth";
 import ProductCard from "@/components/ProductCard.vue";
 import { useRoute, useRouter } from "vue-router";
 import { wishlistService } from "@/services/wishlistService";
-import { toProductCard } from "@/services/productService";
+import { productService, toProductCard } from "@/services/productService";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
 
 const { items, total, setQuantity, remove } = useCart();
@@ -25,9 +25,35 @@ async function loadWishlist() {
   }
   try {
     const response = await wishlistService.list();
-    wishlistItems.value = Array.isArray(response)
-      ? response.map((item) => toProductCard(item.product || item))
-      : [];
+    wishlistItems.value = await Promise.all(
+  (Array.isArray(response) ? response : []).map(async (item) => {
+    const product = item.product || item;
+    const detail = await productService.detail(product.id);
+
+    const variants =
+      detail.productType === "DEVICE"
+        ? detail.deviceVariants
+        : detail.foodVariants;
+
+    const available = (variants || []).filter(
+      (v) => v.status === "ON_SALE" && v.stock > 0,
+    );
+
+    // 구매 가능한 옵션 중 가장 저렴한 옵션
+    const cheapest = [...available].sort(
+      (a, b) => Number(a.price) - Number(b.price),
+    )[0];
+
+    return toProductCard({
+      ...detail,
+      price: cheapest?.price,
+      imagePath:
+        detail.images?.find((image) => image.main)?.imagePath ||
+        detail.images?.[0]?.imagePath,
+      soldOut: !available.length,
+    });
+  }),
+);
   } catch {
     wishlistItems.value = [];
   }
