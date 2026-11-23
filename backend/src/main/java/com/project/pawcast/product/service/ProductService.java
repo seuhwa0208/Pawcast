@@ -292,7 +292,7 @@ public class ProductService {
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_DETAIL);
         }
     }
-    
+
     private void validateImages(List<ImageCreateRequest> images) {
         if (images != null && images.stream().filter(ImageCreateRequest::main).count() > 1) {
             throw new BusinessException(ErrorCode.MULTIPLE_MAIN_IMAGES);
@@ -403,7 +403,7 @@ public class ProductService {
         BigDecimal average = product.getReviewCount() == 0
                 ? BigDecimal.ZERO.setScale(1)
                 : BigDecimal.valueOf(product.getRatingSum())
-                        .divide(BigDecimal.valueOf(product.getReviewCount()), 1, RoundingMode.HALF_UP);
+                .divide(BigDecimal.valueOf(product.getReviewCount()), 1, RoundingMode.HALF_UP);
         boolean soldOut = variants.stream().noneMatch(option ->
                 option.getProductVariantStatus() == ProductVariantStatus.ON_SALE && option.getStock() > 0);
         return new ProductResponse(
