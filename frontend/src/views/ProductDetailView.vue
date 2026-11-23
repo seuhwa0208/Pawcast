@@ -168,10 +168,6 @@ const { add } = useCart();
 const { isFavorite, toggle } = useWishlist();
 const { accessToken } = useAuthSession();
 const addToCart = async () => {
-  if (!accessToken.value) {
-    loginRequired.value = true;
-    return;
-  }
   try {
     await add(
       {

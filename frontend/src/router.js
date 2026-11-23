@@ -18,6 +18,7 @@ import CheckoutView from "@/views/CheckoutView.vue";
 import PaymentResultView from "@/views/PaymentResultView.vue";
 import ErrorView from "@/views/ErrorView.vue";
 import { useAuthSession } from "@/stores/auth";
+import AdminLayout from "@/layouts/AdminLayout.vue";
 
 // 용량이 큰 ECharts는 관리자 경로에 들어왔을 때만 내려받도록 화면을 지연 로딩합니다.
 const AdminDashboardView = () => import("@/views/AdminDashboardView.vue");
@@ -84,43 +85,74 @@ const router = createRouter({
     { path: "/signup", component: SignupView },
     { path: "/password-reset", component: PasswordResetView },
     { path: "/oauth/callback", component: OAuthCallbackView },
+    
+    // 관리자 페이지 공통 레이아웃
     {
-      path: "/admin/dashboard",
-      name: "admin-dashboard",
-      component: AdminOverviewView,
-      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
-    },
-    {
-      path: "/admin/sales",
-      name: "admin-sales",
-      component: AdminDashboardView,
-      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
-    },
-    {
-      path: "/admin/members",
-      name: "admin-members",
-      component: AdminOperationsView,
-      props: { section: "members" },
-      meta: { requiresAuth: true, requiresAdmin: true, adminLayout: true },
-    },
-    {
-      path: "/admin/products/new",
-      name: "admin-product-create",
-      component: AdminProductCreateView,
-      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
-    },
-    {
-      path: "/admin/:section(orders|products|qna|notices)",
-      name: "admin-operations",
-      component: AdminOperationsView,
-      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
-    },
-    {
-      path: "/admin/:tool(category|settings)",
-      name: "admin-demo",
-      component: AdminDemoView,
-      meta: { requiresAuth: true, requiresManager: true, adminLayout: true },
-    },
+      path: "/admin",
+      component: AdminLayout,
+      meta: {
+        requiresAuth: true,
+        requiresManager: true,
+        adminLayout: true,
+      },
+      children: [
+        // 관리자 기본 진입 경로
+        {
+          path: "",
+          redirect: "/admin/dashboard",
+        },
+
+        // 관리자 대시보드
+        {
+          path: "dashboard",
+          name: "admin-dashboard",
+          component: AdminOverviewView,
+        },
+
+        // 매출 분석
+        {
+          path: "sales",
+          name: "admin-sales",
+          component: AdminDashboardView,
+        },
+
+        // 회원 관리 (ADMIN 전용)
+        {
+          path: "members",
+          name: "admin-members",
+          component: AdminOperationsView,
+          props: {
+            section: "members",
+          },
+          meta: {
+            requiresAdmin: true,
+          },
+        },
+
+        // 상품 등록
+        {
+          path: "products/new",
+          name: "admin-product-create",
+          component: AdminProductCreateView,
+        },
+
+        // 주문, 상품, QnA, 공지사항 관리
+        {
+          path: ":section(orders|products|qna|notices)",
+          name: "admin-operations",
+          component: AdminOperationsView,
+          props: true,
+        },
+
+        // 카테고리 및 설정
+        {
+          path: ":tool(category|settings)",
+          name: "admin-demo",
+          component: AdminDemoView,
+          props: true,
+        },
+      ],
+    },  
     {
       path: "/error/:status(403|404|500)",
       name: "error",

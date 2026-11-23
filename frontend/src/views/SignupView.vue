@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { authService } from "@/services/authService";
 import { useAuthSession } from "@/stores/auth";
 import SignupCompleteModal from "@/components/SignupCompleteModal.vue";
+import { useCart } from "@/stores/cart";
 
 const router = useRouter();
 const {
@@ -340,6 +341,18 @@ async function submit() {
   } finally {
     state.loading = false;
   }
+}
+// 장바구니 기능
+const { mergeGuestCart } = useCart();
+
+async function mergeCartAfterLogin() {
+    try {
+        await mergeGuestCart();
+    } catch (error) {
+        console.error("비회원 장바구니 병합 실패:", error);
+        errorMessage.value =
+            "로그인은 완료됐지만 장바구니 병합에 실패했습니다. 비회원 상품은 브라우저에 보관되어 있습니다.";
+    }
 }
 </script>
 
