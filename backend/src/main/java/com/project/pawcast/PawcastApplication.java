@@ -3,9 +3,7 @@ package com.project.pawcast;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
-import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
-@EnableJpaAuditing
 @SpringBootApplication
 // JWT 등 타입 기반 설정을 Spring Bean으로 등록한다.
 @ConfigurationPropertiesScan
