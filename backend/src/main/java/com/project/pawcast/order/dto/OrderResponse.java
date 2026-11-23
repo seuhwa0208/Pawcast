@@ -30,6 +30,7 @@ public record OrderResponse(
         LocalDateTime created_at,
         List<OrderItemResponse> items
 ) {
+    // Order 엔티티와 주문 항목 목록을 응답 DTO로 변환
     public static OrderResponse from(Order order, List<OrderItem> orderItems) {
         return new OrderResponse(
                 order.getId(),

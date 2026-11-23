@@ -34,7 +34,7 @@ public class QnaService {
     public Qna findById(Long id){
         return qnaRepository.findById(id).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
     }
-    
+
     //목록 조회
     // 비공개 여부는 프론트에서 / 전체목록을 보여주고 isPrivate가 Ture인 글만 "비공개된 글입니다." 같은 방식의 처리
     // 검색 가능
@@ -44,7 +44,7 @@ public class QnaService {
         else {qnaType = QnaType.valueOf(type.name());}
         return qnaRepository.searchQnas(qnaType, keyword).stream().map(QnaResponse::from).toList();
     }
-    
+
     // 단건 조회
     // 다만 삭제 처리한 글(deleted_at)은 URL로 접근 못하게
     // 이게 목록에서 비공개글을 클릭했을때 검사하는 기능도 있어야함
@@ -54,7 +54,7 @@ public class QnaService {
 
         return QnaResponse.from(qna);
     }
-    
+
     // 로그인한 회원의 문의 목록
     public List<QnaResponse> myQnaList(Long memberId){
         return qnaRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId).stream().map(QnaResponse::from).toList();
@@ -65,7 +65,7 @@ public class QnaService {
         Qna qna = qnaRepository.findByIdAndMember_Id(qnaId,memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_QNA));
         return QnaResponse.from(qna);
     }
-    
+
     // 등록
     // 회원만 , 비회원은 안됨
     @Transactional
@@ -77,7 +77,7 @@ public class QnaService {
         Product product =null;
         if(request.productId() != null){ product = productRepository.findById(request.productId())
                 .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
-                type = QnaType.PRODUCT;}
+            type = QnaType.PRODUCT;}
 
         Qna qna = Qna.builder()
                 .member(member)
@@ -90,7 +90,7 @@ public class QnaService {
 
         return QnaResponse.from(qnaRepository.save(qna));
     }
-    
+
     // 수정
     // 마찬가지로 회원만 가능
     @Transactional
@@ -114,7 +114,7 @@ public class QnaService {
 
         return QnaResponse.from(qna);
     }
-    
+
     // 삭제
     // 삭제는 회원과 관리자만??
     // 삭제는 소프트로

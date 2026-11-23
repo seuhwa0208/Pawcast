@@ -9,6 +9,8 @@ public record SocialLoginResponse(
         String userId,
         String name,
         Members.Role role,
-        boolean isNewMember
+        boolean isNewMember,
+        String nextStep,
+        String email
 ) {
 }

@@ -14,6 +14,7 @@ public record OrderItemResponse(
         BigDecimal unitPrice,
         BigDecimal totalPrice
 ) {
+    // OrderItem 엔티티를 응답 DTO로 변환
     public static OrderItemResponse from(OrderItem item) {
         return new OrderItemResponse(
                 item.getId(),

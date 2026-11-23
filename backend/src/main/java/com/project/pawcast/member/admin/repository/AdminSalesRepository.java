@@ -42,6 +42,4 @@ public interface AdminSalesRepository extends JpaRepository<Order, Long> {
              AND p.paid_at < :endDate
         """, nativeQuery = true)
     List<Object[]> findSalesStatistics(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
-
-
 }

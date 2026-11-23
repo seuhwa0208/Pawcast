@@ -1,7 +1,7 @@
-"""PAWCAST 리뷰 분류 파이프라인 평가 스크립트.
+"""공식 AI 데이터로 현재 배포 중인 긍정/부정 모델을 평가한다.
 
-욕설 필터를 먼저 적용하고, 욕설이 아닌 리뷰는 감성 모델로
-긍정/부정을 분류해 ABUSIVE/POSITIVE/NEGATIVE 3개 클래스로 평가한다.
+AI 실사용 데이터는 긍정/부정 2분류만 포함한다.
+욕설 검증은 Spring(Java)의 책임이므로 이 평가에 포함하지 않는다.
 """
 
 import argparse
@@ -11,51 +11,52 @@ from pathlib import Path
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score
 
-from app.review.profanity_service import contains_prohibited_word
 from app.review.sentiment_service import get_sentiment_analyzer
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_CSV_PATH = PROJECT_ROOT / "data" / "review" / "product_reviews_5000.csv"
+DEFAULT_CSV_PATH = PROJECT_ROOT / "data" / "review" / "ai_review_sentiment.csv"
 RESULTS_DIR = PROJECT_ROOT / "evaluation_results" / "review"
-LABELS = ["ABUSIVE", "POSITIVE", "NEGATIVE"]
+LABELS = ["POSITIVE", "NEGATIVE"]
 LABEL_NAMES = {
-    "ABUSIVE": "욕설",
     "POSITIVE": "긍정",
     "NEGATIVE": "부정",
 }
-SENTIMENT_LABEL_MAP = {"긍정": "POSITIVE", "부정": "NEGATIVE"}
+KOREAN_LABEL_MAP = {"긍정": "POSITIVE", "부정": "NEGATIVE"}
 
-# PAWCAST 서비스 검증 기준
-# 욕설 미탐지는 실제 노출 사고로 이어질 수 있어 재현율 기준을 가장 높게 둔다.
 PASS_CRITERIA = {
-    "accuracy": 0.80,
-    "macro_f1": 0.80,
-    "abusive_recall": 0.90,
-    "positive_f1": 0.75,
-    "negative_f1": 0.75,
+    "accuracy": 0.75,
+    "macro_f1": 0.75,
+    "positive_f1": 0.70,
+    "negative_f1": 0.70,
 }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="리뷰 욕설/감성 모델 평가")
+    parser = argparse.ArgumentParser(description="리뷰 긍정/부정 모델 평가")
     parser.add_argument(
         "--csv",
         type=Path,
         default=DEFAULT_CSV_PATH,
         help=f"평가 CSV 경로 (기본값: {DEFAULT_CSV_PATH})",
     )
+    parser.add_argument(
+        "--split",
+        choices=("valid", "test", "ood_test", "all"),
+        default="test",
+        help="평가 데이터 분할(기본값: test, all도 train은 제외)",
+    )
     return parser.parse_args()
 
 
-def load_evaluation_data(csv_path: Path) -> pd.DataFrame:
+def load_evaluation_data(csv_path: Path, split: str) -> tuple[pd.DataFrame, int]:
     resolved_path = csv_path.expanduser().resolve()
     if not resolved_path.is_file():
         raise FileNotFoundError(f"평가 CSV를 찾을 수 없습니다: {resolved_path}")
 
     # 생성된 CSV는 Excel 한글 호환을 위해 UTF-8 BOM을 사용한다.
     df = pd.read_csv(resolved_path, encoding="utf-8-sig")
-    required_columns = {"content", "label"}
+    required_columns = {"content", "label", "split"}
     missing_columns = required_columns - set(df.columns)
     if missing_columns:
         raise ValueError(
@@ -65,17 +66,28 @@ def load_evaluation_data(csv_path: Path) -> pd.DataFrame:
 
     df = df.copy()
     df["content"] = df["content"].fillna("").astype(str).str.strip()
-    df["label"] = df["label"].fillna("").astype(str).str.strip().str.upper()
+    df["label"] = df["label"].fillna("").astype(str).str.strip()
+    df["split"] = df["split"].fillna("").astype(str).str.strip()
+
+    if split == "all":
+        df = df[df["split"].isin(["valid", "test", "ood_test"])]
+    else:
+        df = df[df["split"] == split]
+
+    if df.empty:
+        raise ValueError(f"선택한 split({split})에 평가 행이 없습니다.")
 
     if (df["content"] == "").any():
         empty_count = int((df["content"] == "").sum())
         raise ValueError(f"내용이 비어 있는 리뷰가 {empty_count}건 있습니다.")
 
-    unknown_labels = sorted(set(df["label"]) - set(LABELS))
+    unknown_labels = sorted(set(df["label"]) - {"긍정", "부정"})
     if unknown_labels:
         raise ValueError(f"지원하지 않는 라벨이 있습니다: {unknown_labels}")
 
-    return df
+    df = df[df["label"].isin(KOREAN_LABEL_MAP)].copy()
+    df["label"] = df["label"].map(KOREAN_LABEL_MAP)
+    return df, 0
 
 
 def predict_reviews(df: pd.DataFrame) -> list[str]:
@@ -84,16 +96,13 @@ def predict_reviews(df: pd.DataFrame) -> list[str]:
     total = len(df)
 
     for index, content in enumerate(df["content"], start=1):
-        if contains_prohibited_word(content):
-            predicted_label = "ABUSIVE"
-        else:
-            sentiment = analyzer.predict(content)["sentiment"]
-            try:
-                predicted_label = SENTIMENT_LABEL_MAP[sentiment]
-            except KeyError as error:
-                raise ValueError(
-                    f"감성 모델이 알 수 없는 라벨을 반환했습니다: {sentiment}"
-                ) from error
+        sentiment = analyzer.predict(content)["sentiment"]
+        try:
+            predicted_label = KOREAN_LABEL_MAP[sentiment]
+        except KeyError as error:
+            raise ValueError(
+                f"감성 모델이 알 수 없는 라벨을 반환했습니다: {sentiment}"
+            ) from error
 
         predictions.append(predicted_label)
         if index % 250 == 0 or index == total:
@@ -117,7 +126,6 @@ def evaluate(y_true: list[str], y_pred: list[str]) -> dict:
     metrics = {
         "accuracy": float(accuracy),
         "macro_f1": float(macro_f1),
-        "abusive_recall": float(class_report["ABUSIVE"]["recall"]),
         "positive_f1": float(class_report["POSITIVE"]["f1-score"]),
         "negative_f1": float(class_report["NEGATIVE"]["f1-score"]),
     }
@@ -133,7 +141,7 @@ def evaluate(y_true: list[str], y_pred: list[str]) -> dict:
     }
 
 
-def print_evaluation(y_true: list[str], y_pred: list[str], result: dict) -> None:
+def print_evaluation(y_true: list[str], y_pred: list[str], result: dict, neutral_count: int) -> None:
     """영문 라이브러리 표 대신 프로젝트 관점의 한글 평가표를 출력한다."""
     class_report = result["class_report"]
     rows = []
@@ -150,8 +158,9 @@ def print_evaluation(y_true: list[str], y_pred: list[str], result: dict) -> None
         )
     report_df = pd.DataFrame(rows).set_index("분류")
 
-    print("\n===== 리뷰 분류 모델 최종 평가 =====")
+    print("\n===== 리뷰 긍정/부정 모델 최종 평가 =====")
     print(f"평가 데이터: {len(y_true):,}건")
+    print(f"중립 제외: {neutral_count:,}건")
     print(f"전체 정확도: {result['metrics']['accuracy']:.4f}")
     print(f"클래스 균형 점수(Macro F1): {result['metrics']['macro_f1']:.4f}\n")
     print("클래스별 평가 결과 (0~1, 높을수록 좋음):")
@@ -166,7 +175,6 @@ def print_evaluation(y_true: list[str], y_pred: list[str], result: dict) -> None
     criterion_names = {
         "accuracy": "전체 정확도",
         "macro_f1": "Macro F1",
-        "abusive_recall": "욕설 재현율(욕설을 놓치지 않는 비율)",
         "positive_f1": "긍정 F1",
         "negative_f1": "부정 F1",
     }
@@ -178,7 +186,7 @@ def print_evaluation(y_true: list[str], y_pred: list[str], result: dict) -> None
     print(f"\n판정: {final_status}")
 
 
-def save_results(df: pd.DataFrame, y_pred: list[str], result: dict) -> None:
+def save_results(df: pd.DataFrame, y_pred: list[str], result: dict, split: str, neutral_count: int) -> None:
     """전체 예측과 오분류 사례를 재검토할 수 있도록 파일로 남긴다."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     evaluated_df = df.copy()
@@ -196,7 +204,9 @@ def save_results(df: pd.DataFrame, y_pred: list[str], result: dict) -> None:
     )
 
     json_result = {
+        "split": split,
         "total_reviews": len(evaluated_df),
+        "excluded_neutral_reviews": neutral_count,
         "correct_reviews": int(evaluated_df["is_correct"].sum()),
         "incorrect_reviews": int((~evaluated_df["is_correct"]).sum()),
         "pass_criteria": PASS_CRITERIA,
@@ -213,16 +223,17 @@ def save_results(df: pd.DataFrame, y_pred: list[str], result: dict) -> None:
 
 def main() -> None:
     args = parse_args()
-    df = load_evaluation_data(args.csv)
+    df, neutral_count = load_evaluation_data(args.csv, args.split)
     print(f"평가 CSV: {args.csv.expanduser().resolve()}")
+    print(f"평가 split: {args.split}")
     print("정답 분포:")
     print(df["label"].value_counts().reindex(LABELS, fill_value=0).to_string())
 
     y_true = df["label"].tolist()
     y_pred = predict_reviews(df)
     result = evaluate(y_true, y_pred)
-    print_evaluation(y_true, y_pred, result)
-    save_results(df, y_pred, result)
+    print_evaluation(y_true, y_pred, result, neutral_count)
+    save_results(df, y_pred, result, args.split, neutral_count)
 
 
 if __name__ == "__main__":

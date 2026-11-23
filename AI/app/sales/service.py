@@ -6,6 +6,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.sales.schemas import SalesForecastResponse
+from app.sales.schemas import (
+    CategorySalesResponse,
+    DashboardForecastResponse,
+    ForecastProductResponse,
+    SalesDashboardResponse,
+    SalesSummaryResponse,
+    SalesTrendResponse,
+)
 
 
 async def retrain_sales_forecast(
@@ -52,4 +60,75 @@ async def retrain_sales_forecast(
         trained_at=datetime.now(),
         training_days=training_days,
         insight=insight,
+    )
+
+
+async def create_sales_dashboard(
+    session: AsyncSession,
+    start_date: date,
+    end_date: date,
+    unit: str,
+) -> SalesDashboardResponse:
+    """CSV 다운로드와 동일한 DB 집계 결과를 관리자 화면 응답으로 변환합니다."""
+    from app.sales.export_service import load_sales_export_frames
+
+    frames = await load_sales_export_frames(session, start_date, end_date)
+    summary_frame = frames["summary"]
+    summary_row = summary_frame.iloc[0].to_dict() if not summary_frame.empty else {}
+
+    daily = frames["daily"].copy()
+    if not daily.empty:
+        daily["sale_date"] = daily["sale_date"].astype("datetime64[ns]")
+        if unit == "day":
+            daily["period"] = daily["sale_date"].dt.strftime("%m-%d")
+        elif unit == "quarter":
+            daily["period"] = daily["sale_date"].dt.year.astype(str) + " Q" + daily["sale_date"].dt.quarter.astype(str)
+        elif unit == "year":
+            daily["period"] = daily["sale_date"].dt.strftime("%Y")
+        else:
+            daily["period"] = daily["sale_date"].dt.strftime("%Y-%m")
+        trend_frame = daily.groupby("period", sort=True, as_index=False).agg(
+            sales=("sales", "sum"),
+            orders=("orders", "sum"),
+        )
+    else:
+        trend_frame = daily
+
+    category_items = [
+        CategorySalesResponse(
+            key=str(row["category_name"]),
+            name=str(row["category_name"]),
+            sales=int(row["sales"] or 0),
+            orders=int(row["orders"] or 0),
+            refund=int(row["refund_amount"] or 0),
+            growth=float(row["growth_rate"] or 0),
+        )
+        for row in frames["categories"].to_dict("records")
+    ]
+
+    forecast_row = frames["forecast"].iloc[0].to_dict()
+    top_products = [
+        ForecastProductResponse(name=str(row["name"]), growthRate=0)
+        for row in frames["products"].head(3).to_dict("records")
+    ]
+
+    return SalesDashboardResponse(
+        summary=SalesSummaryResponse(
+            totalSales=int(summary_row.get("total_sales", 0) or 0),
+            totalOrders=int(summary_row.get("total_orders", 0) or 0),
+            averageOrderAmount=int(summary_row.get("average_order_amount", 0) or 0),
+            refundAmount=int(summary_row.get("refund_amount", 0) or 0),
+        ),
+        trend=SalesTrendResponse(
+            labels=trend_frame["period"].astype(str).tolist() if not trend_frame.empty else [],
+            sales=[int(value) for value in trend_frame["sales"].tolist()] if not trend_frame.empty else [],
+            orders=[int(value) for value in trend_frame["orders"].tolist()] if not trend_frame.empty else [],
+        ),
+        categories=category_items,
+        forecast=DashboardForecastResponse(
+            predictedSales=int(forecast_row.get("predicted_sales", 0) or 0),
+            growthRate=float(forecast_row.get("growth_rate", 0) or 0),
+            insight=str(forecast_row.get("insight", "예측 데이터가 없습니다.")),
+            topProducts=top_products,
+        ),
     )

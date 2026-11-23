@@ -1,16 +1,19 @@
 // 회원 주문 목록과 주문 상세 정보를 Spring 주문 API에서 조회합니다.
-import { springRequest } from "@/services/http/springClient";
+import { jsonBody, springRequest } from "@/services/http/springClient";
 
 export const orderService = {
-  getMyOrders: ({ period = "6m", status, from, to } = {}) => {
-    const query = new URLSearchParams({ period });
-    if (status) query.set("status", status);
-    if (from) query.set("from", from);
-    if (to) query.set("to", to);
-    return springRequest(`/orders?${query.toString()}`);
-  },
+  // 현재 Spring 주문 목록 API는 별도 기간·상태 쿼리를 받지 않고 로그인 회원 전체 목록을 반환합니다.
+  getMyOrders: () => springRequest("/orders"),
   getOrder: (orderId) => springRequest(`/orders/${orderId}`),
-  cancelOrder: (orderId) =>
-    springRequest(`/orders/${orderId}/cancel`, { method: "POST" }),
+  cancelOrder: (orderId, cancelReason) =>
+    springRequest(`/orders/${orderId}/cancel`, {
+      method: "POST",
+      body: jsonBody({ cancelReason }),
+    }),
   getRefund: (orderId) => springRequest(`/orders/${orderId}/refunds`),
+  requestRefund: (orderId, cancelReason) =>
+    springRequest(`/orders/${orderId}/refunds`, {
+      method: "POST",
+      body: jsonBody({ cancelReason }),
+    }),
 };

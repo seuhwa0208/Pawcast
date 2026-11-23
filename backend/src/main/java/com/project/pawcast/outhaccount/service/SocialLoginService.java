@@ -5,11 +5,14 @@ import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
+import com.project.pawcast.outhaccount.dto.SocialAccountLinkRequest;
 import com.project.pawcast.outhaccount.dto.SocialLoginResponse;
+import com.project.pawcast.outhaccount.dto.SocialSignupRequest;
 import com.project.pawcast.outhaccount.entity.OauthAccount;
 import com.project.pawcast.outhaccount.repository.OauthAccountRepository;
 import com.project.pawcast.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,61 +21,121 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class SocialLoginService {
 
+    private static final String PROVIDER_GOOGLE = "GOOGLE";
+
     private final GoogleAuthService googleAuthService;
     private final OauthAccountRepository oauthAccountRepository;
     private final MembersRepository membersRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final PasswordEncoder passwordEncoder;
 
-    // 구글 소셜 로그인
+    // Google ID Token 검증 후 기존 계정 로그인 또는 후속 단계("LINK" / "SIGNUP") 반환
     @Transactional
-    public SocialLoginResponse googleLogin(String idToken) {    // 프론트가 준 토큰이겠지?
-
-        // Google ID Token 검증
-        GoogleIdToken.Payload payload = googleAuthService.verify(idToken);
-
-        // Google 사용자 정보 추출
-        String provider = "GOOGLE";
+    public SocialLoginResponse googleLogin(String idToken) {
+        GoogleIdToken.Payload payload = verifyGooglePayload(idToken);
         String providerUserId = payload.getSubject();
         String email = payload.getEmail();
         String name = (String) payload.get("name");
 
-        // 이메일 인증 여부 확인 - 구글 이메일 인증임
-        if (!Boolean.TRUE.equals(payload.getEmailVerified())) {throw new BusinessException(ErrorCode.FORBIDDEN);}
-
-        // 기존 소셜 계정 조회 있는지 확인
-        OauthAccount oauthAccount = oauthAccountRepository.findByProviderAndProviderUserId(provider, providerUserId).orElse(null);
-
-        Members member;
-        boolean isNewMember = false;
-
-        // 기존 계정이 없는 경우 자동 회원가입
-        if (oauthAccount == null) { // 소셜계정으로 가입된 회원이 없으면
-            // 기존 이메일 회원과 자동으로 연결하지 않음 - 에러남 - 계정연동 기능이 따로 있어야함 - 후순위로 밈
-            if (membersRepository.existsByEmail(email)) {throw new BusinessException(ErrorCode.DUPLICATE_MEMBER);}
-
-            // 회원 자동 생성
-            member = createSocialMember(email, name);
-
-            // OAuth 계정 연결
-            OauthAccount newAccount = OauthAccount.builder()
-                    .member(member)
-                    .provider(provider)
-                    .providerUserId(providerUserId)
-                    .build();
-
-            oauthAccountRepository.save(newAccount);
-            isNewMember = true;
-
-        } else {
-            // 기존 소셜 계정
-            member = oauthAccount.getMember();
+        OauthAccount oauthAccount = findOauthAccount(providerUserId);
+        if (oauthAccount != null) {
+            return loginResponse(oauthAccount.getMember(), false);
         }
 
-        // JWT 발급
-        String accessToken = jwtTokenProvider.createAccessToken(member.getId(),member.getEmail(),member.getRole().toString());
-        String refreshToken = jwtTokenProvider.createRefreshToken(member.getId(),member.getEmail(),member.getRole().toString());
+        // 동일 이메일로 가입된 기존 계정이 있으면 계정 연동 유도, 없으면 신규 가입 단계로 안내
+        String nextStep = membersRepository.existsByEmail(email) ? "LINK" : "SIGNUP";
+        return pendingResponse(nextStep, email, name);
+    }
 
-        // 로그인 결과 반환 -> 자동 로그인?
+    // 추가 입력 정보 및 약관 동의 검증 후 Google 소셜 회원가입 및 로그인 처리
+    @Transactional
+    public SocialLoginResponse completeGoogleSignup(SocialSignupRequest request) {
+        GoogleIdToken.Payload payload = verifyGooglePayload(request.idToken());
+        String providerUserId = payload.getSubject();
+        String email = payload.getEmail();
+        String name = request.name().trim();
+
+        OauthAccount existing = findOauthAccount(providerUserId);
+        if (existing != null) {
+            return loginResponse(existing.getMember(), false);
+        }
+
+        if (membersRepository.existsByEmail(email)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_MEMBER);
+        }
+
+        validateRequiredAgreements(request);
+
+        Members member = createSocialMember(email, name, request.tel(), providerUserId, request);
+        saveOauthAccount(member, providerUserId);
+        return loginResponse(member, true);
+    }
+
+    // 기존 일반 회원 계정 비밀번호 확인 후 Google 소셜 계정 연동 및 로그인 처리
+    @Transactional
+    public SocialLoginResponse linkGoogleAccount(SocialAccountLinkRequest request) {
+        GoogleIdToken.Payload payload = verifyGooglePayload(request.idToken());
+        String providerUserId = payload.getSubject();
+        String email = payload.getEmail();
+
+        OauthAccount existing = findOauthAccount(providerUserId);
+        if (existing != null) {
+            return loginResponse(existing.getMember(), false);
+        }
+
+        Members member = membersRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
+        if (member.getPasswordHash() == null || !passwordEncoder.matches(request.password(), member.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
+        }
+
+        saveOauthAccount(member, providerUserId);
+        return loginResponse(member, false);
+    }
+
+    // Google ID Token 검증 및 이메일 인증 여부 확인
+    private GoogleIdToken.Payload verifyGooglePayload(String idToken) {
+        GoogleIdToken.Payload payload = googleAuthService.verify(idToken);
+        if (!Boolean.TRUE.equals(payload.getEmailVerified())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        return payload;
+    }
+
+    // Google 소셜 계정 조회
+    private OauthAccount findOauthAccount(String providerUserId) {
+        return oauthAccountRepository
+                .findByProviderAndProviderUserId(PROVIDER_GOOGLE, providerUserId)
+                .orElse(null);
+    }
+
+    // 필수 약관 동의 여부 검사
+    private void validateRequiredAgreements(SocialSignupRequest request) {
+        if (!request.agreedTerms()) {
+            throw new BusinessException(ErrorCode.REQUIRED_TERMS_AGREEMENT);
+        }
+        if (!request.agreedPrivacy()) {
+            throw new BusinessException(ErrorCode.REQUIRED_PRIVACY_AGREEMENT);
+        }
+        if (!request.agreedEfinance()) {
+            throw new BusinessException(ErrorCode.REQUIRED_EFINANCE_AGREEMENT);
+        }
+    }
+
+    // JWT 발급 및 로그인 완료 응답 생성
+    private SocialLoginResponse loginResponse(Members member, boolean isNewMember) {
+        String accessToken = jwtTokenProvider.createAccessToken(
+                member.getId(),
+                member.getEmail(),
+                member.getRole().toString()
+        );
+        String refreshToken = jwtTokenProvider.createRefreshToken(
+                member.getId(),
+                member.getEmail(),
+                member.getRole().toString()
+        );
+
         return new SocialLoginResponse(
                 accessToken,
                 refreshToken,
@@ -80,23 +143,55 @@ public class SocialLoginService {
                 member.getUserId(),
                 member.getName(),
                 member.getRole(),
-                isNewMember
+                isNewMember,
+                "LOGIN",
+                member.getEmail()
         );
     }
 
-    // 회원가입
-    @Transactional
-    private Members createSocialMember(String email, String name) {
-        // Members 엔티티의 필수 필드에 맞춰 회원 생성
+    // 가입 또는 계정 연동 후속 단계 응답 생성
+    private SocialLoginResponse pendingResponse(String nextStep, String email, String name) {
+        return new SocialLoginResponse(
+                null,
+                null,
+                null,
+                null,
+                name,
+                null,
+                false,
+                nextStep,
+                email
+        );
+    }
+
+    // OauthAccount 매핑 엔티티 저장
+    private void saveOauthAccount(Members member, String providerUserId) {
+        oauthAccountRepository.save(OauthAccount.builder()
+                .member(member)
+                .provider(PROVIDER_GOOGLE)
+                .providerUserId(providerUserId)
+                .build());
+    }
+
+    // 소셜 가입 회원 엔티티 생성 및 저장
+    private Members createSocialMember(
+            String email,
+            String name,
+            String tel,
+            String providerUserId,
+            SocialSignupRequest request
+    ) {
         Members member = Members.builder()
                 .email(email)
                 .name(name)
+                .userId("google_" + providerUserId)
+                .tel(tel)
                 .role(Members.Role.USER)
                 .status(Members.Status.ACTIVE)
-                .isAgreedTerms(true)
-                .isAgreedPrivacy(true)
-                .isAgreedEfinance(true)
-                .isAgreedMarketing(false)
+                .isAgreedTerms(request.agreedTerms())
+                .isAgreedPrivacy(request.agreedPrivacy())
+                .isAgreedEfinance(request.agreedEfinance())
+                .isAgreedMarketing(request.agreedMarketing())
                 .build();
 
         return membersRepository.save(member);

@@ -51,58 +51,54 @@ public class OrderService {
     private final RefundService refundService;
     private final InventoryService inventoryService;
 
-    // 주문하기
-    // 상품 검증 → 가격 계산 → 주문 생성 → 주문 상세 생성 → 재고 차감 → 결제 처리
-    // 회원 확인하고 - 기반으로 카트불러오기 -
-    //              - 바로 주문 창 -> // 결제 완료후 주문번호 이메일 발송?
+    // 주문 생성: 회원 확인 -> 옵션 비관적 락 조회/검증 -> 금액 계산 -> 주문 및 주문 항목 저장
     @Transactional
-    public OrderResponse createOrder(Long memberId, OrderRequest request){
-        // 회원 조회 - 비회원이면 null로 처리
+    public OrderResponse createOrder(Long memberId, OrderRequest request) {
+        // 비회원 주문 허용을 위해 memberId가 있을 때만 회원 엔티티 조회
         Members member = null;
-        if (memberId != null){
-            member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        if (memberId != null) {
+            member = membersRepository.findById(memberId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         }
 
-        // 상품 옵션 조회 -> 재고 여부와 판매 가능한 상태, 재고가 주문수량 이상인지 검사
-        // 상품 옵션을 ID 오름차순으로 정렬 → FOR UPDATE 로 락
-            // 상품 옵션 ID를 오름차순 정렬
-        List<Long> variantIds = request.items().stream().map(OrderItemRequest::productVariantId).sorted().toList();
-            //오름차순 정렬 순으로 상품 옵션 가져옴
+        // 교착 상태 방지를 위해 상품 옵션 ID를 오름차순 정렬한 뒤 FOR UPDATE 락으로 조회
+        List<Long> variantIds = request.items().stream()
+                .map(OrderItemRequest::productVariantId)
+                .sorted()
+                .toList();
         List<ProductVariant> variants = productVariantRepository.findAllByIdForUpdate(variantIds);
-            // DB에서 검색한 옵션값과 방금 받은 Id 값(중복제거) 비교해서 제대로 요청된 옵션인지 확인
-        if (variants.size() != variantIds.stream().distinct().count()) {throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);}
-            // 주문한 상품을 비교해서 중복된 상품을 막음 -> 하나로 주문해라
-        if (variantIds.size() != variantIds.stream().distinct().count()) {throw new BusinessException(ErrorCode.INVALID_ORDER_REQUEST);}
 
-        // 상품 가격 계산 / orderItem에는 가격*수량 금액을 / Order에는 총 금액
-            // Map으로 변경 / options.stream().filter(found -> found.getId().equals(item.optionId())).findFirst()...
-            // 위처럼 list도 되지만 매번 stream().filter를 사용하게됨
-        Map<Long, ProductVariant> variantMap = variants.stream().collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
+        // 요청한 고유 옵션 수와 조회된 옵션 수 일치 여부 검증
+        long distinctCount = variantIds.stream().distinct().count();
+        if (variants.size() != distinctCount) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);
+        }
+        if (variantIds.size() != distinctCount) {
+            throw new BusinessException(ErrorCode.INVALID_ORDER_REQUEST);
+        }
 
+        // O(1) 조회를 위해 옵션 ID 기준 Map 구성
+        Map<Long, ProductVariant> variantMap = variants.stream()
+                .collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
 
-        List<OrderItem> orderItems = new ArrayList<>(); //
-        BigDecimal totalAmount = BigDecimal.ZERO;   // 총액
-        // 현재 가격 정책에는 별도 주문 할인이 없습니다.
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal discountAmount = BigDecimal.ZERO;
 
-            // request에 들은 아이템 만큼 orderItem이 반복
         for (OrderItemRequest item : request.items()) {
             ProductVariant variant = variantMap.get(item.productVariantId());
-            // 옵션 확인
-            if (variant == null) {throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);}
-            // 재고 확인
-            if (variant.getStock() < item.quantity()) {throw new BusinessException(ErrorCode.OUT_OF_STOCK);}
+            if (variant == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);
+            }
+            if (variant.getStock() < item.quantity()) {
+                throw new BusinessException(ErrorCode.OUT_OF_STOCK);
+            }
 
-            // 상품 조회와 동일한 최종 판매가를 주문 시점 단가로 저장
+            // 주문 시점의 옵션 단가 및 항목 합계 계산
             BigDecimal unitPrice = variant.getPrice();
-
-            // 옵션별 상품 금액 / 가격 * 수량 = totalPrice
             BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
-            
-            // 모든 주문 금액 총액 계산
             totalAmount = totalAmount.add(itemTotal);
 
-            // 주문 상품 생성 / OrderItem
             OrderItem orderItem = OrderItem.builder()
                     .productVariant(variant)
                     .productName(variant.getProduct().getName())
@@ -113,14 +109,14 @@ public class OrderService {
                     .build();
 
             orderItems.add(orderItem);
-            }// for문 끝 / OrderItem 주문 상품 목록 끝
-        // 최종금액 및 배달비 및 할인 금액 계산 / for문 위에 있음
-            //배달비
-        BigDecimal shippingFee = totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0 ? BigDecimal.ZERO : BigDecimal.valueOf(3000);
-            // 최종 금액 / 총액 + 배달비
+        }
+
+        // 20,000원 이상 무료 배송, 미만 시 3,000원 부과
+        BigDecimal shippingFee = totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(3000);
         BigDecimal finalAmount = totalAmount.add(shippingFee);
 
-        //Order를 생성하고 ->
         Order order = Order.builder()
                 .member(member)
                 .orderNumber(OrderNumberGenerator.createOrderNumber())
@@ -138,51 +134,59 @@ public class OrderService {
                 .finalAmount(finalAmount)
                 .build();
 
-        // 저장
         orderRepository.save(order);
-        // orderItem들 order 값 저장
-        for (OrderItem item : orderItems) {item.setOrder(order);}
+        for (OrderItem item : orderItems) {
+            item.setOrder(order);
+        }
         orderItemRepository.saveAll(orderItems);
-        return OrderResponse.from(order,orderItems);
+
+        return OrderResponse.from(order, orderItems);
     }
 
-    // 주문 내역(목록) 조회
-    public List<OrderResponse> listOrder(Long memberId){
-        // 회원 아이디로 주문 정보 조회(N개)
+    // 회원 주문 내역 목록 조회
+    public List<OrderResponse> listOrder(Long memberId) {
         List<Order> orders = orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId);
-        // 주문 정보로 주문 아이디 추출
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
-        // 주문 아이디로 주문 아이템들 추출
-        List<OrderItem> items = orderIds.isEmpty() ? List.of() : orderItemRepository.findByOrder_IdIn(orderIds);
-        // 주문 아이디와 주문 아이템들로 다시 묶어줌
-        Map<Long, List<OrderItem>> itemMap = items.stream().collect(Collectors.groupingBy(item -> item.getOrder().getId()));
-        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
+
+        // 주문 ID 목록으로 주문 항목을 일괄 조회해 메모리에서 주문별로 매핑
+        List<OrderItem> items = orderIds.isEmpty()
+                ? List.of()
+                : orderItemRepository.findByOrder_IdIn(orderIds);
+        Map<Long, List<OrderItem>> itemMap = items.stream()
+                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+
+        return orders.stream()
+                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .toList();
     }
 
-    // 주문 정보(상세) 조회( 회원 비회원 - 이메일과 주문번호)
-    public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber){
-        // 회원은 - 회원 아이디로 조회 / 비회원은 이메일 + 주문번호
-        if (memberId != null){return OrderResponse.from(orderRepository.findByIdAndMemberId(orderId, memberId)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));}
-        // 비회원
-        return OrderResponse.from(orderRepository.findByEmailAndOrderNumber(email, orderNumber)
-                .orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER)),orderItemRepository.findAllByOrder_Id(orderId));
-    }
-    
-    // 공통 - orderId 와 memberId로 조회
-    public Order findByIdAndMemberId(Long orderId, Long memberId){
-        return orderRepository.findByIdAndMemberId(orderId, memberId).orElseThrow(()-> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+    // 주문 상세 조회 (회원은 memberId + orderId, 비회원은 이메일 + 주문번호 기준)
+    public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber) {
+        if (memberId != null) {
+            Order order = orderRepository.findByIdAndMemberId(orderId, memberId)
+                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+            return OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(orderId));
+        }
+
+        Order guestOrder = orderRepository.findByEmailAndOrderNumber(email, orderNumber)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+        return OrderResponse.from(guestOrder, orderItemRepository.findAllByOrder_Id(guestOrder.getId()));
     }
 
-    // 수정 - 결제 완료 되면 수정 불가 - 배송지 수정
+    // 회원 소유 주문 단건 조회 공통 메서드
+    public Order findByIdAndMemberId(Long orderId, Long memberId) {
+        return orderRepository.findByIdAndMemberId(orderId, memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+    }
+
+    // 주문 배송지 정보 수정 (결제 대기 또는 결제 완료 상태에서만 가능)
     @Transactional
-    public OrderResponse updateOrder(Long orderId, Long memberId, OrderRequest request){
+    public OrderResponse updateOrder(Long orderId, Long memberId, OrderRequest request) {
         Order order = findByIdAndMemberId(orderId, memberId);
-        // 주문 상태 검사
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT && order.getStatus() != OrderStatus.PAID){
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT && order.getStatus() != OrderStatus.PAID) {
             throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
         }
-        // 결제 완료는 옵션은 못바꿈 - 취소후 다시 재주문
+
         order.setRecipientName(request.recipientName());
         order.setRecipientPhone(request.recipientPhone());
         order.setRecipientEmail(request.recipientEmail());
@@ -191,82 +195,80 @@ public class OrderService {
         order.setDeliveryAddress2(request.deliveryAddress2());
         order.setDeliveryMessage(request.deliveryMessage());
 
-        return OrderResponse.from(orderRepository.save(order),orderItemRepository.findAllByOrder_Id(orderId));
+        return OrderResponse.from(orderRepository.save(order), orderItemRepository.findAllByOrder_Id(orderId));
     }
 
-    // 삭제 - 소프트삭제 - 삭제할 이유는 보관 기간이 만료되어서 삭제 될때말곤 없어서 필요없는 기능임
-//    @Transactional
-//    public void deleteOrder(Long orderId, Long memberId){
-//        Order order = findByIdAndMemberId(orderId, memberId);
-//        order.setDeletedAt(LocalDateTime.now());
-//    }
-
-    // 주문 취소하기 - 이용자가 직접함 - 회원정보 일치하는지 확인
-    // 결제 완료(배송 대기중 상태로 넘어가기 전에) -> 결제 취소 -> 환불 정보
+    // 주문 취소: 주문 락 조회 -> 소유자 확인 -> 결제 취소 -> 환불 생성 -> 재고 및 판매량 복구
     @Transactional
-    public void cancelOrder(Long orderId, Long memberId, String cancelReason){
-        Order order = orderRepository.findByIdForUpdate(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);}
-        Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
-        //결제 취소
-        String  providerRefundKey = paymentService.cancelPayment(orderId,cancelReason);
-        // 상품 상태 변경 - 취소함
+    public void cancelOrder(Long orderId, Long memberId, String cancelReason) {
+        Order order = orderRepository.findByIdForUpdate(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);
+        }
+
+        Payment payment = paymentRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
+
+        String providerRefundKey = paymentService.cancelPayment(orderId, cancelReason);
         order.setStatus(OrderStatus.CANCELLED);
-        // 환불 정보 만들고 -> 완료 날짜 새겨줘야함
-        refundService.createRefund(payment,cancelReason, providerRefundKey, Refund.RefundStatus.COMPLETED , LocalDateTime.now());
-        // 재고 검사
+        refundService.createRefund(
+                payment,
+                cancelReason,
+                providerRefundKey,
+                Refund.RefundStatus.COMPLETED,
+                LocalDateTime.now()
+        );
+
+        // 재고 복구 시 옵션 ID 기준으로 정렬해 순차 처리
         List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId())
                 .stream()
                 .sorted(Comparator.comparing(item -> item.getProductVariant().getId()))
                 .toList();
-        // 재고 증가 및 판매량 감소
-        for (OrderItem item : items){
+
+        for (OrderItem item : items) {
             inventoryService.increaseStock(item.getProductVariant().getId(), item.getQuantity());
             productRepository.decreaseSalesCount(item.getProductVariant().getProduct().getId(), item.getQuantity());
         }
     }
 
-    // 취소 요청의 진행상태? 및 환불 정보 조회 - 취소된 목록X 취소된 하나의 정보 불러오는것
-
-
-    //전체 목록 띄우고
-    public List<OrderResponse> getOrderList(Long memberId){
-        // 권한 검사
-        Members member = membersRepository.findById(memberId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+    // 관리자/매니저용 전체 주문 목록 조회
+    public List<OrderResponse> getOrderList(Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
 
-        // 전체 주문 조회
         List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
-
-        // 주문 ID 목록 추출
         List<Long> orderIds = orders.stream().map(Order::getId).toList();
 
-        // 주문 상품 일괄 조회 및 그룹화
-        Map<Long, List<OrderItem>> itemMap = orderIds.isEmpty() ? Map.of() : orderItemRepository.findByOrder_IdIn(orderIds).stream()
+        Map<Long, List<OrderItem>> itemMap = orderIds.isEmpty()
+                ? Map.of()
+                : orderItemRepository.findByOrder_IdIn(orderIds).stream()
                 .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
 
-        // Response 변환
-        return orders.stream().map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of()))).toList();
+        return orders.stream()
+                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .toList();
     }
 
-    // 주문 상태 변경 (관리자 및 매니저) 및 배송 완료되면 판매량 증가 + 1
+    // 관리자/매니저용 주문 상태 변경 (최초 배송 완료 전환 시 상품 판매량 반영)
     @Transactional
     public void changeOrderStatus(Long memberId, Long orderId, OrderStatusRequest request) {
-        // 권한 검사
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateManager(member);
 
-        Order order = orderRepository.findById(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
 
-        // 배송 완료로 변경되는 경우 판매량 증가
         if (order.getStatus() != OrderStatus.DELIVERED && request.orderStatus() == OrderStatus.DELIVERED) {
             List<OrderItem> orderItems = orderItemRepository.findAllByOrder_Id(orderId);
-
             for (OrderItem item : orderItems) {
                 Long productId = item.getProductVariant().getProduct().getId();
                 productRepository.increaseSalesCount(productId, item.getQuantity());
             }
         }
+
         order.setStatus(request.orderStatus());
     }
 }

@@ -70,7 +70,7 @@ public enum ErrorCode {
     NOT_FOUND_CART_ITEM(HttpStatus.NOT_FOUND, "장바구니 항목을 찾을 수 없습니다."),
     INVALID_CART_QUANTITY(HttpStatus.BAD_REQUEST, "장바구니 수량은 1 이상이어야 합니다."),
     PRODUCT_NOT_ON_SALE(HttpStatus.CONFLICT, "현재 판매 중인 상품 옵션이 아닙니다."),
-
+    IMAGE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR,"이미지 업로드에 실패했습니다."),
     NOT_FOUND_QNA(HttpStatus.NOT_FOUND,"질문 글을 찾을 수 없습니다."),
     NOT_FOUND_QNA_ANSWER(HttpStatus.NOT_FOUND,"답변 글을 찾을 수 없습니다."),
     FORBIDDEN_ACCESS(HttpStatus.FORBIDDEN,"잘못된 접근 권한 입니다."),

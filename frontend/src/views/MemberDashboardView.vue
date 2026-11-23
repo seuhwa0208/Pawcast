@@ -8,6 +8,7 @@ import { useWishlist } from "@/stores/wishlist";
 import { orderService } from "@/services/orderService";
 import { cartService } from "@/services/cartService";
 import { reviewService } from "@/services/reviewService";
+import { verifyMyPassword } from "@/services/memberService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const route = useRoute();
@@ -16,9 +17,7 @@ const { accessToken, currentUserId } = useAuthSession();
 const { count: cartCount, add: addLocalCart } = useCart();
 const wishlistStore = useWishlist();
 const effectiveUserId = computed(() => currentUserId.value);
-const displayName = computed(
-  () => effectiveUserId.value || "포캐스트 회원",
-);
+const displayName = computed(() => effectiveUserId.value || "포캐스트 회원");
 const verifyOpen = ref(false);
 const orders = ref([]);
 const ordersLoading = ref(false);
@@ -32,6 +31,10 @@ const reviewItem = ref(null);
 const reviewRating = ref(5);
 const reviewContent = ref("");
 const reviewSubmitting = ref(false);
+const cancelOpen = ref(false);
+const cancelOrderTarget = ref(null);
+const cancelReason = ref("");
+const cancelSubmitting = ref(false);
 function showActionMessage(message) {
   actionMessage.value = message;
   window.setTimeout(() => (actionMessage.value = ""), 2400);
@@ -64,7 +67,9 @@ const orderCards = computed(() =>
       orderItems,
       firstItem,
       displayStatus: statusLabels[order.status] || order.status,
-      displayDate: String(order.createdAt || order.created_at || order.orderDate || "")
+      displayDate: String(
+        order.createdAt || order.created_at || order.orderDate || "",
+      )
         .slice(0, 10)
         .replaceAll("-", "."),
       extraCount: Math.max(0, orderItems.length - 1),
@@ -106,15 +111,25 @@ async function openOrderDetail(orderId) {
     showActionMessage(error.message || "주문 상세를 불러오지 못했습니다.");
   }
 }
-async function cancelOrder(order) {
-  const orderId = order.orderId || order.id;
-  if (!orderId || !window.confirm("주문을 취소할까요? 취소 후 결제 금액은 환불 처리됩니다.")) return;
+function openCancelOrder(order) {
+  cancelOrderTarget.value = order;
+  cancelReason.value = "";
+  cancelOpen.value = true;
+}
+async function submitCancelOrder() {
+  const orderId =
+    cancelOrderTarget.value?.orderId || cancelOrderTarget.value?.id;
+  if (!orderId || !cancelReason.value.trim()) return;
   try {
-    await orderService.cancelOrder(orderId);
+    cancelSubmitting.value = true;
+    await orderService.cancelOrder(orderId, cancelReason.value.trim());
+    cancelOpen.value = false;
     showActionMessage("주문이 취소되었습니다.");
     await loadOrders();
   } catch (error) {
     showActionMessage(error.message || "주문을 취소하지 못했습니다.");
+  } finally {
+    cancelSubmitting.value = false;
   }
 }
 async function repurchaseOrderItem(item) {
@@ -170,8 +185,16 @@ async function verifyPassword() {
   }
   try {
     verifying.value = true;
-    verifyError.value =
-      "회원정보 수정을 위한 비밀번호 검증 API가 존재하지 않습니다.";
+    const verified = await verifyMyPassword(password.value);
+    if (!verified) {
+      verifyError.value = "비밀번호가 일치하지 않습니다.";
+      return;
+    }
+    // 라우터 가드가 같은 로그인 토큰으로 검증 완료 여부를 확인합니다.
+    sessionStorage.setItem("powcast-profile-verified", accessToken.value);
+    verifyOpen.value = false;
+    password.value = "";
+    await router.push("/mypage/settings");
   } catch (error) {
     verifyError.value = error.message || "비밀번호가 일치하지 않습니다.";
   } finally {
@@ -238,16 +261,28 @@ async function verifyPassword() {
             주문 내역을 불러오는 중입니다.
           </p>
           <div v-else-if="orderCards.length" class="order-list">
-            <article v-for="order in orderCards" :key="order.orderId || order.id">
+            <article
+              v-for="order in orderCards"
+              :key="order.orderId || order.id"
+            >
               <header>
                 <b>{{ order.displayDate }} 주문</b
-                ><button type="button" @click="openOrderDetail(order.orderId || order.id)">
-                  주문 상세
-                </button><button
-                  v-if="['PENDING_PAYMENT', 'PAID', 'PAYMENT_COMPLETED'].includes(order.status)"
+                ><button
                   type="button"
-                  @click="cancelOrder(order)"
-                >주문 취소</button>
+                  @click="openOrderDetail(order.orderId || order.id)"
+                >
+                  주문 상세</button
+                ><button
+                  v-if="
+                    ['PENDING_PAYMENT', 'PAID', 'PAYMENT_COMPLETED'].includes(
+                      order.status,
+                    )
+                  "
+                  type="button"
+                  @click="openCancelOrder(order)"
+                >
+                  주문 취소
+                </button>
               </header>
               <div class="order-product-list">
                 <article
@@ -295,7 +330,9 @@ async function verifyPassword() {
                     </button>
                     <button
                       type="button"
-                      :disabled="!['DELIVERED', 'CONFIRMED'].includes(order.status)"
+                      :disabled="
+                        !['DELIVERED', 'CONFIRMED'].includes(order.status)
+                      "
                       @click="openReview(item)"
                     >
                       리뷰 작성
@@ -325,6 +362,56 @@ async function verifyPassword() {
         </section>
       </div>
     </div>
+    <Teleport to="body">
+      <div
+        v-if="cancelOpen"
+        class="common-modal-backdrop"
+        @click.self="!cancelSubmitting && (cancelOpen = false)"
+      >
+        <form
+          class="common-modal claim-request-modal"
+          @submit.prevent="submitCancelOrder"
+        >
+          <button
+            type="button"
+            class="common-modal-close"
+            aria-label="닫기"
+            :disabled="cancelSubmitting"
+            @click="cancelOpen = false"
+          >
+            ×
+          </button>
+          <small>ORDER CANCELLATION</small>
+          <h2>주문 취소를 요청할까요?</h2>
+          <p>취소 사유를 확인한 뒤 결제 취소와 환불 절차가 진행됩니다.</p>
+          <label
+            >취소 사유<textarea
+              v-model.trim="cancelReason"
+              rows="5"
+              maxlength="500"
+              required
+              placeholder="취소 사유를 입력해주세요."
+            />
+          </label>
+          <div class="common-modal-actions">
+            <button
+              type="button"
+              class="secondary"
+              :disabled="cancelSubmitting"
+              @click="cancelOpen = false"
+            >
+              취소
+            </button>
+            <button
+              class="primary"
+              :disabled="cancelSubmitting || !cancelReason.trim()"
+            >
+              {{ cancelSubmitting ? "요청 중..." : "취소 요청" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Teleport>
     <Teleport to="body"
       ><div
         v-if="verifyOpen"
@@ -399,16 +486,24 @@ async function verifyPassword() {
           <small>ORDER DETAIL</small>
           <h2>주문 상세정보</h2>
           <div class="order-detail-number">
-            <span>{{ String(selectedOrder?.createdAt || "").slice(0, 16).replace("T", " ") }}</span>
+            <span>{{
+              String(selectedOrder?.createdAt || "")
+                .slice(0, 16)
+                .replace("T", " ")
+            }}</span>
             <b>주문번호 {{ selectedOrder?.orderNumber }}</b>
           </div>
           <section class="order-detail-block">
             <header>
               <h3>주문상품</h3>
-              <span>{{ statusLabels[selectedOrder?.status] || selectedOrder?.status }}</span>
+              <span>{{
+                statusLabels[selectedOrder?.status] || selectedOrder?.status
+              }}</span>
             </header>
             <article
-              v-for="item in selectedOrder?.orderItems || selectedOrder?.items || []"
+              v-for="item in selectedOrder?.orderItems ||
+              selectedOrder?.items ||
+              []"
               :key="item.id"
               class="order-detail-product"
             >
@@ -417,21 +512,32 @@ async function verifyPassword() {
                 :to="productDetailPath(item)"
                 @click="orderDetailOpen = false"
               >
-                <img :src="item.imageUrl || item.image" :alt="item.productName" />
+                <img
+                  :src="item.imageUrl || item.image"
+                  :alt="item.productName"
+                />
               </RouterLink>
               <div>
                 <h4>
                   <RouterLink
                     :to="productDetailPath(item)"
                     @click="orderDetailOpen = false"
-                  >{{ item.productName }}</RouterLink>
+                    >{{ item.productName }}</RouterLink
+                  >
                 </h4>
-                <p>{{ item.optionLabel || "기본 옵션" }} · 수량 {{ item.quantity || 1 }}개</p>
+                <p>
+                  {{ item.optionLabel || "기본 옵션" }} · 수량
+                  {{ item.quantity || 1 }}개
+                </p>
                 <b>{{ Number(item.unitPrice || 0).toLocaleString() }}원</b>
               </div>
               <div class="order-detail-product-actions">
-                <button type="button" @click="repurchaseOrderItem(item)">장바구니 담기</button>
-                <button type="button" @click="notifyDirectPaymentPending">바로 결제하기</button>
+                <button type="button" @click="repurchaseOrderItem(item)">
+                  장바구니 담기
+                </button>
+                <button type="button" @click="notifyDirectPaymentPending">
+                  바로 결제하기
+                </button>
                 <button
                   type="button"
                   :disabled="
@@ -447,7 +553,8 @@ async function verifyPassword() {
           <section class="order-detail-block compact">
             <header><h3>배송지</h3></header>
             <dl>
-              <dt>받는 분</dt><dd>{{ selectedOrder?.recipientName }}</dd>
+              <dt>받는 분</dt>
+              <dd>{{ selectedOrder?.recipientName }}</dd>
               <dt>연락처</dt>
               <dd>
                 {{ selectedOrder?.recipientPhone || "주문 정보 확인 필요" }}
@@ -471,7 +578,9 @@ async function verifyPassword() {
               </dd>
               <dt>할인 금액</dt>
               <dd>
-                -{{ Number(selectedOrder?.discountAmount || 0).toLocaleString() }}원
+                -{{
+                  Number(selectedOrder?.discountAmount || 0).toLocaleString()
+                }}원
               </dd>
               <dt>배송비</dt>
               <dd>
@@ -504,22 +613,59 @@ async function verifyPassword() {
         class="common-modal-backdrop"
         @click.self="reviewOpen = false"
       >
-        <form class="common-modal review-write-modal" @submit.prevent="submitReview">
-          <button type="button" class="common-modal-close" aria-label="닫기" @click="reviewOpen = false">×</button>
+        <form
+          class="common-modal review-write-modal"
+          @submit.prevent="submitReview"
+        >
+          <button
+            type="button"
+            class="common-modal-close"
+            aria-label="닫기"
+            @click="reviewOpen = false"
+          >
+            ×
+          </button>
           <small>PURCHASE REVIEW</small>
           <h2>리뷰 작성</h2>
           <p>{{ reviewItem?.productName }}</p>
-          <label>별점
-            <select v-model.number="reviewRating">
-              <option v-for="score in [5, 4, 3, 2, 1]" :key="score" :value="score">{{ score }}점</option>
-            </select>
-          </label>
-          <label>리뷰 내용
-            <textarea v-model="reviewContent" rows="5" placeholder="상품에 대한 리뷰를 남겨쥬세요."></textarea>
+          <fieldset class="review-rating-field">
+            <legend>별점</legend>
+            <!-- # 별을 직접 선택해 드롭다운보다 빠르고 직관적으로 평점을 입력한다. -->
+            <div
+              class="review-rating-stars"
+              role="radiogroup"
+              aria-label="별점 선택"
+            >
+              <button
+                v-for="score in [1, 2, 3, 4, 5]"
+                :key="score"
+                type="button"
+                :class="{ selected: score <= reviewRating }"
+                :aria-label="`${score}점`"
+                :aria-checked="score === reviewRating"
+                role="radio"
+                @click="reviewRating = score"
+              >
+                ★
+              </button>
+              <strong>{{ reviewRating }}점</strong>
+            </div>
+          </fieldset>
+          <label
+            >리뷰 내용
+            <textarea
+              v-model="reviewContent"
+              rows="5"
+              placeholder="상품에 대한 리뷰를 남겨쥬세요."
+            ></textarea>
           </label>
           <div class="common-modal-actions">
-            <button type="button" class="secondary" @click="reviewOpen = false">취소</button>
-            <button class="primary" :disabled="reviewSubmitting">{{ reviewSubmitting ? "등록 중..." : "등록" }}</button>
+            <button type="button" class="secondary" @click="reviewOpen = false">
+              취소
+            </button>
+            <button class="primary" :disabled="reviewSubmitting">
+              {{ reviewSubmitting ? "등록 중..." : "등록" }}
+            </button>
           </div>
         </form>
       </div>

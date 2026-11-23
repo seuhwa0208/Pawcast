@@ -62,7 +62,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/google").permitAll()   // 구글 소셜 로그인 관련 허용
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/logs/**").permitAll()
-                        // 관리자
+                        // 회원 목록·상태·역할 변경은 관리자 전용이다. 반드시 포괄 /api/admin/** 규칙보다 먼저 둔다.
+                        .requestMatchers("/api/admin/members/**", "/api/admin").hasRole("ADMIN")
+                        // 모델 재학습은 운영 데이터에 영향을 주므로 관리자만 실행할 수 있다.
+                        .requestMatchers("/api/admin/ai/**").hasRole("ADMIN")
+                        // 매출·주문·상품·공지·Q&A 운영은 관리자와 매니저가 함께 사용한다.
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
                         // 그 밖의 API 는 로그인 필요
                         .anyRequest().authenticated())

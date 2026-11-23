@@ -29,28 +29,33 @@ public class EmailVerificationService {
     // 버튼을 누르면 이메일서비스가 이메일을 보내기전 코드를 저장하고, 이메일을 보냄
     // 이후 저장한 코드와 보낸 코드가 일치하면 인증 시간을 기록함
     // 만료시간은 보낸 시간 값 + 5분? 10분?
+    @Transactional
+    public void sendVerifyEmail(EmailRequest request) {
+        sendVerifyEmail(request.email());
+    }
 
     @Transactional
-    public void sendVerifyEmail(EmailRequest request){
-        
-        //이메일 보내기전 이미 이 이메일로 가입된 회원이 있는지 검사
-        if(membersRepository.existsByEmail(request.email())){throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);}
-        emailVerificationRepo.deleteByEmail(request.email());
+    public void sendVerifyEmail(String email) {
+        // 이메일 보내기전 이미 이 이메일로 가입된 회원이 있는지 검사
+        if (membersRepository.existsByEmail(email)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_EMAIL);
+        }
+        emailVerificationRepo.deleteByEmail(email);
 
-        //이메일 코드 발생 및 변환
+        // 이메일 코드 발생 및 변환
         String verifyCode = String.format("%06d", secureRandom.nextInt(1000000));
         String encodeCode = passwordEncoder.encode(verifyCode);
-        
-        //이메일 보내기전 테이블에 저장
+
+        // 이메일 보내기전 테이블에 저장
         EmailVerification emailVerification = new EmailVerification();
-        emailVerification.setEmail(request.email());
+        emailVerification.setEmail(email);
         emailVerification.setVerificationCode(encodeCode);
         LocalDateTime dateNow = LocalDateTime.now();
         emailVerification.setCreatedAt(dateNow);
         emailVerification.setExpiresAt(dateNow.plusMinutes(5));
         emailVerificationRepo.save(emailVerification);
 
-        //이메일 보내기
-        emailService.sendEmail(request.email(),"회원가입 이메일 인증 번호","인증번호는 " + verifyCode + "입니다.");
+        // 이메일 보내기
+        emailService.sendEmail(email, "회원가입 이메일 인증 번호", "인증번호는 " + verifyCode + "입니다.");
     }
 }

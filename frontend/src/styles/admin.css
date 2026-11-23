@@ -1,0 +1,35 @@
+/* 모든 관리자 화면의 데스크톱 기준 레이아웃을 통일합니다. */
+.admin-overview,
+.admin-dashboard,
+.admin-operations,
+.demo {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: #f7f5f2;
+  color: #3d281b;
+}
+.admin-overview > main,
+.admin-dashboard > main,
+.admin-operations > main,
+.demo > main {
+  box-sizing: border-box;
+  width: min(100%, 1540px);
+  min-width: 0;
+  margin: 0 auto;
+  padding: clamp(28px, 3vw, 52px) clamp(24px, 4vw, 72px) 56px;
+}
+@media (max-width: 760px) {
+  .admin-overview,
+  .admin-dashboard,
+  .admin-operations,
+  .demo {
+    grid-template-columns: 1fr;
+  }
+  .admin-overview > main,
+  .admin-dashboard > main,
+  .admin-operations > main,
+  .demo > main {
+    padding: 26px 16px 42px;
+  }
+}

@@ -5,4 +5,7 @@ import App from "./App.vue";
 import router from "./router.js";
 import "./styles/global.css";
 import "./styles/corrections.css";
+import "./styles/admin.css";
+import "./styles/admin-overview.css";
+import "./styles/admin-operations.css";
 createApp(App).use(createPinia()).use(router).mount("#app");

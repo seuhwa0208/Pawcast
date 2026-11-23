@@ -22,7 +22,9 @@ export const authService = {
     }),
   signup: (payload) => post("/auth/signup", payload),
   login: (payload) => post("/auth/login", payload),
-  requestPasswordReset: (email) =>
-    postQuery("/auth/reset-password", { email }),
+  requestPasswordReset: (email) => postQuery("/auth/reset-password", { email }),
   googleLogin: (idToken) => post("/auth/google", { idToken }),
+  completeGoogleSignup: (payload) => post("/auth/google/signup", payload),
+  linkGoogleAccount: (idToken, password) =>
+    post("/auth/google/link", { idToken, password }),
 };
