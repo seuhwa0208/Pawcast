@@ -10,7 +10,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 @Component
-public class ImageStorage {
+public class  ImageStorage {
 
     // 이미지 저장 경로
     private final Path uploadPath = Paths.get("uploads/images");
