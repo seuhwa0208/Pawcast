@@ -148,3 +148,35 @@
   text-align: left;
   white-space: pre-wrap;
 }
+
+/* QnA 관리 목록: 공지사항과 동일한 프론트 페이지바 */
+.admin-list-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.admin-list-pagination button {
+  min-width: 36px;
+  border: 1px solid #dfc8b4;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+  color: #68452e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-list-pagination button.active {
+  border-color: #ac6a3d;
+  background: #ac6a3d;
+  color: #fff;
+}
+
+.admin-list-pagination button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

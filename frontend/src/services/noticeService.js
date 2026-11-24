@@ -1,4 +1,4 @@
-import { springRequest } from "@/services/http/springClient";
+import { jsonBody, springRequest } from "@/services/http/springClient";
 
 function toNotice(item, index) {
   return {
@@ -23,4 +23,7 @@ export const noticeService = {
   },
   detail: async (noticeId) =>
     toNotice(await springRequest(`/notices/${noticeId}`), 0),
+  create: (payload) => springRequest("/notices", { method: "POST", body: jsonBody(payload) }),
+  update: (noticeId, payload) => springRequest(`/notices/${noticeId}`, { method: "PATCH", body: jsonBody(payload) }),
+  remove: (noticeId) => springRequest(`/notices/${noticeId}`, { method: "DELETE" }),
 };

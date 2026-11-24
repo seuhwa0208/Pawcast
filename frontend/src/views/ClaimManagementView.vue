@@ -1,10 +1,11 @@
 <!-- 주문 API와 환불 API를 사용해 고객이 취소·반품 요청 현황을 직접 관리하는 화면입니다. -->
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 import { useAuthSession } from "@/stores/auth";
 import { orderService } from "@/services/orderService";
+import PaginationBar from "@/components/PaginationBar.vue";
 
 const router = useRouter();
 const { currentUserId } = useAuthSession();
@@ -18,11 +19,23 @@ const refundOrder = ref(null);
 const refundReason = ref("");
 const refundSubmitting = ref(false);
 const message = ref("");
+const page = ref(1);
+const CLAIM_PAGE_SIZE = 5;
 const refundableOrders = computed(() =>
   orders.value.filter((order) =>
     ["DELIVERED", "CONFIRMED"].includes(order.status),
   ),
 );
+const claimPageCount = computed(() =>
+  Math.max(1, Math.ceil(refundableOrders.value.length / CLAIM_PAGE_SIZE)),
+);
+const pagedRefundableOrders = computed(() => {
+  const start = (page.value - 1) * CLAIM_PAGE_SIZE;
+  return refundableOrders.value.slice(start, start + CLAIM_PAGE_SIZE);
+});
+watch(claimPageCount, (count) => {
+  if (page.value > count) page.value = count;
+});
 function displayDate(value) {
   return String(value || "-")
     .slice(0, 10)
@@ -55,6 +68,7 @@ async function loadClaims() {
       }),
     );
     refunds.value = Object.fromEntries(results);
+    page.value = 1;
   } catch (cause) {
     orders.value = [];
     error.value = cause.message || "취소·환불 내역을 불러오지 못했습니다.";
@@ -110,15 +124,15 @@ onMounted(loadClaims);
               배송 완료 또는 구매 확정 주문만 반품 환불을 신청할 수 있습니다.
             </p>
           </div>
-          <button type="button" @click="loadClaims">새로고침</button>
         </header>
         <p v-if="loading" class="dashboard-order-state">
           내역을 불러오는 중입니다.
         </p>
         <p v-else-if="error" class="dashboard-order-state error">{{ error }}</p>
         <p v-else-if="message" class="claim-message">{{ message }}</p>
-        <div v-else-if="refundableOrders.length" class="claim-order-list">
-          <article v-for="order in refundableOrders" :key="order.orderId">
+        <template v-else-if="refundableOrders.length">
+          <div class="claim-order-list">
+          <article v-for="order in pagedRefundableOrders" :key="order.orderId">
             <div>
               <b>{{ displayDate(order.created_at || order.createdAt) }} 주문</b>
               <span>{{
@@ -141,7 +155,13 @@ onMounted(loadClaims);
               </button>
             </div>
           </article>
-        </div>
+          </div>
+          <PaginationBar
+            v-model:page="page"
+            :total-pages="claimPageCount"
+            label="취소·반품·교환 내역 페이지"
+          />
+        </template>
         <p v-else class="dashboard-order-state">
           환불 신청 가능한 주문이 없습니다.
         </p>

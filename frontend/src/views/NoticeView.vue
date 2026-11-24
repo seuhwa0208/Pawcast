@@ -9,6 +9,7 @@ const notices = ref([]);
 const loadError = ref("");
 const filter = ref("전체"),
   keyword = ref(""),
+  keywordInput = ref(""),
   selected = ref(null),
   page = ref(1);
 onMounted(async () => {
@@ -70,6 +71,10 @@ function chooseFilter(value) {
   filter.value = value;
   page.value = 1;
 }
+function applySearch() {
+  keyword.value = keywordInput.value.trim();
+  page.value = 1;
+}
 function closeDetail() {
   selected.value = null;
   router.push({ name: "notice-list" });
@@ -96,13 +101,13 @@ watch(() => route.params.id, (noticeId) => selectFromRoute(noticeId));
           </button>
         </div>
         <label>
-          <button type="button" class="notice-search-icon" aria-label="검색" />
+          <button type="button" class="notice-search-icon" aria-label="검색" @click="applySearch" />
           <input
-            v-model.trim="keyword"
-            placeholder="제목 또는 내용을 검색하세요"
+            v-model.trim="keywordInput"
+            placeholder="예) 배송 문의"
+            @keyup.enter="applySearch"
           />
         </label>
-        <button class="notice-search">검색</button>
       </div>
       <p v-if="!loadError" class="notice-count">
         {{ noticeCountLabel }} <b>{{ filtered.length }}건</b>
@@ -141,6 +146,9 @@ watch(() => route.params.id, (noticeId) => selectFromRoute(noticeId));
           ><span>{{ item.date }}</span>
         </button>
       </div>
+      <p v-if="!pinned.length && !visibleItems.length && !loadError" class="board-empty-state">
+        검색 조건에 맞는 게시글이 없습니다.
+      </p>
       <nav class="qna-pagination" aria-label="페이지 이동">
         <button :disabled="page === 1" aria-label="첫 페이지" @click="page = 1">
           «</button

@@ -33,7 +33,7 @@ public class ReviewController {
     // 리뷰 등록
     @PostMapping("/reviews")
     public ReviewResponse createReview(@AuthenticationPrincipal LoginMember member,
-                                       @Valid @RequestPart ReviewCreateRequest request,
+            @Valid @RequestPart("request") ReviewCreateRequest request,
                                        @RequestPart(value = "images", required = false) List<MultipartFile> images) {
         return reviewService.createReview(member.getId(), request, images);
     }

@@ -1,6 +1,7 @@
 package com.project.pawcast.payment.service;
 
 import com.project.pawcast.cart.service.CartService;
+import com.project.pawcast.order.event.OrderPaidEvent;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.order.entity.Order;
@@ -16,8 +17,10 @@ import com.project.pawcast.payment.entity.PaymentsStatus;
 import com.project.pawcast.payment.repository.PaymentRepository;
 import com.project.pawcast.product.service.InventoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,6 +40,7 @@ public class PaymentService {
     private final InventoryService inventoryService;
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
+    private final ApplicationEventPublisher eventPublisher;
 
     // 결제
     @Transactional
@@ -50,7 +54,12 @@ public class PaymentService {
         // 1. 주문 조회
         Order order = orderRepository.findByIdForUpdate(orderId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
         // 2. 본인 주문인지 확인
-        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);}
+        if (memberId == null) {
+            // 비회원은 서버가 생성한 예측 불가능한 주문번호를 결제 승인 요청에 함께 제출한다.
+            if (order.getMember() != null) throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);
+        } else if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {
+            throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);
+        }
         // 3. 결제 대기 상태인지 확인
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);}
         // 4. 주문번호 검증
@@ -112,6 +121,14 @@ public class PaymentService {
         // 주문 생성·결제 실패·결제 취소 경로에서는 호출하지 않습니다.
         cartService.removePurchasedItems(memberId, items);
 
+        // 메일 발송 실패가 PG 승인·주문 저장 트랜잭션을 되돌리지 않도록 커밋 후 이벤트로 처리한다.
+        eventPublisher.publishEvent(new OrderPaidEvent(
+                order.getRecipientEmail(),
+                order.getRecipientName(),
+                order.getOrderNumber(),
+                order.getFinalAmount()
+        ));
+
         // 12. 응답 반환
         return new PaymentDtos.PaymentResponse(
                 payment.getId(),
@@ -141,16 +158,28 @@ public class PaymentService {
         Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
         //결제 상태 검사
         if (payment.getStatus() != PaymentsStatus.PAID) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
-        // 토스 취소
-        TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
-        TossCancelResponse.CancelInfo cancelInfo = response.cancels().get(response.cancels().size() - 1);
-        // 취소 성공 확인
-        // Toss 취소 상태 - DONE, CANCELED
-        if (!"DONE".equals(cancelInfo.cancelStatus())) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
+        try {
+            // 토스 취소
+            TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
+            if (response == null || response.cancels() == null || response.cancels().isEmpty()) {
+                throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+            }
 
-        // 결제 상태 취소
-        payment.setStatus(PaymentsStatus.CANCELLED);
-        return cancelInfo.transactionKey();
+            TossCancelResponse.CancelInfo cancelInfo = response.cancels().get(response.cancels().size() - 1);
+            // Toss 취소 상태 - DONE, CANCELED
+            if (!"DONE".equals(cancelInfo.cancelStatus())) {
+                throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+            }
+
+            // 결제 상태 취소
+            payment.setStatus(PaymentsStatus.CANCELLED);
+            return cancelInfo.transactionKey();
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RestClientException | IllegalStateException exception) {
+            // 테스트 키·이미 취소된 결제·PG 응답 오류를 서버 500으로 노출하지 않습니다.
+            throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+        }
     }
     
 

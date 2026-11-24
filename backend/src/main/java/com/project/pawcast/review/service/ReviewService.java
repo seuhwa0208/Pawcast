@@ -187,6 +187,9 @@ public class ReviewService {
         // 0. 리뷰 필터링 검사
         profanityFilter.containsProhibitedWord(request.content());
 
+        // 0. 리뷰 필터링 검사
+        profanityFilter.containsProhibitedWord(request.content());
+
         // 1. 기존 본문과 비교
         boolean contentChanged =
                 !Objects.equals(review.getContent(), request.content());

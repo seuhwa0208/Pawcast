@@ -19,6 +19,26 @@
   margin: 0 auto;
   padding: clamp(28px, 3vw, 52px) clamp(24px, 4vw, 72px) 56px;
 }
+
+.admin-layout-content table th,
+.admin-layout-content table td {
+  text-align: center !important;
+  vertical-align: middle;
+}
+
+/* 모든 관리자 검색 입력창은 동일한 갈색 돋보기와 충분한 왼쪽 여백을 사용합니다. */
+input[type="search"] {
+  appearance: none;
+  padding-left: 43px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='%23805737' stroke-width='2'/%3E%3Cpath d='m15.4 15.4 5 5' fill='none' stroke='%23805737' stroke-linecap='round' stroke-width='2'/%3E%3C/svg%3E") !important;
+  background-position: 14px center !important;
+  background-size: 19px 19px !important;
+  background-repeat: no-repeat !important;
+}
+input[type="search"]::placeholder {
+  color: #9c897a;
+  opacity: 1;
+}
 @media (max-width: 760px) {
   .admin-overview,
   .admin-dashboard,

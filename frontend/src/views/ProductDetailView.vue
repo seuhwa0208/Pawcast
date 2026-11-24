@@ -15,6 +15,7 @@ import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
 import CartAddedModal from "@/components/CartAddedModal.vue";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import ReviewEditModal from "@/components/ReviewEditModal.vue";
 import { reviewService } from "@/services/reviewService";
 
 const props = defineProps({ pet: String, id: String });
@@ -22,8 +23,17 @@ const router = useRouter();
 const product = ref(null);
 const detailLoading = ref(true);
 const detailError = ref("");
-const reviews = ref([]);
+const reviews = ref([]);useAuthSession();
 const reviewsLoading = ref(false);
+const reviewPage = ref(1);
+const REVIEW_PAGE_SIZE = 5;
+
+// 리뷰 수정 모달 관련 상태
+const reviewEditOpen = ref(false);
+const editingReview = ref(null);
+const reviewEditLoading = ref(false);
+const reviewEditError = ref("");
+const reviewEditSuccess = ref("");
 
 function normalizeDetail(detail) {
   const variants =
@@ -70,8 +80,12 @@ async function loadProduct() {
     const detail = await productService.detail(props.id);
     product.value = normalizeDetail(detail);
     try {
-      // FastAPI가 별점·AI 긍정도·최신 작성일·리뷰 ID 순으로 정렬합니다.
-      reviews.value = await reviewService.getRankedProductReviews(props.id);
+      // 공개 리뷰는 Spring이 정한 별점·작성일 기준 정렬 결과를 그대로 사용한다.
+      const reviewResult = await reviewService.getProductReviews(props.id);
+      reviews.value = Array.isArray(reviewResult)
+        ? reviewResult
+        : reviewResult?.reviews || [];
+      reviewPage.value = 1;
     } catch (reviewError) {
       // # 리뷰 API 오류가 상품 상세 페이지 전체를 막지 않도록 리뷰 영역만 빈 상태로 둔다.
       reviews.value = [];
@@ -103,7 +117,17 @@ onMounted(() => {
 onBeforeUnmount(() =>
   document.removeEventListener("pointerdown", closeOptionOnOutside),
 );
-watch(() => props.id, loadProduct);
+watch(
+    () => props.id,
+    () => {
+        closeReviewEdit();
+
+        reviewEditError.value = "";
+        reviewEditSuccess.value = "";
+
+        loadProduct();
+    }
+);
 const sectionName = computed(() =>
   props.pet === "CAT"
     ? "고양이관"
@@ -126,7 +150,6 @@ watchEffect(() => {
     );
 });
 const tab = ref("detail");
-const showAllReviews = ref(false);
 const galleryIndex = ref(0);
 const optionOpen = ref(false);
 const cartAdded = ref(false);
@@ -150,6 +173,28 @@ const productOptions = computed(() =>
 const currentOption = computed(
   () => selectedOption.value || productOptions.value[0] || "기본 옵션",
 );
+const bestReview = computed(() => reviews.value[0] || null);
+const regularReviews = computed(() => reviews.value.slice(1));
+const reviewPageCount = computed(() =>
+  Math.max(1, Math.ceil(regularReviews.value.length / REVIEW_PAGE_SIZE)),
+);
+const reviewPageNumbers = computed(() => {
+  const start = Math.floor((reviewPage.value - 1) / 5) * 5 + 1;
+  return Array.from(
+    { length: Math.min(5, reviewPageCount.value - start + 1) },
+    (_, index) => start + index,
+  );
+});
+const pagedReviews = computed(() => {
+  const start = (reviewPage.value - 1) * REVIEW_PAGE_SIZE;
+  return regularReviews.value.slice(start, start + REVIEW_PAGE_SIZE);
+});
+function maskReviewWriter(userId) {
+  const value = String(userId || "").trim();
+  if (!value) return "고객님";
+  const visibleLength = value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
+  return `${value.slice(0, visibleLength)}${"*".repeat(Math.min(4, Math.max(2, value.length - visibleLength)))} 고객님`;
+}
 // 옵션별 가격표가 없는 API 상품도 기본 판매가로 안전하게 표시합니다.
 const currentPrice = computed(
   () =>
@@ -166,12 +211,146 @@ const getOptionExtra = (option) =>
   Math.max(0, getOptionPrice(option) - getOptionPrice(productOptions.value[0]));
 const { add } = useCart();
 const { isFavorite, toggle } = useWishlist();
-const { accessToken } = useAuthSession();
+const { accessToken, currentUserId } = useAuthSession();
+
+// 로그인 회원 본인의 리뷰인지 확인합니다.
+function isMyReview(review) {
+    return Boolean(
+        accessToken.value &&
+        currentUserId.value &&
+        review?.writerId === currentUserId.value
+    );
+}
+
+// 리뷰 수정 모달 열기
+async function openReviewEdit(review) {
+    if (!accessToken.value) {
+        loginRequired.value = true;
+        return;
+    }
+
+    if (!isMyReview(review)) {
+        return;
+    }
+
+    if (reviewEditLoading.value) {
+        return;
+    }
+
+    reviewEditError.value = "";
+    reviewEditSuccess.value = "";
+    reviewEditLoading.value = true;
+
+    const requestedProductId = props.id;
+
+    try {
+        // 수정 전 서버에서 최신 리뷰 정보를 조회합니다.
+        const latestReview = await reviewService.getReview(
+            review.id
+        );
+
+        // 조회 도중 다른 상품으로 이동한 경우 모달을 열지 않습니다.
+        if (requestedProductId !== props.id) {
+            return;
+        }
+
+        // 최신 리뷰 정보에서도 작성자 본인인지 확인합니다.
+        if (!isMyReview(latestReview)) {
+            reviewEditError.value =
+                "본인이 작성한 리뷰만 수정할 수 있습니다.";
+
+            return;
+        }
+
+        editingReview.value = latestReview;
+        reviewEditOpen.value = true;
+
+    } catch (error) {
+        reviewEditError.value =
+            error.message ||
+            "리뷰 정보를 불러오지 못했습니다.";
+
+    } finally {
+        reviewEditLoading.value = false;
+    }
+}
+
+// 리뷰 수정 모달 닫기
+function closeReviewEdit() {
+    reviewEditOpen.value = false;
+    editingReview.value = null;
+}
+
+// 리뷰 수정 완료 후 리뷰 목록 및 상품 평점 갱신
+async function handleReviewUpdated(updatedReview) {
+    reviewEditError.value = "";
+
+    reviewEditSuccess.value =
+        "리뷰가 정상적으로 수정되었습니다.";
+
+    const requestedProductId = props.id;
+
+    // 수정된 리뷰를 화면에 우선 반영합니다.
+    reviews.value = reviews.value.map((review) =>
+        review.id === updatedReview.id
+            ? { ...review, ...updatedReview }
+            : review
+    );
+
+    reviewsLoading.value = true;
+
+    try {
+        // 서버에서 최신 리뷰 목록 및 평균 별점을 조회합니다.
+        const reviewResult =
+            await reviewService.getProductReviews(
+                requestedProductId
+            );
+
+        if (requestedProductId !== props.id) {
+            return;
+        }
+
+        reviews.value = Array.isArray(reviewResult)
+            ? reviewResult
+            : reviewResult?.reviews || [];
+
+        // 상품 상세 및 리뷰 영역의 평균 별점을 함께 갱신합니다.
+        if (product.value) {
+            product.value = {
+                ...product.value,
+
+                rating: Number(
+                    reviewResult?.averageRating ??
+                    product.value.rating
+                ),
+
+                reviewCount: Number(
+                    reviewResult?.reviewCount ??
+                    reviews.value.length
+                ),
+            };
+        }
+
+        // 현재 리뷰 페이지가 전체 페이지 수를 초과하지 않도록 처리합니다.
+        reviewPage.value = Math.min(
+            reviewPage.value,
+            reviewPageCount.value
+        );
+
+    } catch (error) {
+        reviewEditError.value =
+            "리뷰는 수정되었지만 최신 목록을 불러오지 못했습니다. 새로고침 후 확인해주세요.";
+
+        console.warn(
+            "리뷰 수정 후 목록 갱신 실패",
+            error
+        );
+
+    } finally {
+        reviewsLoading.value = false;
+    }
+}
 const addToCart = async () => {
-  if (!accessToken.value) {
-    loginRequired.value = true;
-    return;
-  }
   try {
     await add(
       {
@@ -355,9 +534,12 @@ const purchaseGuide = [
               :aria-expanded="optionOpen"
               @click="optionOpen = !optionOpen"
             >
-              <span>{{ currentOption }}</span>
-              <small v-if="getOptionExtra(currentOption)">
-                (+{{ getOptionExtra(currentOption).toLocaleString() }}원)
+              <span class="option-trigger-name">{{ currentOption }}</span>
+              <small class="option-trigger-price">
+                {{ getOptionPrice(currentOption).toLocaleString() }}원
+                <template v-if="getOptionExtra(currentOption)">
+                  <b>(+{{ getOptionExtra(currentOption).toLocaleString() }}원)</b>
+                </template>
               </small>
               <i aria-hidden="true" />
             </button>
@@ -371,6 +553,7 @@ const purchaseGuide = [
                 v-for="option in productOptions"
                 :key="option"
                 :class="{ selected: currentOption === option }"
+                @click="chooseOption(option)"
               >
                 <input
                   type="radio"
@@ -379,8 +562,14 @@ const purchaseGuide = [
                   :value="option"
                   @change="selectedOption = option"
                 />
-                <i aria-hidden="true" />
-                <span>{{ option }}</span>
+                <i class="option-choice" aria-hidden="true" />
+                <span class="option-menu-name">{{ option }}</span>
+                <small class="option-menu-price">
+                  {{ getOptionPrice(option).toLocaleString() }}원
+                  <template v-if="getOptionExtra(option)">
+                    (+{{ getOptionExtra(option).toLocaleString() }}원)
+                  </template>
+                </small>
               </label>
             </div>
           </div>
@@ -469,30 +658,87 @@ const purchaseGuide = [
           </div>
           <strong>★ {{ product.rating }}</strong>
         </header>
-        <!-- 첫 번째 항목은 별점·AI 긍정도·최신 작성일·리뷰 ID 기준의 베스트 리뷰입니다. -->
+
+        <!-- 리뷰 수정 성공 메시지 -->
+        <p v-if="reviewEditSuccess" class="review-update-success" role="status">
+          {{ reviewEditSuccess }}
+        </p>
+
+        <!-- 리뷰 수정 오류 메시지 -->
+        <p v-if="reviewEditError" class="review-update-error" role="alert">
+          {{ reviewEditError }}
+        </p>
+
+        <!-- 리뷰 조회 중 안내 -->
+        <p v-if="reviewsLoading" class="empty-data-notice" role="status">
+          상품 리뷰를 불러오는 중입니다.
+        </p>
+
+        <!-- Spring 공개 리뷰 정렬의 첫 항목을 베스트 리뷰로 노출하고, 나머지는 페이지로 나눠 표시한다. -->
         <section v-if="reviews.length" class="review-list">
-          <article class="best-review">
-            <small>BEST REVIEW</small
-            ><b>★ {{ reviews[0].rating }} · {{ reviews[0].writerName }}</b>
-            <small>AI 긍정 {{ reviews[0].positivePercentage }}%</small>
-            <p>{{ reviews[0].content }}</p>
+          <!-- BEST 리뷰 -->
+          <article v-if="bestReview && reviewPage === 1" class="best-review">
+            <small>BEST REVIEW</small>
+            <div class="review-meta">
+              <b>★ {{ bestReview.rating }}</b>
+              <span>{{ maskReviewWriter(bestReview.writerId) }}</span>
+              <span v-if="isMyReview(bestReview)" class="my-review-label">내 리뷰</span>
+              <time>{{ String(bestReview.createdAt || "").slice(0, 10) }}</time>
+              <button
+                v-if="isMyReview(bestReview)"
+                type="button"
+                class="review-edit-button"
+                :disabled="reviewEditLoading || reviewsLoading"
+                @click="openReviewEdit(bestReview)"
+              >
+                수정
+              </button>
+            </div>
+            <p>{{ bestReview.content }}</p>
           </article>
-          <button
-            v-if="reviews.length > 1"
-            type="button"
-            class="review-all-button"
-            @click="showAllReviews = !showAllReviews"
-          >
-            {{ showAllReviews ? "접기" : `전체보기 (${reviews.length})` }}
-          </button>
-          <ol v-if="showAllReviews" class="review-items">
-            <li v-for="review in reviews.slice(1)" :key="review.id">
-              <b>★ {{ review.rating }} · {{ review.writerName }}</b>
-              <small>AI 긍정 {{ review.positivePercentage }}%</small>
+
+          <!-- 일반 리뷰 -->
+          <ol v-if="regularReviews.length" class="review-items">
+            <li v-for="review in pagedReviews" :key="review.id">
+              <div class="review-meta">
+                <b>★ {{ review.rating }}</b>
+                <span>{{ maskReviewWriter(review.writerId) }}</span>
+                <span v-if="isMyReview(review)" class="my-review-label">내 리뷰</span>
+                <time>{{ String(review.createdAt || "").slice(0, 10) }}</time>
+                <button
+                  v-if="isMyReview(review)"
+                  type="button"
+                  class="review-edit-button"
+                  :disabled="reviewEditLoading || reviewsLoading"
+                  @click="openReviewEdit(review)"
+                >
+                  수정
+                </button>
+              </div>
               <p>{{ review.content }}</p>
             </li>
           </ol>
+
+          <!-- 리뷰 페이지네이션 -->
+          <nav
+            v-if="reviewPageCount > 1"
+            class="qna-pagination review-pagination"
+            aria-label="상품 리뷰 페이지 이동"
+          >
+            <button :disabled="reviewPage === 1" aria-label="첫 페이지" @click="reviewPage = 1">«</button>
+            <button :disabled="reviewPage === 1" aria-label="이전 페이지" @click="reviewPage--">‹</button>
+            <button
+              v-for="number in reviewPageNumbers"
+              :key="number"
+              :class="{ on: reviewPage === number }"
+              @click="reviewPage = number"
+            >{{ number }}</button>
+            <button :disabled="reviewPage === reviewPageCount" aria-label="다음 페이지" @click="reviewPage++">›</button>
+            <button :disabled="reviewPage === reviewPageCount" aria-label="마지막 페이지" @click="reviewPage = reviewPageCount">»</button>
+          </nav>
         </section>
+
+        <!-- 등록된 리뷰가 없는 경우 -->
         <p v-else-if="!reviewsLoading" class="empty-data-notice">
           등록된 상품 리뷰가 없습니다.
         </p>
@@ -500,8 +746,99 @@ const purchaseGuide = [
     </section>
     <CartAddedModal v-model="cartAdded" @cart="router.push('/cart')" />
     <LoginRequiredModal v-model="loginRequired" @login="goToLogin" />
+
+    <!-- 회원 본인 리뷰 수정 모달 -->
+    <ReviewEditModal
+        v-if="reviewEditOpen && editingReview"
+        :key="editingReview.id"
+        :review="editingReview"
+        :product-name="product.name"
+        @close="closeReviewEdit"
+        @updated="handleReviewUpdated"
+    />
   </div>
   <main v-else class="container detail-page detail-page-state">
     {{ detailLoading ? "상품 정보를 불러오는 중입니다." : detailError }}
   </main>
 </template>
+
+<style scoped>
+/* 회원 본인 리뷰 표시 */
+.my-review-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #f3e6d7;
+    padding: 4px 8px;
+    color: #95643d;
+    font-size: 11px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+/* 리뷰 수정 버튼 */
+.review-edit-button {
+    min-width: 58px;
+    min-height: 30px;
+    border: 1px solid #ddc9b7;
+    border-radius: 7px;
+    background: #fff;
+    padding: 5px 12px;
+    color: #805737;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.review-edit-button:hover:not(:disabled) {
+    border-color: #95643d;
+    background: #95643d;
+    color: #fff;
+}
+
+.review-edit-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 리뷰 수정 성공 메시지 */
+.review-update-success {
+    margin: 16px 0;
+    border: 1px solid #cfe3ce;
+    border-radius: 9px;
+    background: #f2f8f0;
+    padding: 12px 16px;
+    color: #4f8051;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* 리뷰 수정 오류 메시지 */
+.review-update-error {
+    margin: 16px 0;
+    border: 1px solid #ebc9c2;
+    border-radius: 9px;
+    background: #fff5f3;
+    padding: 12px 16px;
+    color: #c65b49;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+@media (max-width: 600px) {
+    .review-meta {
+        flex-wrap: wrap;
+    }
+
+    .review-edit-button {
+        min-height: 34px;
+    }
+}
+</style>

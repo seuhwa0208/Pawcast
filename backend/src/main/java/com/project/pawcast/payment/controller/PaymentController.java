@@ -18,7 +18,7 @@ public class PaymentController {
     // 결제 하기 - 승인
     @PostMapping("/confirm")
     public PaymentDtos.PaymentResponse approve(@PathVariable Long orderId, @AuthenticationPrincipal LoginMember member, @RequestBody @Valid PaymentDtos.PaymentRequest request) {
-        return paymentService.approve(orderId, member.getId(), request.paymentKey(), request.orderNumber(), request.amount());
+        return paymentService.approve(orderId, member == null ? null : member.getId(), request.paymentKey(), request.orderNumber(), request.amount());
     }
 
     // 결제 조회

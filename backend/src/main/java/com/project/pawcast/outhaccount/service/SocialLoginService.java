@@ -64,9 +64,16 @@ public class SocialLoginService {
             throw new BusinessException(ErrorCode.DUPLICATE_MEMBER);
         }
 
+        if (membersRepository.existsByUserId(request.userId().trim())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_USERID);
+        }
+        if (!request.passwordHash().equals(request.checkPasswordHash())) {
+            throw new BusinessException(ErrorCode.CHECK_PASSWORD_ERROR);
+        }
+
         validateRequiredAgreements(request);
 
-        Members member = createSocialMember(email, name, request.tel(), providerUserId, request);
+        Members member = createSocialMember(email, name, request.tel(), request);
         saveOauthAccount(member, providerUserId);
         return loginResponse(member, true);
     }
@@ -178,14 +185,14 @@ public class SocialLoginService {
             String email,
             String name,
             String tel,
-            String providerUserId,
             SocialSignupRequest request
     ) {
         Members member = Members.builder()
                 .email(email)
                 .name(name)
-                .userId("google_" + providerUserId)
+                .userId(request.userId().trim())
                 .tel(tel)
+                .passwordHash(passwordEncoder.encode(request.passwordHash()))
                 .role(Members.Role.USER)
                 .status(Members.Status.ACTIVE)
                 .isAgreedTerms(request.agreedTerms())

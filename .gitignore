@@ -12,3 +12,28 @@
 **/.pytest_cache/
 **/*.pyc
 AI/app/review/models/
+
+# Java Heap Dump
+*.hprof
+
+# 이전 AI 프로젝트
+/ai_old/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# 환경변수
+.env
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+dist/
+
+# Backend
+.gradle/
+build/

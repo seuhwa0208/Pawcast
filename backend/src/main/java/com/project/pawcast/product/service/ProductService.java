@@ -352,7 +352,7 @@ public class ProductService {
         for (int i = 0; i < images.size(); i++) {
             MultipartFile image = images.get(i);
 
-            String imagePath = imageService.upload(image);
+            String imagePath = imageService.uploadProduct(image);
             productImages.add(
                     ProductImage.builder()
                             .product(product)
@@ -365,19 +365,62 @@ public class ProductService {
         imageRepository.saveAll(productImages);
     }
 
-    private void saveDetails(Product product, FoodDetailCreateRequest food, DeviceDetailCreateRequest device) {
+    private void saveDetails(
+            Product product,
+            FoodDetailCreateRequest food,
+            DeviceDetailCreateRequest device
+    ) {
         if (food != null) {
-            foodRepository.saveAndFlush(FoodDetail.builder()
-                    .productId(product.getId()).product(product)
-                    .foodKind(food.foodKind()).foodForm(food.foodForm())
-                    .mainIngredient(food.mainIngredient()).lifeStage(food.lifeStage())
-                    .ingredientDescription(food.ingredientDescription()).build());
+            FoodDetail detail = foodRepository.findById(product.getId())
+                    .orElse(null);
+
+            if (detail == null) {
+                // 신규: productId는 직접 넣지 않습니다.
+                detail = FoodDetail.builder()
+                        .product(product)
+                        .foodKind(food.foodKind())
+                        .foodForm(food.foodForm())
+                        .mainIngredient(food.mainIngredient())
+                        .lifeStage(food.lifeStage())
+                        .ingredientDescription(food.ingredientDescription())
+                        .build();
+
+                foodRepository.saveAndFlush(detail);
+            } else {
+                // 기존: 조회한 엔티티의 값을 변경합니다.
+                detail.update(
+                        food.foodKind(),
+                        food.foodForm(),
+                        food.mainIngredient(),
+                        food.lifeStage(),
+                        food.ingredientDescription()
+                );
+
+                foodRepository.flush();
+            }
         }
+
         if (device != null) {
-            deviceRepository.saveAndFlush(DeviceDetail.builder()
-                    .productId(product.getId()).product(product)
-                    .deviceKind(device.deviceKind()).material(device.material())
-                    .featureDescription(device.featureDescription()).build());
+            DeviceDetail detail = deviceRepository.findById(product.getId())
+                    .orElse(null);
+
+            if (detail == null) {
+                detail = DeviceDetail.builder()
+                        .product(product)
+                        .deviceKind(device.deviceKind())
+                        .material(device.material())
+                        .featureDescription(device.featureDescription())
+                        .build();
+
+                deviceRepository.saveAndFlush(detail);
+            } else {
+                // DeviceDetail에는 이미 @Setter가 있습니다.
+                detail.setDeviceKind(device.deviceKind());
+                detail.setMaterial(device.material());
+                detail.setFeatureDescription(device.featureDescription());
+
+                deviceRepository.flush();
+            }
         }
     }
 

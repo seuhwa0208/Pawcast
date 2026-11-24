@@ -35,6 +35,11 @@ public interface ProductReviewRepository
     // 주문 항목에 이미 리뷰가 있는지 확인
     boolean existsByOrderItemId(Long orderItemId);
 
+    // 주문 항목 ID 목록을 기준으로 작성된 리뷰 일괄 조회
+    List<ProductReview> findAllByOrderItemIdIn(
+            List<Long> orderItemIds
+    );
+
     // 상품별 대표 리뷰 조회
     @Query("""
     SELECT r

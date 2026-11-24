@@ -272,15 +272,16 @@ onBeforeUnmount(() =>
         ＋ 문의하기
       </button>
     </header>
-    <nav v-if="accessToken && mode === 'list'" class="qna-scope-tabs">
-      <button :class="{ on: !mineOnly }" @click="setScope('all')">
-        전체 문의</button
-      ><button :class="{ on: mineOnly }" @click="setScope('mine')">
-        내 문의 내역
-      </button>
-    </nav>
     <section v-if="mode === 'list'" class="qna-board">
-      <div class="qna-toolbar">
+      <div class="qna-board-controls">
+        <nav v-if="accessToken" class="qna-scope-tabs">
+          <button :class="{ on: !mineOnly }" @click="setScope('all')">
+            전체 문의</button
+          ><button :class="{ on: mineOnly }" @click="setScope('mine')">
+            내 문의 내역
+          </button>
+        </nav>
+        <div class="qna-toolbar">
         <div class="qna-type-filter">
           <button
             type="button"
@@ -305,21 +306,17 @@ onBeforeUnmount(() =>
           </div>
         </div>
         <label>
-          <button
-            type="button"
-            class="qna-search-icon"
-            aria-label="검색"
-            @click="applySearch"
-          />
           <input
             v-model.trim="keywordInput"
-            placeholder="제목 또는 내용을 검색하세요"
+            type="search"
+            placeholder="예) 배송 문의, 재입고"
             @keyup.enter="applySearch"
           />
         </label>
         <button type="button" class="qna-search" @click="applySearch">
           검색
         </button>
+        </div>
       </div>
       <p v-if="!loading && !errorMessage" class="qna-count">
         {{ mineOnly ? "내 문의" : "전체" }} <b>{{ filtered.length }}건</b>
@@ -540,20 +537,22 @@ onBeforeUnmount(() =>
       v-model="loginRequired"
       @login="router.push('/login')"
     />
-    <div
-      v-if="privateAccessOpen"
-      class="qna-private-modal-backdrop"
-      role="presentation"
-      @click.self="privateAccessOpen = false"
-    >
-      <section class="qna-private-modal" role="alertdialog" aria-modal="true" aria-labelledby="private-qna-title">
-        <button class="qna-modal-close" aria-label="닫기" @click="privateAccessOpen = false">×</button>
-        <span class="qna-modal-lock" aria-hidden="true">▣</span>
-        <small>PRIVATE INQUIRY</small>
-        <h2 id="private-qna-title">비공개 문의입니다</h2>
-        <p>비공개 문의는 작성자와 관리자만 확인할 수 있습니다.</p>
-        <button class="qna-modal-confirm" @click="privateAccessOpen = false">확인</button>
-      </section>
-    </div>
+    <Teleport to="body">
+      <div
+        v-if="privateAccessOpen"
+        class="qna-private-modal-backdrop"
+        role="presentation"
+        @click.self="privateAccessOpen = false"
+      >
+        <section class="qna-private-modal" role="alertdialog" aria-modal="true" aria-labelledby="private-qna-title">
+          <button class="qna-modal-close" aria-label="닫기" @click="privateAccessOpen = false">×</button>
+          <span class="qna-modal-lock" aria-hidden="true">🔒</span>
+          <small>PRIVATE INQUIRY</small>
+          <h2 id="private-qna-title">비공개 문의입니다</h2>
+          <p>비공개 문의는 작성자와 관리자만 확인할 수 있습니다.</p>
+          <button class="qna-modal-confirm" @click="privateAccessOpen = false">확인</button>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>

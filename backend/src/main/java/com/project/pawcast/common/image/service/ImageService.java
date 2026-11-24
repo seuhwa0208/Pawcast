@@ -24,6 +24,26 @@ public class ImageService {
     // 이미지 업로드
     public String upload(MultipartFile file){
 
+        validateUpload(file);
+        try {
+            return imageStorage.save(file);
+        }catch (IOException e){
+            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
+    /** 상품 이미지는 공개 상품 전용 디렉터리에 저장합니다. */
+    public String uploadProduct(MultipartFile file){
+        validateUpload(file);
+        try {
+            return imageStorage.saveProduct(file);
+        }catch (IOException e){
+            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
+    private void validateUpload(MultipartFile file) {
+
         // 파일 존재 여부 확인
         if (file == null || file.isEmpty()) {throw new IllegalArgumentException("이미지 파일이 비어 있습니다.");}
         // 파일 크기 확인
@@ -35,12 +55,6 @@ public class ImageService {
         String extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다.");}
 
-        // 실제 파일 저장
-        try {
-            return imageStorage.save(file);
-        }catch (IOException e){
-            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
-        }
     }
 
     // 이미지 삭제

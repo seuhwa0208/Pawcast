@@ -1,4 +1,4 @@
-// 로그인 회원의 배송지 목록 조회와 신규 배송지 등록 API를 제공합니다.
+// 로그인 회원의 배송지 조회·등록·수정 API를 제공합니다.
 import { jsonBody, springRequest } from "@/services/http/springClient";
 
 export const addressService = {
@@ -6,6 +6,11 @@ export const addressService = {
   addAddress: (payload) =>
     springRequest("/members/me/addresses", {
       method: "POST",
+      body: jsonBody(payload),
+    }),
+  updateAddress: (addressId, payload) =>
+    springRequest(`/members/me/addresses/${addressId}`, {
+      method: "PATCH",
       body: jsonBody(payload),
     }),
   setDefault: (addressId) =>

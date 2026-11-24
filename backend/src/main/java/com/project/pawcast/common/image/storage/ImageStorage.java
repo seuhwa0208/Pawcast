@@ -14,6 +14,7 @@ public class  ImageStorage {
 
     // 이미지 저장 경로
     private final Path uploadPath = Paths.get("uploads/images");
+    private final Path productUploadPath = Paths.get("uploads/products");
 
     // 이미지 저장
     public String save(MultipartFile file) throws IOException {
@@ -29,6 +30,16 @@ public class  ImageStorage {
         Path targetPath = uploadPath.resolve(storedFilename);
         file.transferTo(targetPath);
         return storedFilename;
+    }
+
+    /** 상품 대표·상세 이미지는 리뷰 파일과 분리한 공개 경로에 저장합니다. */
+    public String saveProduct(MultipartFile file) throws IOException {
+        Files.createDirectories(productUploadPath);
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String storedFilename = UUID.randomUUID() + extension;
+        file.transferTo(productUploadPath.resolve(storedFilename));
+        return "/uploads/products/" + storedFilename;
     }
 
     // 이미지 삭제

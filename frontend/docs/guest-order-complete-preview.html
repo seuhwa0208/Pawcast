@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAWCAST 비회원 주문 완료 미리보기</title>
+  <style>
+    :root { --brown:#92613b; --ink:#39271b; --line:#ead8c8; --cream:#fffaf4; --ground:#f6f7f8; --green:#568458; }
+    *{box-sizing:border-box} body{margin:0;background:var(--ground);color:var(--ink);font:16px/1.55 system-ui,sans-serif}.top{border-top:6px solid #3e3549;background:#f9e8d2;padding:18px 6vw;font-size:24px;font-weight:900;letter-spacing:-.04em}.page{max-width:850px;margin:54px auto;padding:0 24px}.card{overflow:hidden;border:1px solid var(--line);border-radius:24px;background:white;box-shadow:0 16px 42px #6f513018;text-align:center}.success{padding:48px 56px 34px}.mark{display:grid;place-items:center;width:76px;height:76px;margin:0 auto 18px;border-radius:50%;background:#e5f1e2;color:var(--green);font-size:38px;font-weight:900}.eyebrow{display:block;color:var(--brown);font-size:12px;font-weight:900;letter-spacing:.14em}h1{margin:7px 0;font-size:32px;letter-spacing:-.06em}p{margin:0;color:#826f60}.notice{margin-top:18px;border:1px solid #f0dfc9;border-radius:12px;background:var(--cream);padding:13px;color:#795b46;font-size:14px}.order-box{margin-top:28px;border-top:1px solid var(--line);text-align:left}.row{display:grid;grid-template-columns:150px 1fr;border-bottom:1px solid #f1e7df;padding:16px 2px}.row dt{color:#8c7868}.row dd{margin:0;font-weight:800}.number{color:#a55e30;font-size:20px;letter-spacing:.02em}.mail-info{padding:22px 56px 30px;background:#fffaf4;text-align:left}.mail-info h2{margin:0 0 8px;font-size:18px}.mail-preview{margin-top:12px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:17px;color:#614737;font-size:14px}.actions{display:flex;justify-content:center;gap:10px;padding:0 56px 46px}.actions button{border:1px solid var(--brown);border-radius:10px;background:var(--brown);padding:13px 24px;color:white;font:inherit;font-weight:800}.actions button.secondary{background:white;color:var(--brown)}.note{margin-top:18px;color:#988575;text-align:center;font-size:13px}@media(max-width:560px){.page{margin:25px auto;padding:0 14px}.success{padding:35px 22px 26px}.mail-info{padding:20px 22px}.actions{padding:0 22px 32px;flex-direction:column}.row{grid-template-columns:1fr;gap:3px}}
+  </style>
+</head>
+<body>
+  <header class="top">pawcast <small>포캐스트 · 반려동물 용품</small></header>
+  <main class="page">
+    <section class="card" aria-label="비회원 주문 완료 화면 예시">
+      <div class="success">
+        <div class="mark">✓</div>
+        <small class="eyebrow">PAWCAST PAYMENT</small>
+        <h1>주문이 완료되었습니다</h1>
+        <p>결제가 정상적으로 완료되어 주문을 접수했습니다.</p>
+        <p class="notice">비회원 주문 확인에 필요한 주문번호를 입력하신 이메일로 발송했습니다.</p>
+        <dl class="order-box">
+          <div class="row"><dt>주문번호</dt><dd class="number">ORD-20261123-482193</dd></div>
+          <div class="row"><dt>주문 이메일</dt><dd>guest@example.com</dd></div>
+          <div class="row"><dt>결제 금액</dt><dd>58,200원</dd></div>
+        </dl>
+      </div>
+      <div class="mail-info">
+        <h2>주문번호 이메일 발송</h2>
+        <p>결제가 확정된 뒤, 백엔드가 주문 생성 규칙으로 발급한 번호를 수신 이메일로 보냅니다.</p>
+        <div class="mail-preview"><b>제목</b> [PAWCAST] 주문이 완료되었습니다<br><br>주문번호: <b>ORD-20261123-482193</b><br>비회원 주문 조회 시 주문번호와 주문 이메일이 필요합니다.</div>
+      </div>
+      <div class="actions"><button>주문번호 복사</button><button class="secondary">홈으로 이동</button></div>
+    </section>
+    <p class="note">정적 화면 검토용 예시입니다. 실제 번호는 서버의 <code>ORD-YYYYMMDD-6자리난수</code> 규칙으로 생성됩니다.</p>
+  </main>
+</body>
+</html>

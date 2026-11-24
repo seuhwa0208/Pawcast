@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+
+# 학습 모델은 용량과 배포 정책에 따라 별도 아티팩트 저장소를 사용할 수 있습니다.
+# models/*.pkl

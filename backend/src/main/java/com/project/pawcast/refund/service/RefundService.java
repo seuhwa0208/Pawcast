@@ -50,6 +50,8 @@ public class RefundService {
                 .refundAmount(payment.getAmount())
                 .reason(cancelReason)
                 .status(status)
+                // JPA 감사 기능 유무와 무관하게 신규 환불 요청의 생성일을 보장한다.
+                .createdAt(LocalDateTime.now())
                 .completedAt(completedAt)
                 .build();
 

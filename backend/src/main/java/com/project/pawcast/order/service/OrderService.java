@@ -20,10 +20,16 @@ import com.project.pawcast.payment.service.PaymentService;
 import com.project.pawcast.product.entity.ProductVariant;
 import com.project.pawcast.product.repository.ProductRepository;
 import com.project.pawcast.product.repository.ProductVariantRepository;
+import com.project.pawcast.product.repository.ProductImageRepository;
 import com.project.pawcast.product.service.InventoryService;
 import com.project.pawcast.refund.entity.Refund;
 import com.project.pawcast.refund.service.RefundService;
 import com.project.pawcast.security.AuthorizationValidator;
+
+// [리뷰 수정 기능] import 추가
+import com.project.pawcast.review.entity.ProductReview;
+import com.project.pawcast.review.repository.ProductReviewRepository;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,10 +46,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class OrderService {
+
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final MembersRepository membersRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final ProductImageRepository productImageRepository;
     private final AuthorizationValidator validator;
     private final ProductRepository productRepository;
     private final PaymentRepository paymentRepository;
@@ -51,11 +59,16 @@ public class OrderService {
     private final RefundService refundService;
     private final InventoryService inventoryService;
 
+    // [리뷰 수정 기능] 주문 항목별 리뷰 조회
+    private final ProductReviewRepository productReviewRepository;
+
     // 주문 생성: 회원 확인 -> 옵션 비관적 락 조회/검증 -> 금액 계산 -> 주문 및 주문 항목 저장
     @Transactional
     public OrderResponse createOrder(Long memberId, OrderRequest request) {
+
         // 비회원 주문 허용을 위해 memberId가 있을 때만 회원 엔티티 조회
         Members member = null;
+
         if (memberId != null) {
             member = membersRepository.findById(memberId)
                     .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
@@ -66,20 +79,29 @@ public class OrderService {
                 .map(OrderItemRequest::productVariantId)
                 .sorted()
                 .toList();
-        List<ProductVariant> variants = productVariantRepository.findAllByIdForUpdate(variantIds);
+
+        List<ProductVariant> variants =
+                productVariantRepository.findAllByIdForUpdate(variantIds);
 
         // 요청한 고유 옵션 수와 조회된 옵션 수 일치 여부 검증
-        long distinctCount = variantIds.stream().distinct().count();
+        long distinctCount = variantIds.stream()
+                .distinct()
+                .count();
+
         if (variants.size() != distinctCount) {
             throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);
         }
+
         if (variantIds.size() != distinctCount) {
             throw new BusinessException(ErrorCode.INVALID_ORDER_REQUEST);
         }
 
         // O(1) 조회를 위해 옵션 ID 기준 Map 구성
         Map<Long, ProductVariant> variantMap = variants.stream()
-                .collect(Collectors.toMap(ProductVariant::getId, variant -> variant));
+                .collect(Collectors.toMap(
+                        ProductVariant::getId,
+                        variant -> variant
+                ));
 
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -87,16 +109,22 @@ public class OrderService {
 
         for (OrderItemRequest item : request.items()) {
             ProductVariant variant = variantMap.get(item.productVariantId());
+
             if (variant == null) {
                 throw new BusinessException(ErrorCode.NOT_FOUND_OPTION);
             }
+
             if (variant.getStock() < item.quantity()) {
                 throw new BusinessException(ErrorCode.OUT_OF_STOCK);
             }
 
             // 주문 시점의 옵션 단가 및 항목 합계 계산
             BigDecimal unitPrice = variant.getPrice();
-            BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(item.quantity()));
+
+            BigDecimal itemTotal = unitPrice.multiply(
+                    BigDecimal.valueOf(item.quantity())
+            );
+
             totalAmount = totalAmount.add(itemTotal);
 
             OrderItem orderItem = OrderItem.builder()
@@ -112,9 +140,11 @@ public class OrderService {
         }
 
         // 20,000원 이상 무료 배송, 미만 시 3,000원 부과
-        BigDecimal shippingFee = totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0
-                ? BigDecimal.ZERO
-                : BigDecimal.valueOf(3000);
+        BigDecimal shippingFee =
+                totalAmount.compareTo(BigDecimal.valueOf(20000)) >= 0
+                        ? BigDecimal.ZERO
+                        : BigDecimal.valueOf(3000);
+
         BigDecimal finalAmount = totalAmount.add(shippingFee);
 
         Order order = Order.builder()
@@ -135,9 +165,11 @@ public class OrderService {
                 .build();
 
         orderRepository.save(order);
+
         for (OrderItem item : orderItems) {
             item.setOrder(order);
         }
+
         orderItemRepository.saveAll(orderItems);
 
         return OrderResponse.from(order, orderItems);
@@ -145,45 +177,120 @@ public class OrderService {
 
     // 회원 주문 내역 목록 조회
     public List<OrderResponse> listOrder(Long memberId) {
-        List<Order> orders = orderRepository.findAllByMember_IdOrderByCreatedAtDesc(memberId);
-        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+
+        List<Order> orders = orderRepository
+                .findAllByMember_IdOrderByCreatedAtDesc(memberId);
+
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .toList();
 
         // 주문 ID 목록으로 주문 항목을 일괄 조회해 메모리에서 주문별로 매핑
         List<OrderItem> items = orderIds.isEmpty()
                 ? List.of()
                 : orderItemRepository.findByOrder_IdIn(orderIds);
-        Map<Long, List<OrderItem>> itemMap = items.stream()
-                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
 
+        Map<Long, List<OrderItem>> itemMap = items.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getOrder().getId()
+                ));
+
+        // [리뷰 수정 기능] 회원의 전체 주문 항목에 작성된 리뷰 일괄 조회
+        Map<Long, Long> reviewIdsByOrderItemId =
+                findReviewIdsByOrderItems(items, memberId);
+
+        // [리뷰 수정 기능] 주문 항목별 리뷰 ID를 포함하여 응답 반환
         return orders.stream()
-                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .map(order -> toOrderResponse(
+                        order,
+                        itemMap.getOrDefault(
+                                order.getId(),
+                                List.of()
+                        ),
+                        reviewIdsByOrderItemId
+                ))
                 .toList();
     }
 
     // 주문 상세 조회 (회원은 memberId + orderId, 비회원은 이메일 + 주문번호 기준)
-    public OrderResponse detailOrder(Long memberId, Long orderId, String email, String orderNumber) {
+    public OrderResponse detailOrder(
+            Long memberId,
+            Long orderId,
+            String email,
+            String orderNumber
+    ) {
         if (memberId != null) {
-            Order order = orderRepository.findByIdAndMemberId(orderId, memberId)
-                    .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-            return OrderResponse.from(order, orderItemRepository.findAllByOrder_Id(orderId));
+            Order order = orderRepository
+                    .findByIdAndMemberId(orderId, memberId)
+                    .orElseThrow(
+                            () -> new BusinessException(
+                                    ErrorCode.NOT_FOUND_ORDER
+                            )
+                    );
+
+            List<OrderItem> orderItems =
+                    orderItemRepository.findAllByOrder_Id(orderId);
+
+            // [리뷰 수정 기능] 회원 본인의 주문 항목별 리뷰 ID 조회
+            Map<Long, Long> reviewIdsByOrderItemId =
+                    findReviewIdsByOrderItems(orderItems, memberId);
+
+            return toOrderResponse(
+                    order,
+                    orderItems,
+                    reviewIdsByOrderItemId
+            );
         }
 
-        Order guestOrder = orderRepository.findByEmailAndOrderNumber(email, orderNumber)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        return OrderResponse.from(guestOrder, orderItemRepository.findAllByOrder_Id(guestOrder.getId()));
+        return detailGuestOrder(email, orderNumber);
+    }
+
+    // 비회원 주문은 주문번호와 결제 시 입력한 이메일이 모두 일치할 때만 조회한다.
+    public OrderResponse detailGuestOrder(
+            String email,
+            String orderNumber
+    ) {
+        Order guestOrder = orderRepository
+                .findGuestOrderByEmailAndOrderNumber(
+                        email.trim(),
+                        orderNumber.trim()
+                )
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_ORDER
+                        )
+                );
+
+        return toOrderResponse(
+                guestOrder,
+                orderItemRepository.findAllByOrder_Id(guestOrder.getId())
+        );
     }
 
     // 회원 소유 주문 단건 조회 공통 메서드
-    public Order findByIdAndMemberId(Long orderId, Long memberId) {
+    public Order findByIdAndMemberId(
+            Long orderId,
+            Long memberId
+    ) {
         return orderRepository.findByIdAndMemberId(orderId, memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_ORDER
+                        )
+                );
     }
 
     // 주문 배송지 정보 수정 (결제 대기 또는 결제 완료 상태에서만 가능)
     @Transactional
-    public OrderResponse updateOrder(Long orderId, Long memberId, OrderRequest request) {
+    public OrderResponse updateOrder(
+            Long orderId,
+            Long memberId,
+            OrderRequest request
+    ) {
         Order order = findByIdAndMemberId(orderId, memberId);
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT && order.getStatus() != OrderStatus.PAID) {
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT
+                && order.getStatus() != OrderStatus.PAID) {
             throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
@@ -195,23 +302,43 @@ public class OrderService {
         order.setDeliveryAddress2(request.deliveryAddress2());
         order.setDeliveryMessage(request.deliveryMessage());
 
-        return OrderResponse.from(orderRepository.save(order), orderItemRepository.findAllByOrder_Id(orderId));
+        return OrderResponse.from(
+                orderRepository.save(order),
+                orderItemRepository.findAllByOrder_Id(orderId)
+        );
     }
 
     // 주문 취소: 주문 락 조회 -> 소유자 확인 -> 결제 취소 -> 환불 생성 -> 재고 및 판매량 복구
     @Transactional
-    public void cancelOrder(Long orderId, Long memberId, String cancelReason) {
+    public void cancelOrder(
+            Long orderId,
+            Long memberId,
+            String cancelReason
+    ) {
         Order order = orderRepository.findByIdForUpdate(orderId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
-        if (order.getMember() == null || !order.getMember().getId().equals(memberId)) {
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_ORDER
+                        )
+                );
+
+        if (order.getMember() == null
+                || !order.getMember().getId().equals(memberId)) {
             throw new BusinessException(ErrorCode.NOT_ORDER_OWNER);
         }
 
         Payment payment = paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_PAYMENT
+                        )
+                );
 
-        String providerRefundKey = paymentService.cancelPayment(orderId, cancelReason);
+        String providerRefundKey =
+                paymentService.cancelPayment(orderId, cancelReason);
+
         order.setStatus(OrderStatus.CANCELLED);
+
         refundService.createRefund(
                 payment,
                 cancelReason,
@@ -221,51 +348,173 @@ public class OrderService {
         );
 
         // 재고 복구 시 옵션 ID 기준으로 정렬해 순차 처리
-        List<OrderItem> items = orderItemRepository.findAllByOrder_Id(order.getId())
+        List<OrderItem> items = orderItemRepository
+                .findAllByOrder_Id(order.getId())
                 .stream()
-                .sorted(Comparator.comparing(item -> item.getProductVariant().getId()))
+                .sorted(
+                        Comparator.comparing(
+                                item -> item.getProductVariant().getId()
+                        )
+                )
                 .toList();
 
         for (OrderItem item : items) {
-            inventoryService.increaseStock(item.getProductVariant().getId(), item.getQuantity());
-            productRepository.decreaseSalesCount(item.getProductVariant().getProduct().getId(), item.getQuantity());
+            inventoryService.increaseStock(
+                    item.getProductVariant().getId(),
+                    item.getQuantity()
+            );
+
+            productRepository.decreaseSalesCount(
+                    item.getProductVariant().getProduct().getId(),
+                    item.getQuantity()
+            );
         }
     }
 
     // 관리자/매니저용 전체 주문 목록 조회
     public List<OrderResponse> getOrderList(Long memberId) {
+
         Members member = membersRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_MEMBER
+                        )
+                );
+
         validator.validateManager(member);
 
-        List<Order> orders = orderRepository.findAllByOrderByCreatedAtDesc();
-        List<Long> orderIds = orders.stream().map(Order::getId).toList();
+        List<Order> orders =
+                orderRepository.findAllByOrderByCreatedAtDesc();
+
+        List<Long> orderIds = orders.stream()
+                .map(Order::getId)
+                .toList();
 
         Map<Long, List<OrderItem>> itemMap = orderIds.isEmpty()
                 ? Map.of()
-                : orderItemRepository.findByOrder_IdIn(orderIds).stream()
-                .collect(Collectors.groupingBy(item -> item.getOrder().getId()));
+                : orderItemRepository.findByOrder_IdIn(orderIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getOrder().getId()
+                ));
 
         return orders.stream()
-                .map(order -> OrderResponse.from(order, itemMap.getOrDefault(order.getId(), List.of())))
+                .map(order -> toOrderResponse(
+                        order,
+                        itemMap.getOrDefault(
+                                order.getId(),
+                                List.of()
+                        )
+                ))
                 .toList();
+    }
+
+    // 주문 이력에서도 현재 상품의 대표 이미지를 함께 반환해 프론트가 깨진 경로를 만들지 않도록 한다.
+    // [리뷰 수정 기능] 기존 호출 방식 유지
+    private OrderResponse toOrderResponse(
+            Order order,
+            List<OrderItem> orderItems
+    ) {
+        return toOrderResponse(
+                order,
+                orderItems,
+                Map.of()
+        );
+    }
+
+    // [리뷰 수정 기능] 상품 대표 이미지 및 주문 항목별 리뷰 ID를 포함하여 주문 응답 생성
+    private OrderResponse toOrderResponse(
+            Order order,
+            List<OrderItem> orderItems,
+            Map<Long, Long> reviewIdsByOrderItemId
+    ) {
+        List<Long> productIds = orderItems.stream()
+                .map(item -> item.getProductVariant().getProduct().getId())
+                .distinct()
+                .toList();
+
+        Map<Long, String> mainImages = productIds.isEmpty()
+                ? Map.of()
+                : productImageRepository
+                .findAllByProductIdInOrderByMainDescSortOrderAscIdAsc(productIds)
+                .stream()
+                .collect(Collectors.toMap(
+                        image -> image.getProduct().getId(),
+                        image -> image.getImagePath(),
+                        (first, ignored) -> first
+                ));
+
+        return OrderResponse.from(
+                order,
+                orderItems,
+                mainImages,
+                reviewIdsByOrderItemId
+        );
+    }
+
+    // [리뷰 수정 기능] 회원 본인의 주문 항목별 리뷰 ID 일괄 조회
+    private Map<Long, Long> findReviewIdsByOrderItems(
+            List<OrderItem> orderItems,
+            Long memberId
+    ) {
+        if (memberId == null || orderItems.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> orderItemIds = orderItems.stream()
+                .map(OrderItem::getId)
+                .distinct()
+                .toList();
+
+        return productReviewRepository
+                .findAllByOrderItemIdIn(orderItemIds)
+                .stream()
+                .filter(review ->
+                        memberId.equals(review.getMember().getId())
+                )
+                .collect(Collectors.toMap(
+                        review -> review.getOrderItem().getId(),
+                        ProductReview::getId
+                ));
     }
 
     // 관리자/매니저용 주문 상태 변경 (최초 배송 완료 전환 시 상품 판매량 반영)
     @Transactional
-    public void changeOrderStatus(Long memberId, Long orderId, OrderStatusRequest request) {
+    public void changeOrderStatus(
+            Long memberId,
+            Long orderId,
+            OrderStatusRequest request
+    ) {
         Members member = membersRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_MEMBER
+                        )
+                );
+
         validator.validateManager(member);
 
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_ORDER));
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.NOT_FOUND_ORDER
+                        )
+                );
 
-        if (order.getStatus() != OrderStatus.DELIVERED && request.orderStatus() == OrderStatus.DELIVERED) {
-            List<OrderItem> orderItems = orderItemRepository.findAllByOrder_Id(orderId);
+        if (order.getStatus() != OrderStatus.DELIVERED
+                && request.orderStatus() == OrderStatus.DELIVERED) {
+
+            List<OrderItem> orderItems =
+                    orderItemRepository.findAllByOrder_Id(orderId);
+
             for (OrderItem item : orderItems) {
-                Long productId = item.getProductVariant().getProduct().getId();
-                productRepository.increaseSalesCount(productId, item.getQuantity());
+                Long productId =
+                        item.getProductVariant().getProduct().getId();
+
+                productRepository.increaseSalesCount(
+                        productId,
+                        item.getQuantity()
+                );
             }
         }
 
