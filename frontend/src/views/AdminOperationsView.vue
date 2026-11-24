@@ -220,7 +220,7 @@ onMounted(load);
       <section class="toolbar">
         <input
           v-model="search"
-          placeholder="주문번호·상품명·회원명 검색"
+          placeholder="예) ORD-2026, 로얄캐닌, 홍길동"
         />
         <select v-model="statusFilter">
           <option value="ALL">전체 상태</option>

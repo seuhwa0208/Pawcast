@@ -26,5 +26,5 @@ function move(target) { emit("update:page", Math.min(safeTotal.value, Math.max(1
 </template>
 
 <style scoped>
-.pagination-bar{display:flex;justify-content:center;gap:2px;margin-top:18px;padding:8px;border-radius:12px;background:#faf7f2}.pagination-bar button{min-width:38px;height:38px;border:0;border-radius:8px;background:transparent;color:#795e49;font:inherit;font-weight:800;cursor:pointer}.pagination-bar button.active{background:#96603a;color:#fff;box-shadow:0 3px 7px rgb(84 49 25 / 18%)}.pagination-bar button:disabled{opacity:.4;cursor:not-allowed}
+.pagination-bar{display:flex;width:max-content;max-width:100%;justify-content:center;gap:4px;margin:22px auto 0;padding:6px 12px;border-radius:12px;background:#faf7f2}.pagination-bar button{min-width:38px;height:38px;border:0;border-radius:8px;background:transparent;color:#795e49;font:inherit;font-size:15px;font-weight:800;cursor:pointer}.pagination-bar button:first-child,.pagination-bar button:nth-child(2),.pagination-bar button:nth-last-child(2),.pagination-bar button:last-child{min-width:42px;font-size:21px;line-height:1}.pagination-bar button.active{background:#96603a;color:#fff;box-shadow:0 3px 7px rgb(84 49 25 / 18%)}.pagination-bar button:disabled{opacity:.4;cursor:not-allowed}
 </style>

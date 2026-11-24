@@ -55,6 +55,7 @@ public enum ErrorCode {
     INVALID_PAYMENT_METHOD(HttpStatus.BAD_REQUEST, "지원하지 않는 결제 수단입니다."),
     NOT_FOUND_PAYMENT(HttpStatus.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
     INVALID_PAYMENT_STATUS(HttpStatus.BAD_REQUEST, "유효하지 않은 결제 상태 입니다."),
+    PAYMENT_CANCELLATION_FAILED(HttpStatus.BAD_REQUEST, "결제 취소를 완료하지 못했습니다. 결제 상태를 확인한 뒤 다시 시도해주세요."),
     REQUIRED_EFINANCE_AGREEMENT(HttpStatus.BAD_REQUEST, "전자금융거래 이용약관에 동의해주세요."),
     INSUFFICIENT_STOCK(HttpStatus.BAD_REQUEST, "재고가 충분하지 않습니다."),
     NOT_FOUND_PRODUCT_VARIANT(HttpStatus.NOT_FOUND, "상품 속성을 찾을 수 없습니다."),

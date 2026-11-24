@@ -297,29 +297,12 @@ async function loadDashboard() {
 
   try {
     const result = await adminDashboardService.getSalesDashboard(filters);
-    let aiForecast = null;
-
-    try {
-      const aiResult = await adminDashboardService.getAiSalesDashboard(filters);
-      aiForecast = aiResult.forecast || null;
-    } catch (aiCause) {
-      // AI 서버가 중단되어도 Spring 매출·주문 원본 집계는 그대로 표시한다.
-      aiForecast = {
-        predictedSales: null,
-        growthRate: null,
-        insight:
-          aiCause.message ||
-          "AI 판매 예측 서버에 연결하지 못했습니다. FastAPI 실행 상태를 확인해 주세요.",
-      };
-    }
-
-    // # Spring은 주문·환불·3개 관 매출을, FastAPI는 AI 예측·인사이트를 직접 제공한다.
+    // Spring이 내부 API 키로 AI를 호출한 응답이다. 브라우저가 AI 서버에 직접
+    // JWT를 전달하지 않으므로 로그인 토큰 검증 실패가 매출 화면에 영향을 주지 않는다.
     dashboard.value = {
       ...result,
       forecast: {
         ...(result.forecast || {}),
-        ...aiForecast,
-        // FastAPI 예측 DTO에는 금액·수량이 없으므로 실제 DB 상위 상품 목록은 Spring 집계를 유지한다.
         topProducts: result.forecast?.topProducts || [],
       },
     };
@@ -661,6 +644,13 @@ onMounted(async () => {
       availableYears.value = [
         ...new Set([...years.map(Number), currentYear]),
       ].sort((a, b) => b - a);
+
+      // 올해 주문이 아직 없으면 화면이 모두 0원으로 보이는 것을 피하고,
+      // DB에 있는 최신 연도의 전체 매출을 첫 화면에 표시한다.
+      if (!years.map(Number).includes(currentYear)) {
+        selectedYear.value = String(availableYears.value[0]);
+        periodUnit.value = "year";
+      }
     }
   } catch {
     availableYears.value = [currentYear];

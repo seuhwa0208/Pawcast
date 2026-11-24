@@ -11,7 +11,7 @@ public record ReviewResponse(
 
         Long id,
         Long productId,
-        String writerName,
+        String writerId,
         Integer rating,
         String content,
         LocalDateTime createdAt,
@@ -34,7 +34,7 @@ public record ReviewResponse(
         return new ReviewResponse(
                 review.getId(),
                 review.getProduct().getId(),
-                review.getMember().getName(),
+                review.getMember().getUserId(),
                 review.getRating(),
                 review.getContent(),
                 review.getCreatedAt(),

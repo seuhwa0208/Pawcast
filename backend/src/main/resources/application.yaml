@@ -20,10 +20,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    # 개발 콘솔 출력이 요청 스레드를 잠그지 않도록 SQL 전체 출력은 끈다.
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 petmall:
   cors:
     allowed-origins:

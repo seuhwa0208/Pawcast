@@ -18,9 +18,6 @@ export const adminManagementService = {
       method: "PATCH",
       body: jsonBody({ role }),
     }),
-  getRefunds: () => springRequest("/admin/refunds"),
-  approveRefund: (refundId) =>
-    springRequest(`/admin/refunds/${refundId}/approve`, { method: "PATCH" }),
   getProducts: () => springRequest("/admin/products"),
   createProduct: (formData) =>
   springRequest("/admin/products", {

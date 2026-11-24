@@ -34,6 +34,9 @@ const ALLERGY_OPTIONS_BY_TYPE = {
 };
 const canAddPet = computed(() => pets.value.length < MAX_PET_COUNT);
 const allergyOptions = computed(() => ALLERGY_OPTIONS_BY_TYPE[form.type] || []);
+const breedPlaceholder = computed(() =>
+  form.type === "CAT" ? "예) 코리안숏헤어, 페르시안" : "예) 포메라니안, 믹스견",
+);
 
 function parseAllergies(value) {
   return String(value || "")
@@ -238,7 +241,7 @@ onMounted(loadPets);
                 <option value="CAT">고양이</option>
               </select></label
             >
-            <label>품종 *<input v-model.trim="form.breed" maxlength="50" required placeholder="예) 포메라니안, 믹스견" /></label>
+            <label>품종 *<input v-model.trim="form.breed" maxlength="50" required :placeholder="breedPlaceholder" /></label>
             <label>생일<input v-model="form.birth" type="date" /></label>
             <label
               >체중(kg)<input

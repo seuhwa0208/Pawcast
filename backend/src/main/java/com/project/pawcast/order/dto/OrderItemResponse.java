@@ -1,7 +1,6 @@
 package com.project.pawcast.order.dto;
 
 import com.project.pawcast.order.entity.OrderItem;
-
 import java.math.BigDecimal;
 
 public record OrderItemResponse(
@@ -14,14 +13,29 @@ public record OrderItemResponse(
         int quantity,
         String optionLabel,
         BigDecimal unitPrice,
-        BigDecimal totalPrice
+        BigDecimal totalPrice,
+        Long reviewId
 ) {
+
     // OrderItem 엔티티를 응답 DTO로 변환
     public static OrderItemResponse from(OrderItem item) {
         return from(item, null);
     }
 
-    public static OrderItemResponse from(OrderItem item, String imageUrl) {
+    // 기존 주문 항목 및 대표 이미지 응답 변환
+    public static OrderItemResponse from(
+            OrderItem item,
+            String imageUrl
+    ) {
+        return from(item, imageUrl, null);
+    }
+
+    // 주문 항목, 대표 이미지, 작성한 리뷰 ID를 응답 DTO로 변환
+    public static OrderItemResponse from(
+            OrderItem item,
+            String imageUrl,
+            Long reviewId
+    ) {
         return new OrderItemResponse(
                 item.getId(),
                 item.getOrder().getId(),
@@ -32,7 +46,8 @@ public record OrderItemResponse(
                 item.getQuantity(),
                 item.getOptionLabel(),
                 item.getUnitPrice(),
-                item.getTotalPrice()
+                item.getTotalPrice(),
+                reviewId
         );
     }
 }

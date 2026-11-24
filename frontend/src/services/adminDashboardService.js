@@ -1,49 +1,41 @@
 // 매출 원본 집계는 Spring, AI 예측·재학습·파일 생성은 FastAPI에 직접 요청한다.
 import { springRequest } from "@/services/http/springClient";
-import { aiRequest } from "@/services/http/aiClient";
-
-function buildAiSalesQuery({ startDate, endDate, unit, format, section }) {
+function dashboardQuery(values) {
   const query = new URLSearchParams();
-
-  if (startDate) query.set("start_date", startDate);
-  if (endDate) query.set("end_date", endDate);
-  if (unit) query.set("unit", unit);
-  if (format) query.set("format", format);
-  if (section) query.set("section", section);
-
+  Object.entries(values).forEach(([key, value]) => {
+    if (value != null && value !== "") query.set(key, value);
+  });
   return query.toString();
 }
 
 export const adminDashboardService = {
   getSalesYears: () => springRequest("/admin/dashboard/sales/years"),
   async getSalesDashboard(filters) {
-    const query = new URLSearchParams({
+    const query = dashboardQuery({
       unit: filters.unit || "month",
       year: filters.year,
       from: filters.from,
       to: filters.to,
     });
-    return springRequest(`/admin/dashboard/sales?${query.toString()}`);
-  },
-  async getAiSalesDashboard({ from, to, unit }) {
-    const query = buildAiSalesQuery({
-      startDate: from,
-      endDate: to,
-      unit,
-    });
-    const { body } = await aiRequest(`/api/sales/dashboard?${query}`);
-    return body;
+    return springRequest(`/admin/dashboard/sales?${query}`);
   },
   async retrainSalesModel(forecastDate) {
-    const { body } = await aiRequest(
-      `/api/sales/retrain?forecast_date=${encodeURIComponent(forecastDate)}`,
+    return springRequest(
+      `/admin/dashboard/sales/retrain?forecastDate=${encodeURIComponent(forecastDate)}`,
       { method: "POST" },
     );
-    return body;
   },
   async downloadStatistics({ startDate, endDate, format, section }) {
-    const query = buildAiSalesQuery({ startDate, endDate, format, section });
-    const { body: blob, response } = await aiRequest(`/api/sales/export?${query}`);
+    const query = dashboardQuery({ startDate, endDate, format, section });
+    const token = localStorage.getItem("powcast-access-token") || "";
+    const response = await fetch(`/api/admin/dashboard/sales/export?${query}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || "통계 파일 다운로드에 실패했습니다.");
+    }
+    const blob = await response.blob();
     const disposition = response.headers.get("content-disposition") || "";
     const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
       || `pawcast-statistics.${format === "csv" ? "zip" : "xlsx"}`;

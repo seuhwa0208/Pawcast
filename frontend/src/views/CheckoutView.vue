@@ -555,6 +555,7 @@ onMounted(() => {
           <dt>총 결제 금액</dt>
           <dd>{{ finalAmount.toLocaleString() }}원</dd>
         </dl>
+        <p class="checkout-shipping-notice">* 20,000원 이상 구매 시 배송비 무료</p>
         <label class="checkout-agreement">
           <input v-model="agreed" type="checkbox" />
           <span

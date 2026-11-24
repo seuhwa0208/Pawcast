@@ -98,7 +98,7 @@ async function submitRequest() {
           {{ message }}
         </p>
         <button class="login-submit" type="submit" :disabled="loading">
-          {{ loading ? "요청 접수 중..." : "관리자에게 초기화 요청하기" }}
+          {{ loading ? "이메일 발송 중..." : "초기화 이메일 보내기" }}
         </button>
         <RouterLink class="back-login" to="/login"
           >로그인으로 돌아가기</RouterLink

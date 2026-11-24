@@ -409,7 +409,7 @@ const list = computed(() => {
           <label class="side-keyword"
             ><span class="side-search-icon" aria-hidden="true" /><input
               v-model="keyword"
-              placeholder="검색어를 입력하세요."
+              placeholder="예) 연어 사료"
           /></label>
           <button
             class="side-detail"

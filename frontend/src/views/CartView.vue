@@ -282,12 +282,12 @@ onMounted(() => {
                             }}
                         </small>
 
-                        <h2>{{ item.name }}</h2>
-
-                        <p v-if="item.option">
-                            <b>옵션:</b>
-                            {{ item.option }}
-                        </p>
+                        <div class="cart-title-row">
+                            <h2>{{ item.name }}</h2>
+                            <span v-if="item.option" class="cart-option">
+                                옵션: {{ item.option }}
+                            </span>
+                        </div>
                     </div>
 
                     <div
@@ -334,13 +334,18 @@ onMounted(() => {
                         </button>
                     </div>
 
-                    <strong>
-                        {{
-                            (
-                                item.price * item.quantity
-                            ).toLocaleString()
-                        }}원
-                    </strong>
+                    <div class="cart-price">
+                        <small v-if="item.quantity > 1">
+                            {{ item.price.toLocaleString() }}원 × {{ item.quantity }}
+                        </small>
+                        <strong>
+                            {{
+                                (
+                                    item.price * item.quantity
+                                ).toLocaleString()
+                            }}원
+                        </strong>
+                    </div>
 
                     <button
                         type="button"
@@ -385,7 +390,7 @@ onMounted(() => {
                 </dl>
 
                 <p class="cart-shipping-notice">
-                    20,000원 이상 구매 시 배송비 무료
+                    * 20,000원 이상 구매 시 배송비 무료
                 </p>
 
                 <button

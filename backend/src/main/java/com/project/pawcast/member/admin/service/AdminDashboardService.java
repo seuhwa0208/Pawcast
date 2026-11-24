@@ -186,6 +186,21 @@ public class AdminDashboardService {
         return salesForecastClient.export(startDate, endDate, format, section);
     }
 
+    /** 개요 화면의 AI 카드는 Spring이 내부 키로 호출해 브라우저 인증 오류와 분리한다. */
+    public Map<String, Object> getReviewSentimentSummary(Long adminId, int limit) {
+        Members admin = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateManager(admin);
+        return salesForecastClient.reviewSentimentSummary(limit);
+    }
+
+    public Map<String, Object> getInventoryForecast(Long adminId, int limit) {
+        Members admin = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        authorizationValidator.validateManager(admin);
+        return salesForecastClient.inventoryForecast(limit);
+    }
+
     private String labelFormat(String unit) {
         return switch (unit) {
             case "day" -> "YYYY-MM-DD";

@@ -3,7 +3,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { adminManagementService } from "@/services/adminManagementService";
 import { adminDashboardService } from "@/services/adminDashboardService";
-import { aiAnalyticsService } from "@/services/aiAnalyticsService";
 
 // # ECharts는 관리자 영역에 들어왔을 때만 불러와 일반 쇼핑 화면의 초기 용량을 지킨다.
 let echartsLoader;
@@ -50,8 +49,6 @@ const products = ref([]);
 const productHighlights = ref({ best: [], worst: [] });
 const managedQnas = ref([]);
 const salesDashboard = ref(null);
-const sentimentSummary = ref(null);
-const inventoryForecast = ref(null);
 
 const salesChartElement = ref(null);
 const categoryChartElement = ref(null);
@@ -70,24 +67,13 @@ const salesSummary = computed(
     },
 );
 
-const sentiment = computed(
-  () =>
-    sentimentSummary.value || {
-      analyzedCount: 0,
-      positiveRate: 0,
-      negativeRate: 0,
-      negativeProducts: [],
-    },
-);
-
-const inventoryItems = computed(() => inventoryForecast.value?.items || []);
 const pendingRefunds = computed(() => refunds.value.filter((row) => row.status === "PENDING"));
 const waitingQnas = computed(() => managedQnas.value.filter((row) => row.status !== "ANSWERED"));
 
 const orderStatuses = computed(() => {
   const options = [
     ["PAID", "결제 완료", "paid"],
-    ["PREPARING", "상품 준비", "preparing"],
+    ["PREPARING", "배송 중", "shipping"],
     ["SHIPPING", "배송 중", "shipping"],
     ["DELIVERED", "배송 완료", "delivered"],
     ["CANCELLED", "취소", "cancelled"],
@@ -188,7 +174,19 @@ function rowsOf(result) {
 
 async function loadSummary() {
   loading.value = true;
-  const year = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+  let year = currentYear;
+
+  // 현재 연도에 주문이 없으면 빈 카드만 보이지 않도록 DB에 실제 주문이 있는
+  // 가장 최근 연도를 기본 조회한다. 연도 조회 실패 시에는 기존 현재 연도를 유지한다.
+  try {
+    const years = await timeout(adminDashboardService.getSalesYears());
+    if (Array.isArray(years) && years.length) {
+      year = Math.max(...years.map(Number).filter(Number.isFinite));
+    }
+  } catch {
+    year = currentYear;
+  }
 
   const results = await Promise.allSettled([
     timeout(
@@ -207,8 +205,6 @@ async function loadSummary() {
     timeout(adminManagementService.getMembers()),
     timeout(adminManagementService.getNotices()),
     timeout(adminManagementService.getManagedQnas()),
-    timeout(aiAnalyticsService.getReviewSentimentSummary()),
-    timeout(aiAnalyticsService.getInventoryForecast()),
   ]);
 
   const [
@@ -221,8 +217,6 @@ async function loadSummary() {
     members,
     notices,
     qnas,
-    sentimentResult,
-    inventoryResult,
   ] = results;
 
   const dashboard = dashboardResult.status === "fulfilled" ? dashboardResult.value : null;
@@ -246,8 +240,6 @@ async function loadSummary() {
   products.value = productRows || [];
   productHighlights.value = { best: bestRows || [], worst: worstRows || [] };
   managedQnas.value = qnaRows || [];
-  sentimentSummary.value = sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
-  inventoryForecast.value = inventoryResult.status === "fulfilled" ? inventoryResult.value : null;
 
   stats.value = {
     orders: orderRows?.length ?? 0,
@@ -363,14 +355,12 @@ onBeforeUnmount(() => {
     <header>
       <small>ADMIN OVERVIEW</small>
       <h1>대시보드</h1>
-      <p>운영 판단을 빠르게 하는 요약 화면 · 실제 API 기준</p>
       <div class="status">
         <span v-if="loading">실제 API 데이터를 확인하는 중입니다.</span>
         <span v-else-if="apiIssue" class="issue">
           일부 API가 응답하지 않습니다. 해당 화면에서 오류 원인과 임시 화면을 안내합니다.
         </span>
         <span v-else>실제 API 기준 · {{ refreshedAt }} 갱신</span>
-        <button :disabled="loading" @click="loadSummary">새로고침</button>
       </div>
     </header>
 
@@ -395,13 +385,6 @@ onBeforeUnmount(() => {
         <strong>{{ stats.preparing }}건</strong>
         <p>주문 상태와 환불 신청을 건별 처리합니다.</p>
         <span>주문·배송 관리 →</span>
-      </RouterLink>
-
-      <RouterLink to="/admin/products">
-        <small>재고 확인</small>
-        <strong>{{ stats.soldOut }}개</strong>
-        <p>품절 상품과 판매·리뷰 현황을 확인합니다.</p>
-        <span>상품 관리 →</span>
       </RouterLink>
 
       <RouterLink to="/admin/orders" class="attention">
@@ -443,8 +426,8 @@ onBeforeUnmount(() => {
       </RouterLink>
     </section>
 
-    <!-- # 주문·배송 관리: 실제 주문 상태 · 환불 승인 대기 / 상품 관리: AI 입고 우선순위 -->
-    <section class="overview-operations-grid" aria-label="주문·환불·재고 운영 현황">
+    <!-- # 주문·배송 관리: 실제 주문 상태와 환불 승인 대기만 요약한다. -->
+    <section class="overview-operations-grid" aria-label="주문·환불 운영 현황">
       <RouterLink to="/admin/orders" class="overview-operation-panel">
         <header>
           <h2>주문 상태 현황</h2>
@@ -488,28 +471,6 @@ onBeforeUnmount(() => {
         <p v-else class="overview-empty">승인 대기 환불이 없습니다.</p>
       </RouterLink>
 
-      <RouterLink to="/admin/products" class="overview-operation-panel">
-        <header>
-          <div>
-            <h2>입고 우선순위</h2>
-            <p>최근 판매량 · 현재 옵션 재고 기준</p>
-          </div>
-          <span>상품 관리 →</span>
-        </header>
-        <ul v-if="inventoryItems.length" class="inventory-summary-list">
-          <li v-for="item in inventoryItems.slice(0, 5)" :key="item.variantId">
-            <div>
-              <b>{{ item.productName }}</b>
-              <small>{{ item.optionLabel }} · 재고 {{ item.stock }}개</small>
-            </div>
-            <span>
-              {{ item.daysUntilStockout }}일 후<br>
-              권장 {{ item.recommendedInboundQuantity }}개
-            </span>
-          </li>
-        </ul>
-        <p v-else class="overview-empty">예측할 판매 이력이 없습니다.</p>
-      </RouterLink>
     </section>
 
     <section class="overview-ai-grid" aria-label="AI 운영 분석">
@@ -543,58 +504,6 @@ onBeforeUnmount(() => {
         <p v-else class="overview-empty">상품 성과 데이터가 없습니다.</p>
       </RouterLink>
 
-      <!-- # 상품 관리: AI 감성 분석이 저장된 공개 리뷰만 집계 -->
-      <RouterLink to="/admin/products" class="overview-ai-panel">
-        <header>
-          <div>
-            <h2>AI 리뷰 감성 비율</h2>
-            <p>AI 분석이 완료된 공개 리뷰 기준</p>
-          </div>
-          <span>상품 관리 →</span>
-        </header>
-        <template v-if="sentiment.analyzedCount">
-          <div class="sentiment-rate" aria-label="리뷰 감성 비율">
-            <span class="positive" :style="{ width: `${sentiment.positiveRate}%` }" />
-            <span class="negative" :style="{ width: `${sentiment.negativeRate}%` }" />
-          </div>
-          <div class="sentiment-legend">
-            <span>긍정 {{ sentiment.positiveRate }}%</span>
-            <span>부정 {{ sentiment.negativeRate }}%</span>
-            <small>분석 리뷰 {{ sentiment.analyzedCount }}건</small>
-          </div>
-          <ul class="ai-list">
-            <li v-for="product in sentiment.negativeProducts.slice(0, 3)" :key="product.productId">
-              <strong>{{ product.productName }}</strong>
-              <span>부정 {{ product.negativeRate }}% · {{ product.negativeCount }}건</span>
-            </li>
-          </ul>
-        </template>
-        <p v-else class="empty-analysis">분석 완료된 공개 리뷰가 없어 감성 비율을 표시하지 않습니다.</p>
-      </RouterLink>
-
-      <!-- # 상품 관리: 최근 실제 판매량과 옵션 재고를 이용한 AI 입고 예측 -->
-      <RouterLink to="/admin/products" class="overview-ai-panel inventory-ai-panel">
-        <header>
-          <div>
-            <h2>AI 재고 소진 예측</h2>
-            <p>최근 {{ inventoryForecast?.lookbackDays || 28 }}일 판매량 · 현재 옵션 재고</p>
-          </div>
-          <span>상품 관리 →</span>
-        </header>
-        <ul v-if="inventoryItems.length" class="ai-list inventory-list">
-          <li v-for="item in inventoryItems.slice(0, 5)" :key="item.variantId">
-            <div>
-              <strong>{{ item.productName }}</strong>
-              <small>{{ item.optionLabel }} · 현재 {{ item.stock }}개</small>
-            </div>
-            <span>
-              {{ item.daysUntilStockout }}일 후 소진<br>
-              권장 입고 {{ item.recommendedInboundQuantity }}개
-            </span>
-          </li>
-        </ul>
-        <p v-else class="empty-analysis">최근 판매 이력이 있는 판매중 옵션이 없어 재고 예측을 표시하지 않습니다.</p>
-      </RouterLink>
     </section>
 
     <!-- # 매출 분석: AI 서버가 실제 주문 이력으로 계산한 다음 달 판매 예측 -->

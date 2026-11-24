@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.Optional;
 
 @Component
@@ -72,6 +73,35 @@ public class SalesForecastClient {
         } catch (BusinessException exception) {
             throw exception;
         } catch (Exception exception) {
+            throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
+        }
+    }
+
+    /** 관리자 개요 카드용 AI 리뷰 감성 집계. 브라우저 JWT 대신 내부 키로 호출한다. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> reviewSentimentSummary(int limit) {
+        return getMap("/api/reviews/sentiment-summary", "limit", limit);
+    }
+
+    /** 관리자 개요 카드용 AI 재고 소진 예측. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> inventoryForecast(int limit) {
+        return getMap("/api/sales/inventory-forecast", "limit", limit);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getMap(String path, String parameter, int value) {
+        try {
+            Map<String, Object> response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder.path(path).queryParam(parameter, value).build())
+                    .header("Internal-Api-Key", internalApiKey)
+                    .retrieve()
+                    .body(Map.class);
+            if (response == null) {
+                throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
+            }
+            return response;
+        } catch (RestClientException exception) {
             throw new BusinessException(ErrorCode.SALES_FORECAST_UNAVAILABLE);
         }
     }

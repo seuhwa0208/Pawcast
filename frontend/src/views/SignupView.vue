@@ -168,13 +168,15 @@ const canSubmit = computed(() => {
   const required =
     form.username.trim() &&
     telValid.value &&
+    state.idChecked &&
+    passwordValid.value &&
+    passwordMatches.value &&
     agreed.terms &&
     agreed.privacy &&
     agreed.efinance;
   return oauthSignup.value
     ? required
     : required &&
-        state.idChecked &&
         state.emailChecked &&
         emailValid.value &&
         state.emailVerified &&
@@ -320,8 +322,11 @@ async function submit() {
     if (oauthSignup.value) {
       const result = await authService.completeGoogleSignup({
         idToken: pendingOAuth.ticket,
+        userId: form.userId,
         name: form.username,
         tel: payload.tel,
+        passwordHash: form.passwordHash,
+        checkPasswordHash: form.checkPasswordHash,
         agreedTerms: agreed.terms,
         agreedPrivacy: agreed.privacy,
         agreedEfinance: agreed.efinance,
@@ -375,9 +380,14 @@ async function mergeCartAfterLogin() {
             </p>
           </div>
         </div>
-        <fieldset v-else>
+        <fieldset>
           <legend>계정 정보</legend>
-          <label class="form-field"
+          <label v-if="oauthSignup" class="form-field"
+            ><span>이메일 <b>*</b></span>
+            <input v-model="form.email" type="email" readonly aria-readonly="true" />
+            <small>Google 계정으로 확인된 이메일입니다. 보안을 위해 변경할 수 없습니다.</small>
+          </label>
+          <label v-else class="form-field"
             ><span>아이디 <b>*</b></span>
             <div class="input-action">
               <input
@@ -425,7 +435,7 @@ async function mergeCartAfterLogin() {
               >가입에 사용할 이메일 주소를 입력해주세요.</small
             ></label
           >
-          <div v-if="state.emailChecked" class="email-verification">
+          <div v-if="!oauthSignup && state.emailChecked" class="email-verification">
             <div class="input-action">
               <input
                 v-model.trim="form.verificationCode"

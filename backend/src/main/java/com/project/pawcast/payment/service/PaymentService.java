@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -157,16 +158,28 @@ public class PaymentService {
         Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
         //결제 상태 검사
         if (payment.getStatus() != PaymentsStatus.PAID) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
-        // 토스 취소
-        TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
-        TossCancelResponse.CancelInfo cancelInfo = response.cancels().get(response.cancels().size() - 1);
-        // 취소 성공 확인
-        // Toss 취소 상태 - DONE, CANCELED
-        if (!"DONE".equals(cancelInfo.cancelStatus())) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
+        try {
+            // 토스 취소
+            TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
+            if (response == null || response.cancels() == null || response.cancels().isEmpty()) {
+                throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+            }
 
-        // 결제 상태 취소
-        payment.setStatus(PaymentsStatus.CANCELLED);
-        return cancelInfo.transactionKey();
+            TossCancelResponse.CancelInfo cancelInfo = response.cancels().get(response.cancels().size() - 1);
+            // Toss 취소 상태 - DONE, CANCELED
+            if (!"DONE".equals(cancelInfo.cancelStatus())) {
+                throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+            }
+
+            // 결제 상태 취소
+            payment.setStatus(PaymentsStatus.CANCELLED);
+            return cancelInfo.transactionKey();
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RestClientException | IllegalStateException exception) {
+            // 테스트 키·이미 취소된 결제·PG 응답 오류를 서버 500으로 노출하지 않습니다.
+            throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+        }
     }
     
 
