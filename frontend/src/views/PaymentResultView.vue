@@ -55,7 +55,7 @@ onMounted(async () => {
       context.orderAccessToken,
     );
     sessionStorage.removeItem("powcast-payment-context");
-    if (context.mode !== "buy-now") clear();
+    if (context.mode !== "buy-now") refresh();
     sessionStorage.removeItem("powcast-buy-now");
     state.value = "success";
     message.value = "결제가 완료되었습니다.";
