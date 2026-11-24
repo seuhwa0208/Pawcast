@@ -18,6 +18,7 @@ spring:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     # 개발 콘솔 출력이 요청 스레드를 잠그지 않도록 SQL 전체 출력은 끈다.
@@ -49,10 +50,6 @@ oauth:
     client-id: ${GOOGLE_CLIENT_ID}
 
 # 리뷰 등록 시 감성 분석은 서버 트랜잭션에서 처리하므로 기존 AI 주소 설정을 유지한다.
-# 매출 예측·재학습·통계 다운로드는 Vue가 FastAPI에 직접 요청한다.
-ai:
-  base-url: ${AI_BASE_URL:http://localhost:8000}
-  internal-api-key: ${AI_INTERNAL_API_KEY:}
 
 file:
   upload:

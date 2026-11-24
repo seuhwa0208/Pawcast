@@ -142,4 +142,20 @@ public class RefundService {
             productRepository.decreaseSalesCount(item.getProductVariant().getProduct().getId(), item.getQuantity());
         }
     }
+
+    // 승인 대기 환불을 거절한다. 주문과 결제 상태는 유지해 회원이 주문 이력을 계속 확인할 수 있다.
+    @Transactional
+    public void rejectRefund(Long refundId, Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+
+        Refund refund = refundRepository.findByIdForUpdate(refundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REFUND));
+        if (refund.getStatus() != Refund.RefundStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_REFUND_STATUS);
+        }
+        refund.setStatus(Refund.RefundStatus.REJECTED);
+        refund.setCompletedAt(LocalDateTime.now());
+    }
 }

@@ -21,17 +21,18 @@ const refundSubmitting = ref(false);
 const message = ref("");
 const page = ref(1);
 const CLAIM_PAGE_SIZE = 5;
-const refundableOrders = computed(() =>
+const claimOrders = computed(() =>
   orders.value.filter((order) =>
-    ["DELIVERED", "CONFIRMED"].includes(order.status),
+    refunds.value[order.orderId]
+    || ["DELIVERED", "CONFIRMED"].includes(order.status),
   ),
 );
 const claimPageCount = computed(() =>
-  Math.max(1, Math.ceil(refundableOrders.value.length / CLAIM_PAGE_SIZE)),
+  Math.max(1, Math.ceil(claimOrders.value.length / CLAIM_PAGE_SIZE)),
 );
-const pagedRefundableOrders = computed(() => {
+const pagedClaimOrders = computed(() => {
   const start = (page.value - 1) * CLAIM_PAGE_SIZE;
-  return refundableOrders.value.slice(start, start + CLAIM_PAGE_SIZE);
+  return claimOrders.value.slice(start, start + CLAIM_PAGE_SIZE);
 });
 watch(claimPageCount, (count) => {
   if (page.value > count) page.value = count;
@@ -46,9 +47,13 @@ function formatWon(value) {
 }
 function refundStatus(refund) {
   if (!refund) return "환불 신청 가능";
-  return ["APPROVED", "COMPLETED"].includes(refund.status)
-    ? "환불 완료"
-    : "환불 신청 접수";
+  const labels = {
+    PENDING: "승인 대기",
+    COMPLETED: "환불 완료",
+    REJECTED: "환불 거절",
+    FAILED: "처리 실패",
+  };
+  return labels[refund.status] || refund.status;
 }
 async function loadClaims() {
   loading.value = true;
@@ -130,9 +135,9 @@ onMounted(loadClaims);
         </p>
         <p v-else-if="error" class="dashboard-order-state error">{{ error }}</p>
         <p v-else-if="message" class="claim-message">{{ message }}</p>
-        <template v-else-if="refundableOrders.length">
+        <template v-else-if="claimOrders.length">
           <div class="claim-order-list">
-          <article v-for="order in pagedRefundableOrders" :key="order.orderId">
+          <article v-for="order in pagedClaimOrders" :key="order.orderId">
             <div>
               <b>{{ displayDate(order.created_at || order.createdAt) }} 주문</b>
               <span>{{
@@ -143,7 +148,7 @@ onMounted(loadClaims);
               }}</small>
             </div>
             <div class="claim-order-action">
-              <em :class="{ completed: refunds[order.orderId] }">{{
+              <em :class="{ completed: refunds[order.orderId]?.status === 'COMPLETED' }">{{
                 refundStatus(refunds[order.orderId])
               }}</em>
               <button
@@ -163,7 +168,7 @@ onMounted(loadClaims);
           />
         </template>
         <p v-else class="dashboard-order-state">
-          환불 신청 가능한 주문이 없습니다.
+          취소·반품(환불) 내역이 없습니다.
         </p>
       </section>
     </div>

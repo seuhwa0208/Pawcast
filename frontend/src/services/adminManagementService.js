@@ -2,6 +2,11 @@ import { jsonBody, springRequest } from "@/services/http/springClient";
 
 export const adminManagementService = {
   getOrders: () => springRequest("/orders/admin"),
+  getRefunds: () => springRequest("/admin/refunds"),
+  approveRefund: (refundId) =>
+    springRequest(`/admin/refunds/${refundId}/approve`, { method: "PATCH" }),
+  rejectRefund: (refundId) =>
+    springRequest(`/admin/refunds/${refundId}/reject`, { method: "PATCH" }),
   changeOrderStatus: (orderId, orderStatus) =>
     springRequest(`/orders/admin/${orderId}/status`, {
       method: "POST",
@@ -19,6 +24,10 @@ export const adminManagementService = {
       body: jsonBody({ role }),
     }),
   getProducts: () => springRequest("/admin/products"),
+  changeProductStatus: (productId, status) =>
+    springRequest(`/admin/products/${productId}/status?status=${encodeURIComponent(status)}`, {
+      method: "PATCH",
+    }),
   createProduct: (formData) =>
   springRequest("/admin/products", {
     method: "POST",
@@ -40,3 +49,4 @@ export const adminManagementService = {
     }),
   getNotices: () => springRequest("/notices"),
 };
+

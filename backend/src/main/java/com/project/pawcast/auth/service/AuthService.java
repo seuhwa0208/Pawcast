@@ -204,17 +204,21 @@ public class AuthService {
     // 토큰 재발급
     @Transactional
     public TokenResponse refresh(String refreshTokenValue, HttpServletRequest httpRequest) {
+        if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
+            throw new BusinessException(ErrorCode.TOKEN_INVALID);
+        }
+
         var claims = tokenProvider.parse(refreshTokenValue);
         if (!tokenProvider.isRefreshToken(claims)) {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
 
-        RefreshTokens stored = refreshTokenRepository.findByToken(refreshTokenValue)
+        RefreshTokens stored = refreshTokenRepository.findByTokenForUpdate(refreshTokenValue)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID));
 
         if (!stored.isUsable()) {
             log.warn("폐기된 refresh 토큰 재사용 시도: memberId={}", stored.getMember().getId());
-            refreshTokenRepository.revokeAllByMember(stored.getMember().getId());
+            // 늦게 도착한 중복 refresh 요청이 새로 회전된 세션까지 무효화하지 않게 합니다.
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
 
@@ -234,7 +238,7 @@ public class AuthService {
                 .ipAddress(clientIp(httpRequest))
                 .build()
         );
-        return new TokenResponse(accessToken);
+        return new TokenResponse(accessToken, newRefresh, member.getRole());
     }
 
     private String clientIp(HttpServletRequest request) {
@@ -250,3 +254,4 @@ public class AuthService {
         return checkVerifyEmail(request.email(), checkCode);
     }
 }
+

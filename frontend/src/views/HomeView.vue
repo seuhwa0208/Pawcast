@@ -93,6 +93,15 @@ function maskBestReviewWriter(userId) {
   const masked = "*".repeat(Math.min(4, Math.max(2, value.length - visibleLength)));
   return `${visible}${masked} 고객님`;
 }
+function formatReviewDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10).replaceAll("-", ".");
+  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(date)
+    .replaceAll(". ", ".")
+    .replace(/\.$/, "");
+}
 function toggleHomeFilterMenu(type) {
   openFilterMenu.value = openFilterMenu.value === type ? "" : type;
 }
@@ -399,10 +408,13 @@ onBeforeUnmount(() => {
     <section class="search-box home-search">
       <h2>상품 검색</h2>
       <form class="home-filter-form" @submit.prevent="performSearch">
-        <label class="search-keyword compact-main-keyword">
-          <span class="search-icon" aria-hidden="true" />
-          <input v-model.trim="keyword" placeholder="예) 연어 사료" aria-label="상품명 검색" />
-        </label>
+        <div class="home-keyword-row">
+          <label class="search-keyword compact-main-keyword">
+            <span class="search-icon" aria-hidden="true" />
+            <input v-model.trim="keyword" placeholder="예) 연어 사료, 츄르" aria-label="상품명 검색" />
+          </label>
+          <button type="submit" class="home-search-submit">검색</button>
+        </div>
         <div id="home-detail-filters" class="home-filter-panel">
             <fieldset class="pet-filter">
               <legend>상품관</legend>
@@ -630,7 +642,7 @@ onBeforeUnmount(() => {
           <div v-if="p.bestReview" class="review-highlight">
             <b>BEST REVIEW</b>
             <p>{{ p.bestReview.content }}</p>
-            <small>★ {{ p.bestReview.rating }} · {{ maskBestReviewWriter(p.bestReview.writerId) }}</small>
+            <small>★ {{ p.bestReview.rating }} · {{ maskBestReviewWriter(p.bestReview.writerId) }} <time v-if="p.bestReview.createdAt">· {{ formatReviewDate(p.bestReview.createdAt) }}</time></small>
           </div>
         </article>
       </div>

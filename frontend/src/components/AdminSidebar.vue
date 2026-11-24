@@ -1,13 +1,13 @@
 <script setup>
 import { useRouter } from "vue-router";
 import { useAuthSession } from "@/stores/auth";
+import { isAdminRole, readUserRole } from "@/utils/roles";
 
 const router = useRouter();
-const { setAccessToken, setUserRole } = useAuthSession();
-const isAdmin = sessionStorage.getItem("powcast-user-role") === "ADMIN";
+const { clearAuthSession } = useAuthSession();
+const isAdmin = isAdminRole(readUserRole());
 
 const menu = [
-  { label: "대시보드", to: "/admin/dashboard" },
   { label: "매출 분석", to: "/admin/sales" },
   { label: "주문·배송 관리", to: "/admin/orders" },
   { label: "상품 관리", to: "/admin/products" },
@@ -18,8 +18,8 @@ const menu = [
 ];
 
 function logout() {
-  setAccessToken("");
-  setUserRole("");
+  // Access Token과 회전 가능한 Refresh Token을 함께 지워 재로그인을 요구합니다.
+  clearAuthSession();
   router.push("/login");
 }
 </script>
@@ -28,7 +28,7 @@ function logout() {
   <aside class="admin-nav-sidebar">
     <header>
       <b>PAWCAST</b>
-      <span>관리자 페이지</span>
+      <span>{{ isAdmin ? "관리자 페이지" : "매니저 페이지" }}</span>
     </header>
     <nav aria-label="관리자 메뉴">
       <RouterLink v-for="item in menu" :key="item.to" :to="item.to">
@@ -85,3 +85,5 @@ function logout() {
   .admin-nav-logout { min-height: 42px; margin-top: 16px; }
 }
 </style>
+
+

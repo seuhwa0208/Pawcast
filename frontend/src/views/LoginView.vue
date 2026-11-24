@@ -12,6 +12,7 @@ import { useRoute, useRouter } from "vue-router";
 import { authService } from "@/services/authService";
 import { useAuthSession } from "@/stores/auth";
 import { useCart } from "@/stores/cart";
+import { getPostLoginPath, getRoleLandingPath } from "@/utils/roles";
 
 const route = useRoute();
 const router = useRouter();
@@ -45,6 +46,11 @@ const googleLinkEmail = ref("");
 const googleLinkError = ref("");
 
 let googleInitTimer;
+const googleStateKey = "__powcastGoogleGISState";
+const googleState = window[googleStateKey] || (window[googleStateKey] = {
+    initialized: false,
+    credentialHandler: null,
+});
 
 // 로그인 성공 시 인증 정보 저장
 function saveLoginSession(result, userId) {
@@ -103,9 +109,10 @@ async function handleGoogleCredential(response) {
         await mergeCartAfterLogin();
 
         await router.push(
-            typeof route.query.redirect === "string"
-                ? route.query.redirect
-                : "/member"
+            getPostLoginPath(
+                route.query.redirect,
+                result.role || result.memberRole,
+            )
         );
     } catch (error) {
         errorMessage.value =
@@ -141,7 +148,7 @@ async function submitGoogleLink() {
 
         googleLinkOpen.value = false;
 
-        await router.push("/member");
+        await router.push(getRoleLandingPath(result.role || result.memberRole));
     } catch (error) {
         googleLinkError.value =
             error.message || "계정 연결에 실패했습니다.";
@@ -156,11 +163,18 @@ function renderGoogleButton() {
         return false;
     }
 
-    window.google.accounts.id.initialize({
-        client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-        callback: handleGoogleCredential,
-    });
+    // GIS initialization is global; the polling callback can run more than once while the script loads.
+    if (!googleState.initialized) {
+        window.google.accounts.id.initialize({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+            // GIS는 전역에 한 번만 설정하고, 현재 마운트된 LoginView로 credential을 전달합니다.
+            callback: (credential) => googleState.credentialHandler?.(credential),
+        });
+        googleState.initialized = true;
+    }
 
+    // Clear a previously rendered iframe before mounting the button again.
+    googleButton.value.replaceChildren();
     window.google.accounts.id.renderButton(
         googleButton.value,
         {
@@ -180,6 +194,7 @@ function renderGoogleButton() {
 }
 
 onMounted(() => {
+    googleState.credentialHandler = handleGoogleCredential;
     if (renderGoogleButton()) {
         return;
     }
@@ -193,6 +208,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     window.clearInterval(googleInitTimer);
+    googleState.credentialHandler = null;
 });
 
 // 일반 로그인
@@ -224,11 +240,10 @@ async function submit() {
         await mergeCartAfterLogin();
 
         await router.push(
-            typeof route.query.redirect === "string"
-                ? route.query.redirect
-                : result.role === "ADMIN"
-                    ? "/admin/dashboard"
-                    : "/member"
+            getPostLoginPath(
+                route.query.redirect,
+                result.role || result.memberRole,
+            )
         );
     } catch (error) {
         // 차단·강퇴 계정은 전역 오류 팝업이 안내합니다.
@@ -307,31 +322,31 @@ async function mergeCartAfterLogin() {
                         <button
                             type="button"
                             class="password-visibility"
-                            :aria-label="
-                                showPassword
-                                    ? '비밀번호 숨기기'
-                                    : '비밀번호 표시'
-                            "
+                            :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 표시'"
                             :aria-pressed="showPassword"
                             @click="showPassword = !showPassword"
                         >
+                            <!-- 눈 윤곽과 눈동자는 공통 유지하고, 숨김 상태(!showPassword)일 때만 사선 표시 -->
                             <svg
                                 viewBox="0 0 24 24"
                                 aria-hidden="true"
                             >
+                                <!-- 위·아래 눈꺼풀 곡선 -->
                                 <path
-                                    d="M2.5 12s3.2-5 9.5-5 9.5 5-3.2 5-9.5 5-9.5-5-9.5-5Z"
+                                    d="M2.2 12c2.2-4.3 5.8-6.5 9.8-6.5s7.6 2.2 9.8 6.5c-2.2 4.3-5.8 6.5-9.8 6.5S4.4 16.3 2.2 12Z"
                                 />
 
+                                <!-- 중앙 눈동자 원 -->
                                 <circle
                                     cx="12"
                                     cy="12"
-                                    r="2.7"
+                                    r="2.6"
                                 />
 
+                                <!-- 비밀번호 숨김 상태일 때 대각선 취소선 -->
                                 <path
                                     v-if="!showPassword"
-                                    d="m4 4 16 16"
+                                    d="M4.5 4.5 19.5 19.5"
                                 />
                             </svg>
                         </button>
@@ -371,7 +386,6 @@ async function mergeCartAfterLogin() {
                     class="google-identity-button"
                     aria-label="Google로 계속하기"
                 ></div>
-
                 <div class="signup-guide">
                     <div>
                         <b>아직 포캐스트 회원이 아니신가요?</b>
@@ -466,3 +480,6 @@ async function mergeCartAfterLogin() {
         </Teleport>
     </main>
 </template>
+
+
+

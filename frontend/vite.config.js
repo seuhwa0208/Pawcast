@@ -19,6 +19,11 @@ export default defineConfig({
     strictPort: true,
     fs: { allow: [projectRoot] },
     proxy: {
+      // 로컬 개발 중 Spring API는 같은 출처의 /api 경로로 전달해 CORS 설정 차이를 줄입니다.
+      "/api": {
+        target: "http://127.0.0.1:8080",
+        changeOrigin: true,
+      },
       "/ai": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
@@ -31,3 +36,4 @@ export default defineConfig({
     },
   },
 });
+

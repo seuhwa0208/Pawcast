@@ -51,6 +51,7 @@ public class Refund {
     public enum RefundStatus {
         PENDING,
         COMPLETED,
+        REJECTED,
         FAILED
     }
 }

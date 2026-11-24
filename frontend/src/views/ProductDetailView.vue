@@ -23,7 +23,8 @@ const router = useRouter();
 const product = ref(null);
 const detailLoading = ref(true);
 const detailError = ref("");
-const reviews = ref([]);useAuthSession();
+const reviews = ref([]);
+useAuthSession();
 const reviewsLoading = ref(false);
 const reviewPage = ref(1);
 const REVIEW_PAGE_SIZE = 5;
@@ -35,6 +36,31 @@ const reviewEditLoading = ref(false);
 const reviewEditError = ref("");
 const reviewEditSuccess = ref("");
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+function resolveImageUrl(rawPath) {
+  if (!rawPath) return "/images/product-placeholder.svg";
+  const path = String(rawPath).trim();
+  if (!path) return "/images/product-placeholder.svg";
+  if (
+    /^https?:\/\//i.test(path) ||
+    path.startsWith("data:") ||
+    path.startsWith("blob:")
+  ) {
+    return path;
+  }
+  const normalizedBase = API_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+function handleImageError(event) {
+  const img = event?.target;
+  if (!img || img.dataset.fallbackApplied === "true") return;
+  img.dataset.fallbackApplied = "true";
+  img.src = "/images/product-placeholder.svg";
+}
+
 function normalizeDetail(detail) {
   const variants =
     detail.productType === "DEVICE"
@@ -44,13 +70,28 @@ function normalizeDetail(detail) {
     (item) => item.status !== "DISCONTINUED",
   );
   const first = available[0] || {};
+
+  // main 우선 정렬 후 중복 제거한 실제 이미지 목록 구성
+  const sortedImages = [...(detail.images || [])].sort(
+    (a, b) => Number(Boolean(b?.main)) - Number(Boolean(a?.main)),
+  );
+  const resolvedImages = sortedImages
+    .map((item) =>
+      resolveImageUrl(item?.imagePath || item?.url || item?.imageUrl),
+    )
+    .filter(Boolean);
+  const uniqueImages = [...new Set(resolvedImages)];
+
+  const fallbackImage = resolveImageUrl(
+    detail.imageUrl || detail.thumbnailUrl || "/images/product-placeholder.svg",
+  );
+  const mainImage = uniqueImages[0] || fallbackImage;
+
   return {
     ...detail,
     category: detail.categoryName || "기타",
-    image:
-      detail.images?.find((item) => item.main)?.imagePath ||
-      detail.images?.[0]?.imagePath ||
-      "/images/product-placeholder.svg",
+    image: mainImage,
+    images: uniqueImages.length ? uniqueImages : [mainImage],
     options: available
       .map((item) => item.optionLabel || item.optionKey)
       .filter(Boolean),
@@ -99,6 +140,7 @@ async function loadProduct() {
     reviewsLoading.value = false;
   }
 }
+
 // # 상품 옵션 드롭다운은 다른 영역을 누르면 닫혀야 키보드·마우스 모두에서 상태가 남지 않는다.
 const optionSelector = ref(null);
 const closeOptionOnOutside = (event) => {
@@ -110,24 +152,28 @@ const closeOptionOnOutside = (event) => {
     optionOpen.value = false;
   }
 };
+
 onMounted(() => {
   loadProduct();
   document.addEventListener("pointerdown", closeOptionOnOutside);
 });
+
 onBeforeUnmount(() =>
   document.removeEventListener("pointerdown", closeOptionOnOutside),
 );
+
 watch(
-    () => props.id,
-    () => {
-        closeReviewEdit();
-
-        reviewEditError.value = "";
-        reviewEditSuccess.value = "";
-
-        loadProduct();
-    }
+  () => props.id,
+  () => {
+    closeReviewEdit();
+    reviewEditError.value = "";
+    reviewEditSuccess.value = "";
+    galleryIndex.value = 0;
+    selectedOption.value = "";
+    loadProduct();
+  },
 );
+
 const sectionName = computed(() =>
   props.pet === "CAT"
     ? "고양이관"
@@ -138,6 +184,7 @@ const sectionName = computed(() =>
 const petLabel = computed(() =>
   props.pet === "CAT" ? "고양이" : props.pet === "ALL" ? "식기·급수" : "강아지",
 );
+
 // 품절 상세 URL로 직접 들어온 경우 해당 상품관 목록으로 즉시 되돌립니다.
 watchEffect(() => {
   if (product.value && product.value.stock <= 0)
@@ -149,20 +196,25 @@ watchEffect(() => {
           : "/dog",
     );
 });
+
 const tab = ref("detail");
 const galleryIndex = ref(0);
 const optionOpen = ref(false);
 const cartAdded = ref(false);
 const loginRequired = ref(false);
 const selectedOption = ref("");
-const galleryImages = computed(() =>
-  !product.value
-    ? []
-    : Array.from({ length: 4 }, (_, index) => ({
-        src: product.value.image,
-        alt: `${product.value.name} 상품 이미지 ${index + 1}`,
-      })),
-);
+
+const galleryImages = computed(() => {
+  if (!product.value) return [];
+  const list = product.value.images?.length
+    ? product.value.images
+    : [product.value.image];
+  return list.map((src, index) => ({
+    src,
+    alt: `${product.value.name} 상품 이미지 ${index + 1}`,
+  }));
+});
+
 const productOptions = computed(() =>
   product.value?.options?.length
     ? product.value.options
@@ -189,12 +241,15 @@ const pagedReviews = computed(() => {
   const start = (reviewPage.value - 1) * REVIEW_PAGE_SIZE;
   return regularReviews.value.slice(start, start + REVIEW_PAGE_SIZE);
 });
+
 function maskReviewWriter(userId) {
   const value = String(userId || "").trim();
   if (!value) return "고객님";
-  const visibleLength = value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
+  const visibleLength =
+    value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
   return `${value.slice(0, visibleLength)}${"*".repeat(Math.min(4, Math.max(2, value.length - visibleLength)))} 고객님`;
 }
+
 // 옵션별 가격표가 없는 API 상품도 기본 판매가로 안전하게 표시합니다.
 const currentPrice = computed(
   () =>
@@ -209,147 +264,119 @@ const getOptionPrice = (option) =>
   product.value?.optionPrices?.[option] || product.value?.price || 0;
 const getOptionExtra = (option) =>
   Math.max(0, getOptionPrice(option) - getOptionPrice(productOptions.value[0]));
+
 const { add } = useCart();
 const { isFavorite, toggle } = useWishlist();
 const { accessToken, currentUserId } = useAuthSession();
 
 // 로그인 회원 본인의 리뷰인지 확인합니다.
 function isMyReview(review) {
-    return Boolean(
-        accessToken.value &&
-        currentUserId.value &&
-        review?.writerId === currentUserId.value
-    );
+  return Boolean(
+    accessToken.value &&
+      currentUserId.value &&
+      review?.writerId === currentUserId.value,
+  );
 }
 
 // 리뷰 수정 모달 열기
 async function openReviewEdit(review) {
-    if (!accessToken.value) {
-        loginRequired.value = true;
-        return;
+  if (!accessToken.value) {
+    loginRequired.value = true;
+    return;
+  }
+
+  if (!isMyReview(review)) {
+    return;
+  }
+
+  if (reviewEditLoading.value) {
+    return;
+  }
+
+  reviewEditError.value = "";
+  reviewEditSuccess.value = "";
+  reviewEditLoading.value = true;
+
+  const requestedProductId = props.id;
+
+  try {
+    // 수정 전 서버에서 최신 리뷰 정보를 조회합니다.
+    const latestReview = await reviewService.getReview(review.id);
+
+    // 조회 도중 다른 상품으로 이동한 경우 모달을 열지 않습니다.
+    if (requestedProductId !== props.id) {
+      return;
     }
 
-    if (!isMyReview(review)) {
-        return;
+    // 최신 리뷰 정보에서도 작성자 본인인지 확인합니다.
+    if (!isMyReview(latestReview)) {
+      reviewEditError.value = "본인이 작성한 리뷰만 수정할 수 있습니다.";
+      return;
     }
 
-    if (reviewEditLoading.value) {
-        return;
-    }
-
-    reviewEditError.value = "";
-    reviewEditSuccess.value = "";
-    reviewEditLoading.value = true;
-
-    const requestedProductId = props.id;
-
-    try {
-        // 수정 전 서버에서 최신 리뷰 정보를 조회합니다.
-        const latestReview = await reviewService.getReview(
-            review.id
-        );
-
-        // 조회 도중 다른 상품으로 이동한 경우 모달을 열지 않습니다.
-        if (requestedProductId !== props.id) {
-            return;
-        }
-
-        // 최신 리뷰 정보에서도 작성자 본인인지 확인합니다.
-        if (!isMyReview(latestReview)) {
-            reviewEditError.value =
-                "본인이 작성한 리뷰만 수정할 수 있습니다.";
-
-            return;
-        }
-
-        editingReview.value = latestReview;
-        reviewEditOpen.value = true;
-
-    } catch (error) {
-        reviewEditError.value =
-            error.message ||
-            "리뷰 정보를 불러오지 못했습니다.";
-
-    } finally {
-        reviewEditLoading.value = false;
-    }
+    editingReview.value = latestReview;
+    reviewEditOpen.value = true;
+  } catch (error) {
+    reviewEditError.value =
+      error.message || "리뷰 정보를 불러오지 못했습니다.";
+  } finally {
+    reviewEditLoading.value = false;
+  }
 }
 
 // 리뷰 수정 모달 닫기
 function closeReviewEdit() {
-    reviewEditOpen.value = false;
-    editingReview.value = null;
+  reviewEditOpen.value = false;
+  editingReview.value = null;
 }
 
 // 리뷰 수정 완료 후 리뷰 목록 및 상품 평점 갱신
 async function handleReviewUpdated(updatedReview) {
-    reviewEditError.value = "";
+  reviewEditError.value = "";
+  reviewEditSuccess.value = "리뷰가 정상적으로 수정되었습니다.";
 
-    reviewEditSuccess.value =
-        "리뷰가 정상적으로 수정되었습니다.";
+  const requestedProductId = props.id;
 
-    const requestedProductId = props.id;
+  // 수정된 리뷰를 화면에 우선 반영합니다.
+  reviews.value = reviews.value.map((review) =>
+    review.id === updatedReview.id ? { ...review, ...updatedReview } : review,
+  );
 
-    // 수정된 리뷰를 화면에 우선 반영합니다.
-    reviews.value = reviews.value.map((review) =>
-        review.id === updatedReview.id
-            ? { ...review, ...updatedReview }
-            : review
-    );
+  reviewsLoading.value = true;
 
-    reviewsLoading.value = true;
+  try {
+    // 서버에서 최신 리뷰 목록 및 평균 별점을 조회합니다.
+    const reviewResult =
+      await reviewService.getProductReviews(requestedProductId);
 
-    try {
-        // 서버에서 최신 리뷰 목록 및 평균 별점을 조회합니다.
-        const reviewResult =
-            await reviewService.getProductReviews(
-                requestedProductId
-            );
-
-        if (requestedProductId !== props.id) {
-            return;
-        }
-
-        reviews.value = Array.isArray(reviewResult)
-            ? reviewResult
-            : reviewResult?.reviews || [];
-
-        // 상품 상세 및 리뷰 영역의 평균 별점을 함께 갱신합니다.
-        if (product.value) {
-            product.value = {
-                ...product.value,
-
-                rating: Number(
-                    reviewResult?.averageRating ??
-                    product.value.rating
-                ),
-
-                reviewCount: Number(
-                    reviewResult?.reviewCount ??
-                    reviews.value.length
-                ),
-            };
-        }
-
-        // 현재 리뷰 페이지가 전체 페이지 수를 초과하지 않도록 처리합니다.
-        reviewPage.value = Math.min(
-            reviewPage.value,
-            reviewPageCount.value
-        );
-
-    } catch (error) {
-        reviewEditError.value =
-            "리뷰는 수정되었지만 최신 목록을 불러오지 못했습니다. 새로고침 후 확인해주세요.";
-
-        console.warn(
-            "리뷰 수정 후 목록 갱신 실패",
-            error
-        );
-
-    } finally {
-        reviewsLoading.value = false;
+    if (requestedProductId !== props.id) {
+      return;
     }
+
+    reviews.value = Array.isArray(reviewResult)
+      ? reviewResult
+      : reviewResult?.reviews || [];
+
+    // 상품 상세 및 리뷰 영역의 평균 별점을 함께 갱신합니다.
+    if (product.value) {
+      product.value = {
+        ...product.value,
+        rating: Number(reviewResult?.averageRating ?? product.value.rating),
+        reviewCount: Number(reviewResult?.reviewCount ?? reviews.value.length),
+      };
+    }
+
+    // 현재 리뷰 페이지가 전체 페이지 수를 초과하지 않도록 처리합니다.
+    reviewPage.value = Math.min(reviewPage.value, reviewPageCount.value);
+  } catch (error) {
+    reviewEditError.value =
+      "리뷰는 수정되었지만 최신 목록을 불러오지 못했습니다. 새로고침 후 확인해주세요.";
+    console.warn("리뷰 수정 후 목록 갱신 실패", error);
+  } finally {
+    reviewsLoading.value = false;
+  }
 }
+
 const addToCart = async () => {
   try {
     await add(
@@ -366,6 +393,7 @@ const addToCart = async () => {
     if (error.message === "LOGIN_REQUIRED") loginRequired.value = true;
   }
 };
+
 const buyNow = () => {
   sessionStorage.setItem(
     "powcast-buy-now",
@@ -383,6 +411,7 @@ const buyNow = () => {
   );
   router.push({ path: "/checkout", query: { mode: "buy-now" } });
 };
+
 // 회원은 같은 위시리스트 Store를 토글하고, 비회원은 로그인 안내를 표시합니다.
 const toggleWishlist = () => {
   if (!accessToken.value) {
@@ -391,6 +420,7 @@ const toggleWishlist = () => {
   }
   toggle(product.value.id);
 };
+
 const goToLogin = () => {
   loginRequired.value = false;
   router.push({
@@ -398,15 +428,18 @@ const goToLogin = () => {
     query: { redirect: router.currentRoute.value.fullPath },
   });
 };
+
 // 나머지 연산으로 양 끝에서 반대편 이미지로 자연스럽게 순환합니다.
 const previousImage = () => {
   galleryIndex.value =
     (galleryIndex.value - 1 + galleryImages.value.length) %
     galleryImages.value.length;
 };
+
 const nextImage = () => {
   galleryIndex.value = (galleryIndex.value + 1) % galleryImages.value.length;
 };
+
 const chooseOption = (option) => {
   selectedOption.value = option;
   optionOpen.value = false;
@@ -479,6 +512,7 @@ const purchaseGuide = [
           <img
             :src="galleryImages[galleryIndex].src"
             :alt="galleryImages[galleryIndex].alt"
+            @error="handleImageError"
           /><button
             type="button"
             class="gallery-arrow previous"
@@ -506,7 +540,11 @@ const purchaseGuide = [
             :aria-label="`${index + 1}번 상품 이미지 보기`"
             @click="galleryIndex = index"
           >
-            <img :src="image.src" :alt="image.alt" />
+            <img
+              :src="image.src"
+              :alt="image.alt"
+              @error="handleImageError"
+            />
           </button>
         </div>
       </div>
@@ -515,7 +553,7 @@ const purchaseGuide = [
         <h2>{{ product.name }}</h2>
         <p>신선한 원료를 천천히 조리해 만든 건강한 상품</p>
         <b
-          >★ {{ product.rating }}　리뷰
+          >★ {{ product.rating }} 리뷰
           {{ product.reviewCount.toLocaleString() }}개</b
         >
         <dl>
@@ -722,7 +760,7 @@ const purchaseGuide = [
           <!-- 리뷰 페이지네이션 -->
           <nav
             v-if="reviewPageCount > 1"
-            class="qna-pagination review-pagination"
+            class="qna-pagination review-pagination pagination-bar"
             aria-label="상품 리뷰 페이지 이동"
           >
             <button :disabled="reviewPage === 1" aria-label="첫 페이지" @click="reviewPage = 1">«</button>
@@ -749,12 +787,12 @@ const purchaseGuide = [
 
     <!-- 회원 본인 리뷰 수정 모달 -->
     <ReviewEditModal
-        v-if="reviewEditOpen && editingReview"
-        :key="editingReview.id"
-        :review="editingReview"
-        :product-name="product.name"
-        @close="closeReviewEdit"
-        @updated="handleReviewUpdated"
+      v-if="reviewEditOpen && editingReview"
+      :key="editingReview.id"
+      :review="editingReview"
+      :product-name="product.name"
+      @close="closeReviewEdit"
+      @updated="handleReviewUpdated"
     />
   </div>
   <main v-else class="container detail-page detail-page-state">
@@ -765,80 +803,80 @@ const purchaseGuide = [
 <style scoped>
 /* 회원 본인 리뷰 표시 */
 .my-review-label {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 5px;
-    background: #f3e6d7;
-    padding: 4px 8px;
-    color: #95643d;
-    font-size: 11px;
-    font-weight: 800;
-    white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #f3e6d7;
+  padding: 4px 8px;
+  color: #95643d;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 /* 리뷰 수정 버튼 */
 .review-edit-button {
-    min-width: 58px;
-    min-height: 30px;
-    border: 1px solid #ddc9b7;
-    border-radius: 7px;
-    background: #fff;
-    padding: 5px 12px;
-    color: #805737;
-    font: inherit;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-    cursor: pointer;
-    transition:
-        background-color 0.2s ease,
-        border-color 0.2s ease,
-        color 0.2s ease;
+  min-width: 58px;
+  min-height: 30px;
+  border: 1px solid #ddc9b7;
+  border-radius: 7px;
+  background: #fff;
+  padding: 5px 12px;
+  color: #805737;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
 }
 
 .review-edit-button:hover:not(:disabled) {
-    border-color: #95643d;
-    background: #95643d;
-    color: #fff;
+  border-color: #95643d;
+  background: #95643d;
+  color: #fff;
 }
 
 .review-edit-button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 리뷰 수정 성공 메시지 */
 .review-update-success {
-    margin: 16px 0;
-    border: 1px solid #cfe3ce;
-    border-radius: 9px;
-    background: #f2f8f0;
-    padding: 12px 16px;
-    color: #4f8051;
-    font-size: 13px;
-    font-weight: 700;
+  margin: 16px 0;
+  border: 1px solid #cfe3ce;
+  border-radius: 9px;
+  background: #f2f8f0;
+  padding: 12px 16px;
+  color: #4f8051;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 /* 리뷰 수정 오류 메시지 */
 .review-update-error {
-    margin: 16px 0;
-    border: 1px solid #ebc9c2;
-    border-radius: 9px;
-    background: #fff5f3;
-    padding: 12px 16px;
-    color: #c65b49;
-    font-size: 13px;
-    font-weight: 700;
+  margin: 16px 0;
+  border: 1px solid #ebc9c2;
+  border-radius: 9px;
+  background: #fff5f3;
+  padding: 12px 16px;
+  color: #c65b49;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 @media (max-width: 600px) {
-    .review-meta {
-        flex-wrap: wrap;
-    }
+  .review-meta {
+    flex-wrap: wrap;
+  }
 
-    .review-edit-button {
-        min-height: 34px;
-    }
+  .review-edit-button {
+    min-height: 34px;
+  }
 }
 </style>

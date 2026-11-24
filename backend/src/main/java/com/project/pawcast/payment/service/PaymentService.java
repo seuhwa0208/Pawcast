@@ -156,10 +156,27 @@ public class PaymentService {
     public String cancelPayment(Long orderId,String cancelReason){
         //결제 검사
         Payment payment = paymentRepository.findByOrderId(orderId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_PAYMENT));
-        //결제 상태 검사
-        if (payment.getStatus() != PaymentsStatus.PAID) {throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);}
+        // 결제 상태가 승인 완료인 건만 취소할 수 있습니다.
+        if (payment.getStatus() != PaymentsStatus.PAID) {
+            throw new BusinessException(ErrorCode.INVALID_PAYMENT_STATUS);
+        }
+
+        // 프로젝트 시드 데이터는 의도적으로 PG에 존재하지 않는 DEMO_ONLY 결제입니다.
+        // 가짜 paymentKey로 Toss를 호출하면 PG의 4xx를 환불 실패 400으로 오인하므로,
+        // 로컬 개발 데이터만 내부 취소 완료로 표시하고 외부 결제 취소는 요청하지 않습니다.
+        if ("DEMO_ONLY".equalsIgnoreCase(payment.getProvider())) {
+            payment.setStatus(PaymentsStatus.CANCELLED);
+            return "DEMO-REFUND-" + payment.getIdempotencyKey();
+        }
+
+        if (!"TOSS".equalsIgnoreCase(payment.getProvider())
+                || payment.getPaymentKey() == null
+                || payment.getPaymentKey().isBlank()) {
+            throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);
+        }
+
         try {
-            // 토스 취소
+            // 실제 Toss 결제만 PG 취소 API로 전달합니다.
             TossCancelResponse response = tossPaymentClient.cancel(payment.getPaymentKey(), cancelReason);
             if (response == null || response.cancels() == null || response.cancels().isEmpty()) {
                 throw new BusinessException(ErrorCode.PAYMENT_CANCELLATION_FAILED);

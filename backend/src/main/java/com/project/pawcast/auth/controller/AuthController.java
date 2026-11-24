@@ -68,7 +68,17 @@ public class AuthController {
 
     // 토큰 재발급
     @PostMapping("/token/refresh")
-    public void refreshToken(@RequestParam String refreshTokenValue, HttpServletRequest request) {
-        authService.refresh(refreshTokenValue, request);
+    public TokenResponse refreshToken(
+            @RequestParam(required = false) String refreshTokenValue,
+            @RequestBody(required = false) RefreshRequest body,
+            HttpServletRequest request
+    ) {
+        // 기존 query 방식과 JSON body 방식을 모두 지원해 클라이언트 배포 시점 차이를 흡수합니다.
+        String token = refreshTokenValue;
+        if ((token == null || token.isBlank()) && body != null) {
+            token = body.refreshTokenValue();
+        }
+        return authService.refresh(token, request);
     }
 }
+

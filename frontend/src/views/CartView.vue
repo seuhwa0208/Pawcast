@@ -11,7 +11,7 @@ import { productService, toProductCard } from "@/services/productService";
 const route = useRoute();
 const router = useRouter();
 
-const { items, total, setQuantity, remove } = useCart();
+const { items, setQuantity, remove } = useCart();
 const { accessToken } = useAuthSession();
 
 const BASE_SHIPPING_FEE = 3000;
@@ -22,8 +22,63 @@ const activeTab = ref(
 );
 
 const wishlistItems = ref([]);
+const selectedKeys = ref([]);
 const errorMessage = ref("");
 const processingKeys = ref([]);
+
+// 장바구니 항목 변경 시 선택 상태 동기화
+watch(
+    items,
+    (nextItems) => {
+        const validKeys = new Set(nextItems.map((item) => item.key));
+        const filtered = selectedKeys.value.filter((key) => validKeys.has(key));
+
+        if (!selectedKeys.value.length && nextItems.length) {
+            selectedKeys.value = nextItems.map((item) => item.key);
+        } else {
+            selectedKeys.value = filtered;
+        }
+    },
+    { immediate: true }
+);
+
+const selectedItems = computed(() =>
+    items.value.filter((item) => selectedKeys.value.includes(item.key))
+);
+
+const allSelected = computed(
+    () =>
+        items.value.length > 0 &&
+        items.value.every((item) => selectedKeys.value.includes(item.key))
+);
+
+function toggleAll(checked) {
+    selectedKeys.value = checked ? items.value.map((item) => item.key) : [];
+}
+
+function toggleSelectAllButton() {
+    toggleAll(!allSelected.value);
+}
+
+// 선택된 상품 기준 금액 계산
+const selectedTotal = computed(() =>
+    selectedItems.value.reduce(
+        (sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0),
+        0
+    )
+);
+
+const shippingFee = computed(() => {
+    if (!selectedItems.value.length) {
+        return 0;
+    }
+
+    return selectedTotal.value >= FREE_SHIPPING_THRESHOLD
+        ? 0
+        : BASE_SHIPPING_FEE;
+});
+
+const finalAmount = computed(() => selectedTotal.value + shippingFee.value);
 
 // 위시리스트 조회: 회원만 가능
 async function loadWishlist() {
@@ -34,36 +89,63 @@ async function loadWishlist() {
 
     try {
         const response = await wishlistService.list();
+        const list = Array.isArray(response) ? response : [];
 
-        wishlistItems.value = await Promise.all(
-            (Array.isArray(response) ? response : []).map(async (item) => {
-                const product = item.product || item;
-                const detail = await productService.detail(product.id);
+        const cards = await Promise.all(
+            list.map(async (item) => {
+                const rawProductId =
+                    item?.productId ?? item?.product?.id ?? item?.id;
+                const productId = Number(rawProductId);
 
-                const variants =
-                    detail.productType === "DEVICE"
-                        ? detail.deviceVariants
-                        : detail.foodVariants;
+                if (!Number.isSafeInteger(productId) || productId <= 0) {
+                    console.warn("유효하지 않은 위시리스트 productId:", item);
+                    return null;
+                }
 
-                const available = (variants || []).filter(
-                    (v) => v.status === "ON_SALE" && v.stock > 0,
-                );
+                try {
+                    const detail = await productService.detail(productId);
 
-                // 구매 가능한 옵션 중 가장 저렴한 옵션
-                const cheapest = [...available].sort(
-                    (a, b) => Number(a.price) - Number(b.price),
-                )[0];
+                    const variants =
+                        detail.productType === "DEVICE"
+                            ? detail.deviceVariants
+                            : detail.foodVariants;
 
-                return toProductCard({
-                    ...detail,
-                    price: cheapest?.price,
-                    imagePath:
-                        detail.images?.find((image) => image.main)?.imagePath ||
-                        detail.images?.[0]?.imagePath,
-                    soldOut: !available.length,
-                });
-            }),
+                    const available = (variants || []).filter(
+                        (v) => v.status === "ON_SALE" && v.stock > 0
+                    );
+
+                    // 구매 가능한 옵션 중 가장 저렴한 옵션
+                    const cheapest = [...available].sort(
+                        (a, b) => Number(a.price) - Number(b.price)
+                    )[0];
+
+                    const variantId =
+                        cheapest?.variantId ??
+                        cheapest?.id ??
+                        detail.variantId ??
+                        null;
+
+                    return toProductCard(
+                        {
+                            ...detail,
+                            variantId,
+                            option: cheapest?.optionLabel ?? cheapest?.optionName ?? detail.option,
+                            price: cheapest?.price,
+                            imagePath:
+                                detail.images?.find((image) => image.main)?.imagePath ||
+                                detail.images?.[0]?.imagePath,
+                            soldOut: !available.length,
+                        },
+                        detail.productType || ""
+                    );
+                } catch (err) {
+                    console.warn(`위시리스트 상품 상세 조회 실패 (productId=${productId}):`, err);
+                    return null;
+                }
+            })
         );
+
+        wishlistItems.value = cards.filter(Boolean);
     } catch (error) {
         console.error("위시리스트 조회 실패:", error);
         wishlistItems.value = [];
@@ -86,10 +168,25 @@ function selectTab(tab) {
     }
 }
 
-// 회원·비회원 모두 주문·결제 화면으로 이동합니다.
-// 비회원은 다음 화면에서 이메일과 배송지를 직접 입력합니다.
+// 선택된 상품(전체 선택 시 전체 상품)을 결제 화면으로 전달
 function moveToCheckout() {
-    router.push("/checkout");
+    errorMessage.value = "";
+
+    if (!selectedItems.value.length) {
+        errorMessage.value = "결제할 상품을 선택해 주세요.";
+        return;
+    }
+
+    sessionStorage.removeItem("powcast-buy-now");
+    sessionStorage.setItem(
+        "powcast-selected-checkout",
+        JSON.stringify(selectedItems.value)
+    );
+
+    router.push({
+        path: "/checkout",
+        query: { mode: "selected" },
+    });
 }
 
 // 수량 변경
@@ -142,22 +239,6 @@ async function removeCartItem(item) {
     }
 }
 
-// 배송비 계산
-const shippingFee = computed(() => {
-    if (!items.value.length) {
-        return 0;
-    }
-
-    return total.value >= FREE_SHIPPING_THRESHOLD
-        ? 0
-        : BASE_SHIPPING_FEE;
-});
-
-// 최종 결제 금액
-const finalAmount = computed(() => {
-    return total.value + shippingFee.value;
-});
-
 // 로그인 상태 변경 시 위시리스트 초기화
 watch(accessToken, (token) => {
     if (!token) {
@@ -184,7 +265,6 @@ watch(
 );
 
 onMounted(() => {
-    // 비회원도 장바구니 페이지에 접근할 수 있습니다.
     if (
         accessToken.value &&
         activeTab.value === "wishlist"
@@ -253,11 +333,29 @@ onMounted(() => {
             class="cart-layout"
         >
             <div class="cart-list">
+                <div class="cart-select-toolbar">
+                    <label>
+                        <input
+                            type="checkbox"
+                            :checked="allSelected"
+                            @change="toggleAll($event.target.checked)"
+                        />
+                        <span>전체 선택 ({{ selectedItems.length }}/{{ items.length }})</span>
+                    </label>
+                </div>
+
                 <article
                     v-for="item in items"
                     :key="item.key"
                     class="cart-item"
                 >
+                    <input
+                        v-model="selectedKeys"
+                        type="checkbox"
+                        :value="item.key"
+                        :aria-label="`${item.name} 선택`"
+                    />
+
                     <RouterLink
                         :to="`/products/${item.pet || 'DOG'}/${item.id || 1}`"
                         class="cart-thumb"
@@ -366,14 +464,10 @@ onMounted(() => {
                 <h2>결제 예정 금액</h2>
 
                 <dl>
-                    <dt>상품 금액</dt>
-
-                    <dd>
-                        {{ total.toLocaleString() }}원
-                    </dd>
+                    <dt>선택 상품 금액 ({{ selectedItems.length }}건)</dt>
+                    <dd>{{ selectedTotal.toLocaleString() }}원</dd>
 
                     <dt>배송비</dt>
-
                     <dd>
                         {{
                             shippingFee
@@ -383,10 +477,7 @@ onMounted(() => {
                     </dd>
 
                     <dt>총 결제 금액</dt>
-
-                    <dd>
-                        {{ finalAmount.toLocaleString() }}원
-                    </dd>
+                    <dd>{{ finalAmount.toLocaleString() }}원</dd>
                 </dl>
 
                 <p class="cart-shipping-notice">
@@ -395,9 +486,14 @@ onMounted(() => {
 
                 <button
                     type="button"
+                    :disabled="!selectedItems.length"
                     @click="moveToCheckout"
                 >
-                    주문하기
+                    {{
+                        allSelected
+                            ? `전체 상품 결제하기 (${selectedItems.length})`
+                            : `선택 상품 결제하기 (${selectedItems.length})`
+                    }}
                 </button>
             </aside>
         </section>
@@ -473,3 +569,4 @@ onMounted(() => {
         </section>
     </main>
 </template>
+

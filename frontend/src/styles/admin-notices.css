@@ -49,3 +49,15 @@
 .admin-notice-search button::after { content: none !important; display: none !important; }
 .admin-notice-search button:hover { border-color: #ac6a3d; background: #fffaf6; }
 @media (max-width: 620px) { .admin-notice-search { grid-template-columns: 1fr; } .admin-notice-search button { width: 100%; } }
+
+/* 탭별 데이터 수와 무관하게 공지 표의 열 순서·폭·행 높이를 고정한다. */
+.notice-table-wrap table { table-layout: fixed; }
+.notice-col-id { width: 9%; }
+.notice-col-type { width: 12%; }
+.notice-col-pin { width: 10%; }
+.notice-col-title { width: auto; }
+.notice-col-date { width: 15%; }
+.notice-col-actions { width: 18%; }
+.notice-table-wrap th,
+.notice-table-wrap td { height: 58px; box-sizing: border-box; }
+.notice-table-wrap td:nth-child(4) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

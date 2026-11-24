@@ -1,4 +1,10 @@
 package com.project.pawcast.auth.dto;
 
-public record TokenResponse(String accessToken) {
+import com.project.pawcast.member.entity.Members;
+
+public record TokenResponse(
+        String accessToken,
+        String refreshToken,
+        Members.Role role
+) {
 }

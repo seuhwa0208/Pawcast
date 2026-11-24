@@ -163,6 +163,10 @@ function goToList() {
   router.push({ name: "qna-list", query: mineOnly.value ? { scope: "mine" } : {} });
 }
 function setScope(scope) {
+  if (scope === "mine" && !accessToken.value) {
+    loginRequired.value = true;
+    return;
+  }
   router.push({
     name: "qna-list",
     query: scope === "mine" ? { scope: "mine" } : {},
@@ -274,7 +278,7 @@ onBeforeUnmount(() =>
     </header>
     <section v-if="mode === 'list'" class="qna-board">
       <div class="qna-board-controls">
-        <nav v-if="accessToken" class="qna-scope-tabs">
+        <nav class="qna-scope-tabs">
           <button :class="{ on: !mineOnly }" @click="setScope('all')">
             전체 문의</button
           ><button :class="{ on: mineOnly }" @click="setScope('mine')">

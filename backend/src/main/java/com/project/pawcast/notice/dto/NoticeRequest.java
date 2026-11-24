@@ -1,13 +1,13 @@
 package com.project.pawcast.notice.dto;
 
-import com.project.pawcast.notice.entity.Notice;
 import com.project.pawcast.notice.entity.NoticeType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-public record NoticeRequest (
-
-        @NotBlank(message = "공지사항 유형을 지정해주세요.")
+public record NoticeRequest(
+        // Enum 타입인 NoticeType은 문자열 전용 @NotBlank 대신 @NotNull로 검증해야 합니다.
+        @NotNull(message = "공지사항 유형을 지정해주세요.")
         NoticeType noticeType,
 
         @NotBlank(message = "제목을 입력해주세요.")
@@ -18,5 +18,5 @@ public record NoticeRequest (
         String content,
 
         boolean isPinned
-){
+) {
 }
