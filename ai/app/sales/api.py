@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.auth import require_admin, require_manager
+from app.common.auth import require_admin
 from app.common.database import get_db_session
 from app.sales.schemas import SalesDashboardResponse, SalesForecastResponse
 from app.sales.export_service import create_csv_file, create_excel_file, load_sales_export_frames
@@ -17,7 +17,7 @@ from app.sales.inventory_service import forecast_inventory_shortage
 router = APIRouter(
     prefix="/api/sales",
     tags=["매출 분석"],
-    dependencies=[Depends(require_manager)],
+    dependencies=[Depends(require_admin)],
 )
 
 

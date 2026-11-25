@@ -8526,6 +8526,102 @@ button.qna-row:hover:not(:disabled) {
   font-size: 18px;
 }
 
+/* 장바구니 목록: 선택·이미지·정보·수량·금액·삭제를 한 행의 고정 흐름으로 유지한다. */
+.cart-page .cart-list {
+  padding: 10px 24px;
+}
+.cart-page .cart-select-toolbar {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 1px solid #ece7e2;
+}
+.cart-page .cart-select-toolbar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #5d4030;
+  font-size: 14px;
+  font-weight: 800;
+}
+.cart-page .cart-item {
+  grid-template-columns: 28px 110px minmax(230px, 1fr) 122px 140px 32px;
+  column-gap: 16px;
+  min-height: 142px;
+  padding: 18px 0;
+}
+.cart-page .cart-item > input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #95643d;
+}
+.cart-page .cart-info {
+  min-width: 0;
+}
+.cart-page .cart-info h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cart-page .cart-remove {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8e6d58;
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cart-page .cart-remove:hover {
+  background: #fae7e2;
+  color: #bd5549;
+}
+.cart-page .cart-price strong {
+  color: #4a2f1e;
+  font-size: 17px;
+  white-space: nowrap;
+}
+
+/* 헤더 카트는 담긴 상품이 있을 때 원형 배경이 아닌 바구니 내부만 강조한다. */
+.site-header .cart-button {
+  background: transparent !important;
+}
+.site-header .cart-button.has-items {
+  color: #805737;
+}
+.site-header .cart-button.has-items svg path:first-child {
+  fill: currentColor;
+  opacity: .28;
+}
+.site-header .cart-button:hover {
+  background: transparent !important;
+  color: #805737;
+}
+
+@media (max-width: 900px) {
+  .cart-page .cart-item {
+    grid-template-columns: 28px 92px minmax(160px, 1fr) 122px 120px 32px;
+    gap: 12px;
+  }
+  .cart-page .cart-thumb { width: 92px; height: 92px; }
+}
+@media (max-width: 700px) {
+  .cart-page .cart-item {
+    grid-template-columns: 24px 82px minmax(0, 1fr) 32px;
+    gap: 10px;
+  }
+  .cart-page .cart-thumb { width: 82px; height: 82px; }
+  .cart-page .cart-quantity,
+  .cart-page .cart-price { grid-column: 3 / 4; justify-self: start; }
+  .cart-page .cart-remove { grid-column: 4; grid-row: 1; }
+}
+
 /* 다른 규칙보다 우선해 Q&A 제목과 설명을 항상 왼쪽 기준으로 둔다. */
 @media (min-width: 701px) {
   .qna-page .qna-heading,
@@ -9034,4 +9130,301 @@ button.qna-row:hover:not(:disabled) {
   height: 3px;
   border-radius: 999px;
   background: #8d623d;
+}
+
+/* 장바구니·위시리스트: 비어 있는 상태와 탭 전용 스타일을 복구한다. */
+.cart-page .shopping-list-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 18px;
+  border-radius: 12px;
+  background: #f5e9dc;
+  padding: 5px;
+}
+.cart-page .shopping-list-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 126px;
+  height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #73513a;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.cart-page .shopping-list-tabs button:hover {
+  background: #efe0d0;
+}
+.cart-page .shopping-list-tabs button.on {
+  background: #95643d;
+  color: #fff;
+  box-shadow: 0 3px 8px rgb(93 57 34 / 16%);
+}
+.cart-page .shopping-list-tabs b {
+  display: inline-grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 30%);
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+}
+.cart-page .cart-empty {
+  display: grid;
+  min-height: 258px;
+  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  border-color: #e8d7c7;
+  background: linear-gradient(145deg, #fffdfb, #fff8f1);
+  padding: 42px 28px;
+  text-align: center;
+}
+.cart-page .cart-empty::before {
+  content: "🛒";
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 50%;
+  background: #f7ead8;
+  color: #8d623d;
+  font-size: 25px;
+}
+.cart-page .cart-empty h2 {
+  margin: 3px 0 0;
+  color: #3e2b20;
+  font-size: 23px;
+}
+.cart-page .cart-empty p {
+  margin: 0;
+  color: #8d7767;
+  font-size: 14px;
+}
+.cart-page .cart-empty a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 7px;
+  border-radius: 9px;
+  background: #95643d;
+  padding: 0 20px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  text-decoration: none;
+}
+.cart-page .cart-empty a:hover { background: #80502f; }
+
+@media (max-width: 600px) {
+  .cart-page .shopping-list-tabs { display: flex; width: 100%; }
+  .cart-page .shopping-list-tabs button { min-width: 0; flex: 1; }
+  .cart-page .cart-empty { min-height: 230px; padding: 34px 20px; }
+}
+
+/* 상품 카드 공통 액션: 위시리스트에서도 찜·장바구니 버튼을 항상 노출한다. */
+.product-card .card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.product-card .wishlist-button,
+.product-card .card-cart-button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #805737;
+  cursor: pointer;
+  transition: background-color .18s ease, color .18s ease, transform .18s ease;
+}
+.product-card .wishlist-button:hover,
+.product-card .card-cart-button:hover {
+  background: #f5e7d8;
+  transform: translateY(-1px);
+}
+.product-card .wishlist-button svg,
+.product-card .card-cart-button svg {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.product-card .wishlist-button.active {
+  color: #93613c;
+}
+.product-card .wishlist-button.active svg {
+  fill: currentColor;
+}
+.product-card .card-cart-button.active {
+  background: #f4e1cb;
+  color: #80502f;
+}
+.product-card .card-cart-button.active .cart-basket-fill {
+  fill: currentColor;
+  opacity: .28;
+}
+.product-card .card-cart-button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+  transform: none;
+}
+
+/* 장바구니 결제 요약 카드와 결제 실행 버튼을 다시 표시한다. */
+.cart-page .cart-summary {
+  position: sticky;
+  top: 108px;
+  box-sizing: border-box;
+  padding: 24px 26px;
+  border-color: #e3d4c6;
+  background: #fffdfb;
+}
+.cart-page .cart-summary h2 {
+  margin: 0 0 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eaded4;
+  color: #3e2b20;
+  font-size: 20px;
+}
+.cart-page .cart-summary dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 13px 12px;
+  margin: 0;
+}
+.cart-page .cart-summary dt,
+.cart-page .cart-summary dd {
+  margin: 0;
+  color: #8b7566;
+  font-size: 14px;
+}
+.cart-page .cart-summary dd {
+  color: #4b3222;
+  font-weight: 900;
+  text-align: right;
+}
+.cart-page .cart-summary dt:nth-of-type(3),
+.cart-page .cart-summary dd:nth-of-type(3) {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #eaded4;
+  color: #583821;
+  font-size: 17px;
+}
+.cart-page .cart-shipping-notice {
+  margin: 18px 0 22px;
+  color: #8a705e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cart-page .cart-summary > button {
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 10px;
+  background: #95643d;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.cart-page .cart-summary > button:hover:not(:disabled) { background: #80502f; }
+.cart-page .cart-summary > button:disabled { cursor: not-allowed; opacity: .5; }
+
+@media (max-width: 880px) {
+  .cart-page .cart-summary { position: static; }
+}
+
+/* 상품 상세 리뷰 페이지바: 버튼 사이 여백과 좌우 폭을 줄여 한 덩어리로 정돈한다. */
+.product-review-panel .review-pagination.pagination-bar {
+  gap: 4px;
+  margin-top: 20px;
+  padding: 5px 10px;
+  border-radius: 12px;
+}
+.product-review-panel .review-pagination.pagination-bar button,
+.product-review-panel .review-pagination.pagination-bar button:first-child,
+.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
+.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
+.product-review-panel .review-pagination.pagination-bar button:last-child {
+  flex: 0 0 32px;
+  min-width: 32px;
+  width: 32px;
+  height: 36px;
+  padding: 0;
+}
+.product-review-panel .review-pagination.pagination-bar button:first-child,
+.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
+.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
+.product-review-panel .review-pagination.pagination-bar button:last-child {
+  font-size: 17px;
+}
+
+/* 상품 상세 리뷰는 공지사항과 동일한 '하나의 크림 바' 페이지바를 사용한다. */
+.product-review-panel .review-pagination.pagination-bar {
+  display: flex;
+  width: max-content;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 22px auto 0;
+  border-radius: 12px;
+  background: #faf7f2;
+  padding: 6px 12px;
+}
+.product-review-panel .review-pagination.pagination-bar button,
+.product-review-panel .review-pagination.pagination-bar button:first-child,
+.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
+.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
+.product-review-panel .review-pagination.pagination-bar button:last-child {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  padding: 0;
+  color: #795e49;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+.product-review-panel .review-pagination.pagination-bar button.on {
+  background: #96603a;
+  color: #fff;
+  box-shadow: 0 3px 7px rgb(84 49 25 / 18%);
+}
+.product-review-panel .review-pagination.pagination-bar button:first-child,
+.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
+.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
+.product-review-panel .review-pagination.pagination-bar button:last-child {
+  flex-basis: 38px;
+  width: 38px;
+  min-width: 38px;
+  font-size: 18px;
 }

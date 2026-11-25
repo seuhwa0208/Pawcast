@@ -81,7 +81,8 @@ function rankProducts(direction) {
   return [...products.value]
     .sort(
       (left, right) =>
-        factor * (Number(left.salesCount || 0) - Number(right.salesCount || 0)) ||
+        factor *
+          (Number(left.salesCount || 0) - Number(right.salesCount || 0)) ||
         Number(right.id || 0) - Number(left.id || 0),
     )
     .slice(0, 3);
@@ -115,8 +116,10 @@ async function changeProductStatus(product, status) {
     try {
       products.value = await adminManagementService.getProducts();
     } catch (refreshCause) {
-      statusError.value += " 상품 목록을 새로고침하지 못해 기존 상태를 유지합니다.";
-      product.status = product.status || (product.soldOut ? "SOLD_OUT" : "ON_SALE");
+      statusError.value +=
+        " 상품 목록을 새로고침하지 못해 기존 상태를 유지합니다.";
+      product.status =
+        product.status || (product.soldOut ? "SOLD_OUT" : "ON_SALE");
     }
   } finally {
     statusUpdatingId.value = null;
@@ -139,17 +142,24 @@ async function analyzeRecentSentiments() {
     // 서버가 100건씩 처리하므로 리뷰가 많아도 브라우저 요청 하나가 과도하게
     // 오래 걸리지 않습니다. 아직 누락·레거시 라벨이 남아 있으면 다음 배치를 요청합니다.
     do {
-      const result = await aiAnalyticsService.analyzeRecentReviewSentiments(28, 100);
+      const result = await aiAnalyticsService.analyzeRecentReviewSentiments(
+        28,
+        100,
+      );
       analyzedCount += Number(result?.analyzedCount || 0);
       remainingCount = Number(result?.remainingCount || 0);
     } while (remainingCount > 0);
 
     // 쓰기 응답의 단순 건수 대신 DB에서 다시 계산한 요약을 사용해
     // 비율과 상품별 부정 현황이 실제 저장 결과와 함께 바뀌도록 합니다.
-    sentimentSummary.value = await aiAnalyticsService.getReviewSentimentSummary(5, 28);
-    sentimentMessage.value = analyzedCount > 0
-      ? `최근 28일 리뷰 ${formatNumber(analyzedCount)}건 분석 완료`
-      : "최근 28일 AI 감성 분석 결과가 최신 상태입니다.";
+    sentimentSummary.value = await aiAnalyticsService.getReviewSentimentSummary(
+      5,
+      28,
+    );
+    sentimentMessage.value =
+      analyzedCount > 0
+        ? `최근 28일 리뷰 ${formatNumber(analyzedCount)}건 분석 완료`
+        : "최근 28일 AI 감성 분석 결과가 최신 상태입니다.";
   } catch (cause) {
     sentimentMessage.value = "";
     aiNotice.value = cause.message || "리뷰 감정 분석을 완료하지 못했습니다.";
@@ -175,7 +185,10 @@ async function loadProducts() {
       adminManagementService.getProducts(),
       adminManagementService.getBestProducts(),
       adminManagementService.getWorstProducts(),
-      aiAnalyticsService.getInventoryForecast(8),
+      // 매출 분석 권한이 없는 매니저는 재고 예측 API를 호출하지 않는다.
+      isAdmin
+        ? aiAnalyticsService.getInventoryForecast(8)
+        : Promise.resolve(null),
       isAdmin
         ? aiAnalyticsService.getReviewSentimentSummary(5, 28)
         : Promise.resolve(null),
@@ -198,14 +211,16 @@ async function loadProducts() {
         ? worstResult.value
         : rankProducts("worst");
     inventoryForecast.value =
-      forecastResult.status === "fulfilled" ? forecastResult.value : null;
+      isAdmin && forecastResult.status === "fulfilled"
+        ? forecastResult.value
+        : null;
     sentimentSummary.value =
       isAdmin && sentimentResult.status === "fulfilled"
         ? sentimentResult.value
         : null;
 
     if (
-      forecastResult.status === "rejected" ||
+      (isAdmin && forecastResult.status === "rejected") ||
       (isAdmin && sentimentResult.status === "rejected")
     ) {
       aiNotice.value = "AI 분석 결과는 현재 확인 중입니다.";
@@ -226,7 +241,9 @@ onMounted(loadProducts);
     <header class="products-heading">
       <small>PRODUCT MANAGEMENT</small>
       <h1>상품 관리</h1>
-      <p>상품 목록과 판매 성과, AI 분석 결과를 실제 조회 데이터로 확인합니다.</p>
+      <p>
+        상품 목록과 판매 성과, AI 분석 결과를 실제 조회 데이터로 확인합니다.
+      </p>
     </header>
 
     <!-- # 상품 관리: Spring 상품 목록의 실제 집계 -->
@@ -243,7 +260,9 @@ onMounted(loadProducts);
       </article>
       <article>
         <small>누적 판매 수량</small>
-        <strong>{{ formatNumber(productSummary.totalSales) }}<em>개</em></strong>
+        <strong
+          >{{ formatNumber(productSummary.totalSales) }}<em>개</em></strong
+        >
         <p>상품별 판매 수량 합계</p>
       </article>
       <article>
@@ -263,13 +282,14 @@ onMounted(loadProducts);
     <template v-else>
       <!-- # 상품 관리: AI 재고 소진 예상 및 권장 입고 수량 -->
       <section class="product-grid">
-        <article class="product-panel inventory-panel">
+        <article v-if="isAdmin" class="product-panel inventory-panel">
           <header class="panel-heading">
             <div>
               <small>AI INVENTORY FORECAST</small>
               <h2>재고 · 판매량 현황</h2>
               <p v-if="inventoryForecast">
-                최근 {{ inventoryForecast.lookbackDays }}일 판매량과 현재 옵션 재고 기준입니다.
+                최근 {{ inventoryForecast.lookbackDays }}일 판매량과 현재 옵션
+                재고 기준입니다.
               </p>
               <p v-else>재고 소진 예측 결과를 확인 중입니다.</p>
             </div>
@@ -348,14 +368,18 @@ onMounted(loadProducts);
             </p>
             <h3>부정 리뷰 많은 상품</h3>
             <ol class="negative-products">
-              <li v-for="item in sentiment.negativeProducts" :key="item.productId">
+              <li
+                v-for="item in sentiment.negativeProducts"
+                :key="item.productId"
+              >
                 <span>{{ item.productName }}</span>
                 <b>{{ item.negativeRate }}%</b>
               </li>
             </ol>
           </template>
           <p v-else class="empty-panel">
-            최근 28일에 분석 완료된 AI 감성 데이터가 없습니다. 감정 분석하기를 눌러 분석하세요.
+            최근 28일에 분석 완료된 AI 감성 데이터가 없습니다. 감정 분석하기를
+            눌러 분석하세요.
           </p>
           <p v-if="aiNotice" class="sentiment-error" role="alert">
             {{ aiNotice }}
@@ -402,7 +426,10 @@ onMounted(loadProducts);
           </article>
         </div>
 
-        <p v-if="!bestProducts.length && !worstProducts.length" class="empty-panel">
+        <p
+          v-if="!bestProducts.length && !worstProducts.length"
+          class="empty-panel"
+        >
           판매 성과 데이터가 없습니다.
         </p>
       </section>
@@ -449,7 +476,9 @@ onMounted(loadProducts);
                 v-for="product in pagedProducts"
                 :key="`${product.id}-${product.variantId}`"
               >
-                <td><b>{{ product.name }}</b></td>
+                <td>
+                  <b>{{ product.name }}</b>
+                </td>
                 <td>{{ product.brand || "-" }}</td>
                 <td>
                   <span class="category-pill">
@@ -457,7 +486,11 @@ onMounted(loadProducts);
                   </span>
                 </td>
                 <td>{{ formatCurrency(product.price) }}</td>
-                <td>{{ product.stock == null ? "-" : formatNumber(product.stock) }}</td>
+                <td>
+                  {{
+                    product.stock == null ? "-" : formatNumber(product.stock)
+                  }}
+                </td>
                 <td>{{ formatNumber(product.salesCount) }}</td>
                 <td>{{ formatNumber(product.wishCount) }}</td>
                 <td>{{ formatNumber(product.reviewCount) }}</td>
@@ -465,9 +498,14 @@ onMounted(loadProducts);
                 <td>
                   <span class="product-status-select">
                     <select
-                      :value="product.status || (product.soldOut ? 'SOLD_OUT' : 'ON_SALE')"
+                      :value="
+                        product.status ||
+                        (product.soldOut ? 'SOLD_OUT' : 'ON_SALE')
+                      "
                       :disabled="statusUpdatingId != null"
-                      @change="changeProductStatus(product, $event.target.value)"
+                      @change="
+                        changeProductStatus(product, $event.target.value)
+                      "
                     >
                       <option value="ON_SALE">판매 중</option>
                       <option value="SOLD_OUT">품절</option>
@@ -710,15 +748,19 @@ onMounted(loadProducts);
 
 .sentiment-analyze-button {
   flex: 0 0 auto;
+  align-self: flex-start;
+  width: 104px;
+  height: 36px;
   min-height: 36px;
   border: 1px solid #bd8965;
   border-radius: 9px;
-  padding: 0 12px;
+  padding: 0 8px;
   background: #fff8f2;
   color: #70482e;
   font: inherit;
   font-size: 13px;
   font-weight: 800;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -969,5 +1011,3 @@ onMounted(loadProducts);
   }
 }
 </style>
-
-

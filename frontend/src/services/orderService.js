@@ -8,6 +8,8 @@ export const orderService = {
   getGuestOrder: ({ email, orderNumber }) =>
     springRequest(
       `/orders/guest?email=${encodeURIComponent(email)}&orderNumber=${encodeURIComponent(orderNumber)}`,
+      // 조회 실패는 모달 안의 안내문으로 처리하며 전역 404 화면으로 이동하지 않는다.
+      { suppressGlobalErrorStatuses: [404] },
     ),
   cancelOrder: (orderId, cancelReason) =>
     springRequest(`/orders/${orderId}/cancel`, {

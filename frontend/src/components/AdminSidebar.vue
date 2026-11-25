@@ -8,7 +8,7 @@ const { clearAuthSession } = useAuthSession();
 const isAdmin = isAdminRole(readUserRole());
 
 const menu = [
-  { label: "매출 분석", to: "/admin/sales" },
+  ...(isAdmin ? [{ label: "매출 분석", to: "/admin/sales" }] : []),
   { label: "주문·배송 관리", to: "/admin/orders" },
   { label: "상품 관리", to: "/admin/products" },
   { label: "상품 등록", to: "/admin/products/new" },

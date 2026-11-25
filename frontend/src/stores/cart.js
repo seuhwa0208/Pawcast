@@ -3,9 +3,15 @@ import { computed, ref, watch } from "vue";
 import { defineStore, storeToRefs } from "pinia";
 import { cartService } from "@/services/cartService";
 import { useAuthSession } from "@/stores/auth";
+import { isManagerRole, readUserRole } from "@/utils/roles";
 
 const GUEST_KEY = "powcast-guest-cart";
 const MERGE_KEY = "powcast-guest-cart-merge";
+
+function isManagerSession() {
+    // 매니저는 쇼핑 기능 대상이 아니므로 cart API를 호출하지 않는다.
+    return isManagerRole(readUserRole());
+}
 
 function readGuestCart() {
     try {
@@ -83,6 +89,11 @@ const useCartStore = defineStore("cart", () => {
 
         if (!token) {
             items.value = readGuestCart();
+            return items.value;
+        }
+
+        if (isManagerSession()) {
+            items.value = [];
             return items.value;
         }
 
@@ -251,6 +262,14 @@ const useCartStore = defineStore("cart", () => {
             return {
                 merged: false,
                 reason: "NO_SESSION",
+            };
+        }
+
+        if (isManagerSession()) {
+            items.value = [];
+            return {
+                merged: false,
+                reason: "MANAGER_SESSION",
             };
         }
 

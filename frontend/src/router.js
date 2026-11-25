@@ -109,7 +109,7 @@ const router = createRouter({
         // 관리자 기본 진입 경로
         {
           path: "",
-          redirect: "/admin/sales",
+          redirect: () => isAdminRole(readUserRole()) ? "/admin/sales" : "/admin/orders",
         },
 
         // 매출 분석
@@ -117,6 +117,7 @@ const router = createRouter({
           path: "sales",
           name: "admin-sales",
           component: AdminSalesAnalyticsView,
+          meta: { requiresAdmin: true },
         },
 
         // 주문·배송 관리: 주문 조회, 배송 상태 변경, 환불 승인

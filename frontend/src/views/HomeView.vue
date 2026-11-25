@@ -88,16 +88,24 @@ function toggleSelection(list, value) {
 function maskBestReviewWriter(userId) {
   const value = String(userId || "").trim();
   if (!value) return "고객님";
-  const visibleLength = value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
+  const visibleLength =
+    value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
   const visible = value.slice(0, visibleLength);
-  const masked = "*".repeat(Math.min(4, Math.max(2, value.length - visibleLength)));
+  const masked = "*".repeat(
+    Math.min(4, Math.max(2, value.length - visibleLength)),
+  );
   return `${visible}${masked} 고객님`;
 }
 function formatReviewDate(value) {
   if (!value) return "";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10).replaceAll("-", ".");
-  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" })
+  if (Number.isNaN(date.getTime()))
+    return String(value).slice(0, 10).replaceAll("-", ".");
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
     .format(date)
     .replaceAll(". ", ".")
     .replace(/\.$/, "");
@@ -315,8 +323,7 @@ watch(
   [selectedRecommendationPetId, recommendationPets],
   () => {
     const selectedPet = recommendationPets.value.find(
-      (item) =>
-        String(item.id) === String(selectedRecommendationPetId.value),
+      (item) => String(item.id) === String(selectedRecommendationPetId.value),
     );
     if (selectedPet) loadRecommendations();
     else {
@@ -411,115 +418,131 @@ onBeforeUnmount(() => {
         <div class="home-keyword-row">
           <label class="search-keyword compact-main-keyword">
             <span class="search-icon" aria-hidden="true" />
-            <input v-model.trim="keyword" placeholder="예) 연어 사료, 츄르" aria-label="상품명 검색" />
+            <input
+              v-model.trim="keyword"
+              placeholder="예) 연어 사료, 츄르"
+              aria-label="상품명 검색"
+            />
           </label>
           <button type="submit" class="home-search-submit">검색</button>
         </div>
         <div id="home-detail-filters" class="home-filter-panel">
-            <fieldset class="pet-filter">
-              <legend>상품관</legend>
-              <div>
-                <button
-                  type="button"
-                  :class="{ on: pet === 'DOG' && !deviceSelected }"
-                  @click="selectPet('DOG')"
+          <fieldset class="pet-filter">
+            <legend>상품관</legend>
+            <div>
+              <button
+                type="button"
+                :class="{ on: pet === 'DOG' && !deviceSelected }"
+                @click="selectPet('DOG')"
+              >
+                강아지</button
+              ><button
+                type="button"
+                :class="{ on: pet === 'CAT' && !deviceSelected }"
+                @click="selectPet('CAT')"
+              >
+                고양이</button
+              ><button
+                type="button"
+                :class="{ on: deviceSelected }"
+                :aria-pressed="deviceSelected"
+                @click="toggleDevice"
+              >
+                식기·급수
+              </button>
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>가격</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'price' }"
+                @click="toggleHomeFilterMenu('price')"
+              >
+                <span>{{ priceSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'price'" class="side-multi-menu">
+                <label v-for="item in priceRanges" :key="item.key"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedPriceRanges.includes(item.key)"
+                    @change="toggleSelection(selectedPriceRanges, item.key)"
+                  /><i /><span>{{ item.label }}</span></label
                 >
-                  강아지</button
-                ><button
-                  type="button"
-                  :class="{ on: pet === 'CAT' && !deviceSelected }"
-                  @click="selectPet('CAT')"
-                >
-                  고양이</button
-                ><button
-                  type="button"
-                  :class="{ on: deviceSelected }"
-                  :aria-pressed="deviceSelected"
-                  @click="toggleDevice"
-                >
-                  식기·급수
-                </button>
               </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>가격</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'price' }"
-                  @click="toggleHomeFilterMenu('price')"
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>브랜드</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'brand' }"
+                @click="toggleHomeFilterMenu('brand')"
+              >
+                <span>{{ brandSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'brand'" class="side-multi-menu">
+                <label v-for="item in homeBrandOptions" :key="item"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedBrands.includes(item)"
+                    @change="toggleSelection(selectedBrands, item)"
+                  /><i /><span>{{ item }}</span></label
                 >
-                  <span>{{ priceSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'price'" class="side-multi-menu">
-                  <label v-for="item in priceRanges" :key="item.key"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedPriceRanges.includes(item.key)"
-                      @change="toggleSelection(selectedPriceRanges, item.key)"
-                    /><i /><span>{{ item.label }}</span></label
-                  >
-                </div>
               </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>브랜드</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'brand' }"
-                  @click="toggleHomeFilterMenu('brand')"
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>평점</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'rating' }"
+                @click="toggleHomeFilterMenu('rating')"
+              >
+                <span>{{ ratingSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'rating'" class="side-multi-menu">
+                <label v-for="item in ratingRanges" :key="item.value"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedRatings.includes(item.value)"
+                    @change="toggleSelection(selectedRatings, item.value)"
+                  /><i /><span>★ {{ item.label }}</span></label
                 >
-                  <span>{{ brandSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'brand'" class="side-multi-menu">
-                  <label v-for="item in homeBrandOptions" :key="item"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedBrands.includes(item)"
-                      @change="toggleSelection(selectedBrands, item)"
-                    /><i /><span>{{ item }}</span></label
-                  >
-                </div>
               </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>평점</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'rating' }"
-                  @click="toggleHomeFilterMenu('rating')"
-                >
-                  <span>{{ ratingSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'rating'" class="side-multi-menu">
-                  <label v-for="item in ratingRanges" :key="item.value"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedRatings.includes(item.value)"
-                      @change="toggleSelection(selectedRatings, item.value)"
-                    /><i /><span>★ {{ item.label }}</span></label
-                  >
-                </div>
-              </div>
-            </fieldset>
-            <fieldset class="stock-filter">
-              <legend>재고 상태</legend>
-              <div>
-                <button type="button" :class="{ on: stock === 'ALL' }" @click="stock = 'ALL'">전체</button>
-                <button type="button" :class="{ on: stock === 'AVAILABLE' }" @click="stock = 'AVAILABLE'">재고 있음</button>
-              </div>
-            </fieldset>
-            <button type="button" class="filter-reset" @click="resetSearch">
-              ↻ 초기화
-            </button>
+            </div>
+          </fieldset>
+          <fieldset class="stock-filter">
+            <legend>재고 상태</legend>
+            <div>
+              <button
+                type="button"
+                :class="{ on: stock === 'ALL' }"
+                @click="stock = 'ALL'"
+              >
+                전체
+              </button>
+              <button
+                type="button"
+                :class="{ on: stock === 'AVAILABLE' }"
+                @click="stock = 'AVAILABLE'"
+              >
+                재고 있음
+              </button>
+            </div>
+          </fieldset>
+          <button type="button" class="filter-reset" @click="resetSearch">
+            ↻ 초기화
+          </button>
         </div>
       </form>
     </section>
@@ -547,8 +570,7 @@ onBeforeUnmount(() => {
               String(selectedRecommendationPetId) === String(petItem.id)
             "
             :class="{
-              on:
-                String(selectedRecommendationPetId) === String(petItem.id),
+              on: String(selectedRecommendationPetId) === String(petItem.id),
             }"
             @click="selectRecommendationPet(petItem.id)"
           >
@@ -565,7 +587,9 @@ onBeforeUnmount(() => {
           <strong>반려동물 정보를 등록해 주세요</strong>
           <p>{{ recommendationMessage }}</p>
         </div>
-        <button type="button" @click="router.push('/mypage/pets')">반려동물 등록</button>
+        <button type="button" @click="router.push('/mypage/pets')">
+          반려동물 등록
+        </button>
       </div>
       <div v-else class="product-grid">
         <ProductCard
@@ -642,7 +666,13 @@ onBeforeUnmount(() => {
           <div v-if="p.bestReview" class="review-highlight">
             <b>BEST REVIEW</b>
             <p>{{ p.bestReview.content }}</p>
-            <small>★ {{ p.bestReview.rating }} · {{ maskBestReviewWriter(p.bestReview.writerId) }} <time v-if="p.bestReview.createdAt">· {{ formatReviewDate(p.bestReview.createdAt) }}</time></small>
+            <small
+              >★ {{ p.bestReview.rating }} ·
+              {{ maskBestReviewWriter(p.bestReview.writerId) }}
+              <time v-if="p.bestReview.createdAt"
+                >· {{ formatReviewDate(p.bestReview.createdAt) }}</time
+              ></small
+            >
           </div>
         </article>
       </div>

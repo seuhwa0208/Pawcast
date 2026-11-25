@@ -90,10 +90,14 @@ const orderPeriodOptions = [
   { value: 0, label: "전체 기간" },
 ];
 const appliedPeriodLabel = computed(
-  () => orderPeriodOptions.find((item) => item.value === appliedPeriodMonths.value)?.label || "전체 기간",
+  () =>
+    orderPeriodOptions.find((item) => item.value === appliedPeriodMonths.value)
+      ?.label || "전체 기간",
 );
 const fallbackOrderImage = "/assets/products/generated/dry-food.png";
-const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY || "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
+const TOSS_CLIENT_KEY =
+  import.meta.env.VITE_TOSS_CLIENT_KEY ||
+  "test_gck_docs_Ovk5rk1EwkEbP0W43n07xlzm";
 function orderDateValue(order) {
   const raw = order.createdAt || order.created_at || order.orderDate;
   const date = raw ? new Date(raw) : null;
@@ -144,7 +148,10 @@ const orderCards = computed(() =>
         ...item,
         id: item.id ?? item.orderItemId,
         variantId: item.variantId ?? item.productVariantId,
-        image: item.image || item.imageUrl || "/assets/products/generated/dry-food.png",
+        image:
+          item.image ||
+          item.imageUrl ||
+          "/assets/products/generated/dry-food.png",
 
         // 백엔드에서 반환한 주문 항목별 리뷰 ID
         reviewId: item.reviewId ?? null,
@@ -174,7 +181,8 @@ onMounted(async () => {
 async function loadProfileName() {
   try {
     const profile = await getMyProfile();
-    profileName.value = profile?.name || profile?.username || profile?.nickname || "";
+    profileName.value =
+      profile?.name || profile?.username || profile?.nickname || "";
   } catch {
     profileName.value = "";
   }
@@ -235,129 +243,120 @@ async function repurchaseOrderItem(item) {
 }
 // 리뷰 작성 가능 여부 확인
 function canWriteReview(status) {
-    return status === "DELIVERED";
+  return status === "DELIVERED";
 }
 
 // 리뷰 작성 또는 수정 버튼 처리
 async function handleReviewAction(item, status) {
-    if (reviewEditLoading.value || reviewSubmitting.value) {
-        return;
-    }
+  if (reviewEditLoading.value || reviewSubmitting.value) {
+    return;
+  }
 
-    if (!accessToken.value) {
-        showActionMessage("로그인이 필요한 서비스입니다.");
-        return;
-    }
+  if (!accessToken.value) {
+    showActionMessage("로그인이 필요한 서비스입니다.");
+    return;
+  }
 
-    // 이미 작성한 리뷰가 존재하면 수정 모달 열기
-    if (item.reviewId != null) {
-        await openReviewEdit(item);
-        return;
-    }
+  // 이미 작성한 리뷰가 존재하면 수정 모달 열기
+  if (item.reviewId != null) {
+    await openReviewEdit(item);
+    return;
+  }
 
-    // 배송 완료된 주문만 리뷰 작성 가능
-    if (!canWriteReview(status)) {
-        showActionMessage("배송 완료 후 리뷰를 작성할 수 있습니다.");
-        return;
-    }
+  // 배송 완료된 주문만 리뷰 작성 가능
+  if (!canWriteReview(status)) {
+    showActionMessage("배송 완료 후 리뷰를 작성할 수 있습니다.");
+    return;
+  }
 
-    openReview(item);
+  openReview(item);
 }
 
 // 신규 리뷰 작성 모달 열기
 function openReview(item) {
-    reviewItem.value = {
-        ...item,
-        id: item.id ?? item.orderItemId,
-    };
+  reviewItem.value = {
+    ...item,
+    id: item.id ?? item.orderItemId,
+  };
 
-    reviewRating.value = 5;
-    reviewContent.value = "";
+  reviewRating.value = 5;
+  reviewContent.value = "";
 
-    clearReviewImages();
+  clearReviewImages();
 
-    reviewOpen.value = true;
+  reviewOpen.value = true;
 }
 
 // 기존 리뷰 조회 및 수정 모달 열기
 async function openReviewEdit(item) {
-    if (reviewEditLoading.value) {
-        return;
+  if (reviewEditLoading.value) {
+    return;
+  }
+
+  try {
+    reviewEditLoading.value = true;
+
+    const review = await reviewService.getReview(item.reviewId);
+
+    // 본인이 작성한 리뷰인지 확인
+    if (
+      !accessToken.value ||
+      !currentUserId.value ||
+      review?.writerId !== currentUserId.value
+    ) {
+      showActionMessage("본인이 작성한 리뷰만 수정할 수 있습니다.");
+      return;
     }
 
-    try {
-        reviewEditLoading.value = true;
+    editingReview.value = review;
+    editingProductName.value = item.productName || "주문 상품";
 
-        const review = await reviewService.getReview(
-            item.reviewId
-        );
-
-        // 본인이 작성한 리뷰인지 확인
-        if (
-            !accessToken.value ||
-            !currentUserId.value ||
-            review?.writerId !== currentUserId.value
-        ) {
-            showActionMessage("본인이 작성한 리뷰만 수정할 수 있습니다.");
-            return;
-        }
-
-        editingReview.value = review;
-        editingProductName.value = item.productName || "주문 상품";
-
-        reviewEditOpen.value = true;
-    } catch (error) {
-        showActionMessage(
-            error.message || "리뷰 정보를 불러오지 못했습니다."
-        );
-    } finally {
-        reviewEditLoading.value = false;
-    }
+    reviewEditOpen.value = true;
+  } catch (error) {
+    showActionMessage(error.message || "리뷰 정보를 불러오지 못했습니다.");
+  } finally {
+    reviewEditLoading.value = false;
+  }
 }
 
 // 리뷰 수정 모달 닫기
 function closeReviewEdit() {
-    reviewEditOpen.value = false;
-    editingReview.value = null;
-    editingProductName.value = "";
+  reviewEditOpen.value = false;
+  editingReview.value = null;
+  editingProductName.value = "";
 }
 
 // 리뷰 변경 후 주문 목록 및 주문 상세 정보 갱신
 async function refreshReviewOrders() {
-    await loadOrders();
+  await loadOrders();
 
-    if (orderDetailOpen.value && selectedOrder.value) {
-        const orderId =
-            selectedOrder.value.orderId ??
-            selectedOrder.value.id;
+  if (orderDetailOpen.value && selectedOrder.value) {
+    const orderId = selectedOrder.value.orderId ?? selectedOrder.value.id;
 
-        if (orderId != null) {
-            try {
-                const result = await orderService.getOrder(orderId);
+    if (orderId != null) {
+      try {
+        const result = await orderService.getOrder(orderId);
 
-                if (
-                    orderDetailOpen.value &&
-                    (selectedOrder.value?.orderId ??
-                        selectedOrder.value?.id) === orderId
-                ) {
-                    selectedOrder.value = result;
-                }
-            } catch {
-                showActionMessage(
-                    "주문 상세 정보를 갱신하지 못했습니다."
-                );
-            }
+        if (
+          orderDetailOpen.value &&
+          (selectedOrder.value?.orderId ?? selectedOrder.value?.id) === orderId
+        ) {
+          selectedOrder.value = result;
         }
+      } catch {
+        showActionMessage("주문 상세 정보를 갱신하지 못했습니다.");
+      }
     }
+  }
 }
 
 // 리뷰 수정 완료 처리
 async function handleReviewUpdated() {
-    closeReviewEdit();
+  closeReviewEdit();
 
-    await refreshReviewOrders();
+  await refreshReviewOrders();
 
-    showActionMessage("리뷰가 수정되었습니다.");
+  showActionMessage("리뷰가 수정되었습니다.");
 }
 function clearReviewImages() {
   reviewImages.value.forEach((item) => URL.revokeObjectURL(item.previewUrl));
@@ -372,8 +371,14 @@ function closeReview() {
 function onReviewImagesChange(event) {
   for (const file of Array.from(event.target.files || [])) {
     const extension = file.name.split(".").pop()?.toLowerCase();
-    if (!["jpg", "jpeg", "png", "webp"].includes(extension) || file.size === 0 || file.size > 5 * 1024 * 1024) {
-      showActionMessage("리뷰 이미지는 JPG, JPEG, PNG, WebP 형식이며 장당 5MB 이하여야 합니다.");
+    if (
+      !["jpg", "jpeg", "png", "webp"].includes(extension) ||
+      file.size === 0 ||
+      file.size > 5 * 1024 * 1024
+    ) {
+      showActionMessage(
+        "리뷰 이미지는 JPG, JPEG, PNG, WebP 형식이며 장당 5MB 이하여야 합니다.",
+      );
       continue;
     }
     if (reviewImages.value.length >= 5) {
@@ -389,50 +394,46 @@ function removeReviewImage(index) {
   if (item) URL.revokeObjectURL(item.previewUrl);
 }
 async function submitReview() {
-    if (reviewSubmitting.value) {
-        return;
-    }
+  if (reviewSubmitting.value) {
+    return;
+  }
 
-    if (!reviewContent.value.trim()) {
-        showActionMessage("리뷰 내용을 입력해주세요.");
-        return;
-    }
+  if (!reviewContent.value.trim()) {
+    showActionMessage("리뷰 내용을 입력해주세요.");
+    return;
+  }
 
-    const orderItemId =
-        reviewItem.value?.id ??
-        reviewItem.value?.orderItemId;
+  const orderItemId = reviewItem.value?.id ?? reviewItem.value?.orderItemId;
 
-    if (orderItemId == null) {
-        showActionMessage("주문 상품 정보를 확인할 수 없습니다.");
-        return;
-    }
+  if (orderItemId == null) {
+    showActionMessage("주문 상품 정보를 확인할 수 없습니다.");
+    return;
+  }
 
-    try {
-        reviewSubmitting.value = true;
+  try {
+    reviewSubmitting.value = true;
 
-        await reviewService.create({
-            orderItemId,
-            rating: reviewRating.value,
-            content: reviewContent.value.trim(),
-            images: reviewImages.value.map((item) => item.file),
-        });
+    await reviewService.create({
+      orderItemId,
+      rating: reviewRating.value,
+      content: reviewContent.value.trim(),
+      images: reviewImages.value.map((item) => item.file),
+    });
 
-        // 제출 상태 해제 후 리뷰 작성 모달 닫기
-        reviewSubmitting.value = false;
+    // 제출 상태 해제 후 리뷰 작성 모달 닫기
+    reviewSubmitting.value = false;
 
-        closeReview();
+    closeReview();
 
-        // 리뷰 등록 후 주문 목록 및 상세 정보 갱신
-        await refreshReviewOrders();
+    // 리뷰 등록 후 주문 목록 및 상세 정보 갱신
+    await refreshReviewOrders();
 
-        showActionMessage("리뷰가 등록되었습니다.");
-    } catch (error) {
-        showActionMessage(
-            error.message || "리뷰를 등록하지 못했습니다."
-        );
-    } finally {
-        reviewSubmitting.value = false;
-    }
+    showActionMessage("리뷰가 등록되었습니다.");
+  } catch (error) {
+    showActionMessage(error.message || "리뷰를 등록하지 못했습니다.");
+  } finally {
+    reviewSubmitting.value = false;
+  }
 }
 onBeforeUnmount(clearReviewImages);
 function loadTossSdk() {
@@ -441,12 +442,17 @@ function loadTossSdk() {
     const script = document.createElement("script");
     script.src = "https://js.tosspayments.com/v2/standard";
     script.onload = () => resolve(window.TossPayments);
-    script.onerror = () => reject(new Error("토스 결제 SDK를 불러오지 못했습니다."));
+    script.onerror = () =>
+      reject(new Error("토스 결제 SDK를 불러오지 못했습니다."));
     document.head.appendChild(script);
   });
 }
 function tossCustomerKey() {
-  const userId = String(effectiveUserId.value || "member").replace(/[^A-Za-z0-9\-._=@]/g, "") || "member";
+  const userId =
+    String(effectiveUserId.value || "member").replace(
+      /[^A-Za-z0-9\-._=@]/g,
+      "",
+    ) || "member";
   const storageKey = `powcast-toss-customer-key:${userId}`;
   const saved = localStorage.getItem(storageKey);
   if (saved) return saved;
@@ -467,25 +473,35 @@ async function resumePendingPayment(order) {
     return;
   }
   try {
-    sessionStorage.setItem("powcast-payment-context", JSON.stringify({
-      orderId,
-      orderNumber,
-      orderEmail: order.recipient_email || order.recipientEmail || "",
-      isMember: true,
-      mode: "resume-order",
-    }));
+    sessionStorage.setItem(
+      "powcast-payment-context",
+      JSON.stringify({
+        orderId,
+        orderNumber,
+        orderEmail: order.recipient_email || order.recipientEmail || "",
+        isMember: true,
+        mode: "resume-order",
+      }),
+    );
     const TossPayments = await loadTossSdk();
-    const widgets = TossPayments(TOSS_CLIENT_KEY).widgets({ customerKey: tossCustomerKey() });
+    const widgets = TossPayments(TOSS_CLIENT_KEY).widgets({
+      customerKey: tossCustomerKey(),
+    });
     await widgets.setAmount({ currency: "KRW", value: amount });
-    const paymentWindow = await widgets.renderPaymentWindow({ orderName: order.orderName || "POWCAST 주문" });
-    paymentWindow.on("paymentRequest", () => widgets.requestPayment({
-      orderId: String(orderNumber),
+    const paymentWindow = await widgets.renderPaymentWindow({
       orderName: order.orderName || "POWCAST 주문",
-      customerName: order.recipient_name || order.recipientName || "고객",
-      customerEmail: order.recipient_email || order.recipientEmail || undefined,
-      successUrl: `${window.location.origin}/payment/result?status=success`,
-      failUrl: `${window.location.origin}/payment/result?status=fail`,
-    }));
+    });
+    paymentWindow.on("paymentRequest", () =>
+      widgets.requestPayment({
+        orderId: String(orderNumber),
+        orderName: order.orderName || "POWCAST 주문",
+        customerName: order.recipient_name || order.recipientName || "고객",
+        customerEmail:
+          order.recipient_email || order.recipientEmail || undefined,
+        successUrl: `${window.location.origin}/payment/result?status=success`,
+        failUrl: `${window.location.origin}/payment/result?status=fail`,
+      }),
+    );
   } catch (error) {
     showActionMessage(error.message || "결제를 시작하지 못했습니다.");
   }
@@ -561,9 +577,20 @@ async function verifyPassword() {
             </div>
             <div class="order-period-select">
               <span>조회 기간</span>
-              <span class="order-period-control" :class="{ open: orderPeriodOpen }">
-                <select v-model.number="selectedPeriodMonths" @focus="orderPeriodOpen = true" @blur="orderPeriodOpen = false">
-                  <option v-for="period in orderPeriodOptions" :key="period.value" :value="period.value">
+              <span
+                class="order-period-control"
+                :class="{ open: orderPeriodOpen }"
+              >
+                <select
+                  v-model.number="selectedPeriodMonths"
+                  @focus="orderPeriodOpen = true"
+                  @blur="orderPeriodOpen = false"
+                >
+                  <option
+                    v-for="period in orderPeriodOptions"
+                    :key="period.value"
+                    :value="period.value"
+                  >
                     {{ period.label }}
                   </option>
                 </select>
@@ -594,23 +621,25 @@ async function verifyPassword() {
               :key="order.orderId || order.id"
             >
               <header>
-                <b>{{ order.displayDate }} 주문</b
-                ><div class="order-card-actions"><button
-                  type="button"
-                  @click="openOrderDetail(order.orderId || order.id)"
-                >
-                  주문 상세</button
-                ><button
-                  v-if="
-                    ['PENDING_PAYMENT', 'PAID', 'PAYMENT_COMPLETED'].includes(
-                      order.status,
-                    )
-                  "
-                  type="button"
-                  @click="openCancelOrder(order)"
-                >
-                  주문 취소
-                </button></div>
+                <b>{{ order.displayDate }} 주문</b>
+                <div class="order-card-actions">
+                  <button
+                    type="button"
+                    @click="openOrderDetail(order.orderId || order.id)"
+                  >
+                    주문 상세</button
+                  ><button
+                    v-if="
+                      ['PENDING_PAYMENT', 'PAID', 'PAYMENT_COMPLETED'].includes(
+                        order.status,
+                      )
+                    "
+                    type="button"
+                    @click="openCancelOrder(order)"
+                  >
+                    주문 취소
+                  </button>
+                </div>
               </header>
               <div class="order-product-list">
                 <article
@@ -653,31 +682,36 @@ async function verifyPassword() {
                     >
                   </div>
                   <div class="order-item-actions">
-                    <button type="button" @click.stop="repurchaseOrderItem(item)">
+                    <button
+                      type="button"
+                      @click.stop="repurchaseOrderItem(item)"
+                    >
                       장바구니 담기
                     </button>
-                    <button v-if="order.status === 'PENDING_PAYMENT'" type="button" @click.stop="resumePendingPayment(order)">
+                    <button
+                      v-if="order.status === 'PENDING_PAYMENT'"
+                      type="button"
+                      @click.stop="resumePendingPayment(order)"
+                    >
                       바로 결제하기
                     </button>
                     <button
                       type="button"
                       :disabled="
-                          reviewEditLoading ||
-                          reviewSubmitting ||
-                          (
-                              item.reviewId == null &&
-                              !canWriteReview(order.status)
-                          )
+                        reviewEditLoading ||
+                        reviewSubmitting ||
+                        (item.reviewId == null && !canWriteReview(order.status))
                       "
                       :title="
-                          item.reviewId != null
-                              ? '리뷰 수정'
-                              : canWriteReview(order.status)
-                                  ? '리뷰 작성'
-                                  : '배송 완료 후 리뷰를 작성할 수 있습니다.'
+                        item.reviewId != null
+                          ? '리뷰 수정'
+                          : canWriteReview(order.status)
+                            ? '리뷰 작성'
+                            : '배송 완료 후 리뷰를 작성할 수 있습니다.'
                       "
-                      @click.stop="handleReviewAction(item, order.status)">
-                        {{ item.reviewId != null ? "리뷰 수정" : "리뷰 작성" }}
+                      @click.stop="handleReviewAction(item, order.status)"
+                    >
+                      {{ item.reviewId != null ? "리뷰 수정" : "리뷰 작성" }}
                     </button>
                   </div>
                 </article>
@@ -849,11 +883,11 @@ async function verifyPassword() {
               }}</span>
             </header>
             <article
-                v-for="item in selectedOrder?.orderItems ||
-                selectedOrder?.items ||
-                []"
-                :key="item.id ?? item.orderItemId"
-                class="order-detail-product"
+              v-for="item in selectedOrder?.orderItems ||
+              selectedOrder?.items ||
+              []"
+              :key="item.id ?? item.orderItemId"
+              class="order-detail-product"
             >
               <RouterLink
                 class="order-detail-product-link"
@@ -884,7 +918,11 @@ async function verifyPassword() {
                 <button type="button" @click="repurchaseOrderItem(item)">
                   장바구니 담기
                 </button>
-                <button v-if="selectedOrder?.status === 'PENDING_PAYMENT'" type="button" @click="resumePendingPayment(selectedOrder)">
+                <button
+                  v-if="selectedOrder?.status === 'PENDING_PAYMENT'"
+                  type="button"
+                  @click="resumePendingPayment(selectedOrder)"
+                >
                   바로 결제하기
                 </button>
                 <button
@@ -892,7 +930,11 @@ async function verifyPassword() {
                   :disabled="
                     !['DELIVERED', 'CONFIRMED'].includes(selectedOrder?.status)
                   "
-                  :title="['DELIVERED', 'CONFIRMED'].includes(selectedOrder?.status) ? '리뷰 작성' : '배송 완료 후 리뷰를 작성할 수 있습니다.'"
+                  :title="
+                    ['DELIVERED', 'CONFIRMED'].includes(selectedOrder?.status)
+                      ? '리뷰 작성'
+                      : '배송 완료 후 리뷰를 작성할 수 있습니다.'
+                  "
                   @click="openReview(item)"
                 >
                   리뷰 작성
@@ -1011,12 +1053,34 @@ async function verifyPassword() {
           </label>
           <section class="review-image-upload">
             <div class="review-image-upload-head">
-              <div><b>사진 첨부</b><small>선택 · 최대 5장 / 장당 5MB</small></div>
-              <label class="review-image-upload-button" for="review-images">사진 선택</label>
-              <input id="review-images" ref="reviewImageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple @change="onReviewImagesChange" />
+              <div>
+                <b>사진 첨부</b><small>선택 · 최대 5장 / 장당 5MB</small>
+              </div>
+              <label class="review-image-upload-button" for="review-images"
+                >사진 선택</label
+              >
+              <input
+                id="review-images"
+                ref="reviewImageInput"
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                multiple
+                @change="onReviewImagesChange"
+              />
             </div>
             <ul v-if="reviewImages.length" class="review-image-preview-list">
-              <li v-for="(image,index) in reviewImages" :key="image.previewUrl"><img :src="image.previewUrl" :alt="image.file.name" /><button type="button" :aria-label="`${image.file.name} 삭제`" @click="removeReviewImage(index)">×</button></li>
+              <li
+                v-for="(image, index) in reviewImages"
+                :key="image.previewUrl"
+              >
+                <img :src="image.previewUrl" :alt="image.file.name" /><button
+                  type="button"
+                  :aria-label="`${image.file.name} 삭제`"
+                  @click="removeReviewImage(index)"
+                >
+                  ×
+                </button>
+              </li>
             </ul>
           </section>
           <div class="common-modal-actions">
@@ -1030,25 +1094,21 @@ async function verifyPassword() {
         </form>
       </div>
     </Teleport>
-    
+
     <!-- 기존 리뷰 수정 모달 재사용 -->
     <ReviewEditModal
-        v-if="reviewEditOpen && editingReview"
-        :key="editingReview.id"
-        :review="editingReview"
-        :product-name="editingProductName"
-        @close="closeReviewEdit"
-        @updated="handleReviewUpdated"
+      v-if="reviewEditOpen && editingReview"
+      :key="editingReview.id"
+      :review="editingReview"
+      :product-name="editingProductName"
+      @close="closeReviewEdit"
+      @updated="handleReviewUpdated"
     />
 
     <Transition name="toast">
-        <div
-            v-if="actionMessage"
-            class="site-toast"
-            role="status"
-        >
-            {{ actionMessage }}
-        </div>
+      <div v-if="actionMessage" class="site-toast" role="status">
+        {{ actionMessage }}
+      </div>
     </Transition>
-</main>
+  </main>
 </template>
