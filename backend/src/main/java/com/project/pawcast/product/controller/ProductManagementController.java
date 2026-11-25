@@ -1,6 +1,7 @@
 package com.project.pawcast.product.controller;
 import com.project.pawcast.common.exception.*;
 import com.project.pawcast.product.dto.*;
+import com.project.pawcast.product.entity.ProductVariantStatus;
 import com.project.pawcast.product.service.ProductService;
 import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
@@ -72,5 +73,20 @@ public class ProductManagementController {
                                              @PathVariable Long variantId,
                                              @RequestParam int quantityChange) {
         return productService.adjustStock(id(member), variantId, quantityChange);
+    }
+
+    @PatchMapping("/variants/{variantId}/status")
+    public void changeVariantStatus(@AuthenticationPrincipal LoginMember member,
+                                    @PathVariable Long variantId,
+                                    @RequestParam ProductVariantStatus status) {
+        productService.changeVariantStatus(id(member), variantId, status);
+    }
+
+    /** 관리자 상품 목록의 상품 단위 상태 변경 결과를 갱신된 집계 상태로 반환한다. */
+    @PatchMapping("/products/{productId}/status")
+    public ProductResponse changeProductStatus(@AuthenticationPrincipal LoginMember member,
+                                               @PathVariable Long productId,
+                                               @RequestParam ProductVariantStatus status) {
+        return productService.changeProductStatus(id(member), productId, status);
     }
 }

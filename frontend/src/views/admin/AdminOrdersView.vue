@@ -5,13 +5,18 @@ import { adminManagementService } from "@/services/adminManagementService";
 import PaginationBar from "@/components/PaginationBar.vue";
 
 const orders = ref([]);
+const refunds = ref([]);
 const loading = ref(false);
 const error = ref("");
 const search = ref("");
 const statusFilter = ref("ALL");
 const orderPage = ref(1);
+const refundPage = ref(1);
+const refundSection = ref(null);
 const openStatusMenuId = ref(null);
+const refundActionId = ref(null);
 const ORDER_PAGE_SIZE = 10;
+const REFUND_PAGE_SIZE = 10;
 
 const orderStatusOptions = [
   { value: "ALL", label: "전체" },
@@ -24,6 +29,25 @@ const orderStatusOptions = [
 const orderStatusLabel = Object.fromEntries(
   orderStatusOptions.map((item) => [item.value, item.label]),
 );
+
+const refundStatusLabel = {
+  PENDING: "승인 대기",
+  COMPLETED: "환불 완료",
+  REJECTED: "승인 거절",
+  FAILED: "처리 실패",
+};
+
+const pendingRefundCount = computed(() =>
+  refunds.value.filter((refund) => refund.status === "PENDING").length,
+);
+
+const refundPageCount = computed(() =>
+  Math.max(1, Math.ceil(refunds.value.length / REFUND_PAGE_SIZE)),
+);
+const pagedRefunds = computed(() => {
+  const start = (refundPage.value - 1) * REFUND_PAGE_SIZE;
+  return refunds.value.slice(start, start + REFUND_PAGE_SIZE);
+});
 
 const statusSummary = computed(() =>
   orderStatusOptions.filter((item) => ["PAID", "SHIPPING", "DELIVERED", "CANCELLED"].includes(item.value)).map((item) => ({
@@ -64,7 +88,24 @@ const pagedOrders = computed(() => {
   return filteredOrders.value.slice(start, start + ORDER_PAGE_SIZE);
 });
 watch([search, statusFilter], () => { orderPage.value = 1; });
-watch(orderPageCount, (count) => { if (orderPage.value > count) orderPage.value = count; });
+watch(orderPageCount, (count) => {
+  if (orderPage.value > count) {
+    orderPage.value = count;
+  }
+});
+watch(refundPageCount, (count) => {
+  // 마지막 페이지에서 환불 항목이 줄어들어도 존재하지 않는 페이지에 남지 않게 합니다.
+  if (refundPage.value > count) {
+    refundPage.value = count;
+  }
+});
+
+function scrollToRefundSection() {
+  refundSection.value?.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+}
 
 function formatCurrency(value) {
   return `${Number(value || 0).toLocaleString("ko-KR")}원`;
@@ -86,14 +127,21 @@ function formatDateTime(value) {
   }).format(date);
 }
 
-async function loadOrders() {
+async function loadOrders({ resetPage = true } = {}) {
   loading.value = true;
   error.value = "";
 
   try {
-    const result = await adminManagementService.getOrders();
-    orders.value = Array.isArray(result) ? result : [];
-    orderPage.value = 1;
+    const [orderResult, refundResult] = await Promise.all([
+      adminManagementService.getOrders(),
+      adminManagementService.getRefunds(),
+    ]);
+    orders.value = Array.isArray(orderResult) ? orderResult : [];
+    refunds.value = Array.isArray(refundResult) ? refundResult : [];
+    if (resetPage) {
+      orderPage.value = 1;
+      refundPage.value = 1;
+    }
   } catch (cause) {
     orders.value = [];
     error.value = cause.message || "주문 정보를 불러오지 못했습니다.";
@@ -102,15 +150,33 @@ async function loadOrders() {
   }
 }
 
+async function processRefund(refund, action) {
+  try {
+    refundActionId.value = refund.refundId;
+    error.value = "";
+    if (action === "approve") {
+      await adminManagementService.approveRefund(refund.refundId);
+    } else {
+      await adminManagementService.rejectRefund(refund.refundId);
+    }
+    await loadOrders({ resetPage: false });
+  } catch (cause) {
+    error.value = cause.message || "환불 처리를 완료하지 못했습니다.";
+  } finally {
+    refundActionId.value = null;
+  }
+}
+
 async function changeStatus(order, event) {
   const nextStatus = event;
   if (nextStatus === order.status) return;
 
   try {
-    await adminManagementService.changeOrderStatus(order.orderId, nextStatus);
-    // 상태 변경 API는 204를 반환하므로, 성공한 현재 행만 교체해 목록을 다시
-    // 불러오지 않아도 즉시 화면과 상태 요약에 반영한다.
-    order.status = nextStatus;
+    const updated = await adminManagementService.changeOrderStatus(order.orderId, nextStatus);
+    const index = orders.value.findIndex((item) => item.orderId === order.orderId);
+    if (index >= 0) {
+      orders.value.splice(index, 1, updated || { ...order, status: nextStatus });
+    }
     openStatusMenuId.value = null;
   } catch (cause) {
     error.value = cause.message || "배송 상태를 변경하지 못했습니다.";
@@ -123,9 +189,11 @@ function canChangeOrderStatus(status) {
 
 function nextStatusOptions(status) {
   const transitions = {
-    PAID: ["PAID", "SHIPPING", "DELIVERED"],
+    // 실제 배송 단계 진행과 운영상 배송 완료 처리를 모두 허용합니다.
+    PAID: ["SHIPPING", "DELIVERED"],
     PREPARING: ["SHIPPING", "DELIVERED"],
-    SHIPPING: ["SHIPPING", "DELIVERED"],
+    // 배송 중 주문도 백엔드 상태 전이 규칙과 동일하게 배송 완료로 마칠 수 있습니다.
+    SHIPPING: ["DELIVERED"],
   };
   return transitions[status] || [];
 }
@@ -151,6 +219,16 @@ onMounted(loadOrders);
         <small>{{ item.label }}</small>
         <strong>{{ item.count.toLocaleString() }}<em>건</em></strong>
       </article>
+      <button
+        class="refund-summary-card"
+        type="button"
+        :aria-label="'환불 신청 ' + refunds.length + '건, 승인 대기 ' + pendingRefundCount + '건. 환불 목록으로 이동'"
+        @click="scrollToRefundSection"
+      >
+        <span class="refund-summary-label">환불 신청</span>
+        <strong>{{ refunds.length.toLocaleString() }}<em>건</em></strong>
+        <span class="refund-summary-pending">승인 대기 {{ pendingRefundCount.toLocaleString() }}건</span>
+      </button>
     </section>
 
     <section class="orders-workspace">
@@ -236,9 +314,41 @@ onMounted(loadOrders);
       <PaginationBar v-model:page="orderPage" :total-pages="orderPageCount" label="주문 목록 페이지" />
     </section>
 
-    <p class="orders-api-note">
-      배송사·송장번호·배송 추적 이력·환불 승인 목록 및 DB 기준 CSV/Excel 내려받기 API는 현재 확인 중이라 표시하지 않았습니다.
-    </p>
+    <section
+      ref="refundSection"
+      class="refund-workspace"
+      aria-label="환불 신청 승인 대기"
+      tabindex="-1"
+    >
+      <header>
+        <div>
+          <small>REFUND REQUESTS</small>
+          <h2>환불 신청 · 승인 대기</h2>
+          <p>고객이 요청한 환불 사유와 금액을 확인한 뒤 승인하거나 거절합니다.</p>
+        </div>
+        <strong>{{ pendingRefundCount.toLocaleString() }}건 대기</strong>
+      </header>
+      <div class="refund-table-wrap" v-if="refunds.length">
+        <table>
+          <thead><tr><th>주문번호</th><th>요청일</th><th>사유</th><th>환불 금액</th><th>상태</th><th>처리</th></tr></thead>
+          <tbody><tr v-for="refund in pagedRefunds" :key="refund.refundId">
+            <td>{{ refund.orderNumber || refund.orderId }}</td>
+            <td>{{ formatDateTime(refund.createdAt) }}</td>
+            <td>{{ refund.reason || '사유 미입력' }}</td>
+            <td>{{ formatCurrency(refund.refundAmount) }}</td>
+            <td><span class="refund-status" :class="refund.status?.toLowerCase()">{{ refundStatusLabel[refund.status] || refund.status }}</span></td>
+            <td><div v-if="refund.status === 'PENDING'" class="refund-actions"><button type="button" :disabled="refundActionId === refund.refundId" @click="processRefund(refund, 'approve')">승인</button><button type="button" class="reject" :disabled="refundActionId === refund.refundId" @click="processRefund(refund, 'reject')">거절</button></div><small v-else class="status-lock">처리 완료</small></td>
+          </tr></tbody>
+        </table>
+      </div>
+      <p v-else class="orders-message">환불 신청 내역이 없습니다.</p>
+      <PaginationBar
+        v-if="refunds.length"
+        v-model:page="refundPage"
+        :total-pages="refundPageCount"
+        label="환불 신청 페이지"
+      />
+    </section>
   </main>
 </template>
 
@@ -248,7 +358,36 @@ onMounted(loadOrders);
 .orders-heading h1 { margin: 8px 0; font-size: clamp(29px, 3vw, 38px); }
 .orders-heading p, .refund-workspace header p { margin: 0; color: #917866; }
 .orders-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 28px 0 18px; }
-.orders-summary-grid article { min-height: 100px; border: 1px solid #ead8c7; border-radius: 15px; background: #fffdfb; padding: 17px; }
+.orders-summary-grid article,
+.refund-summary-card {
+  min-height: 100px;
+  border: 1px solid #ead8c7;
+  border-radius: 15px;
+  background: #fffdfb;
+  padding: 17px;
+}
+.refund-summary-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  color: #3d281b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.refund-summary-card:hover,
+.refund-summary-card:focus-visible {
+  border-color: #ac6a3d;
+  box-shadow: 0 5px 16px rgb(84 49 25 / 12%);
+  outline: none;
+  transform: translateY(-1px);
+}
+.refund-summary-label { color: #97765e; font-size: 13px; font-weight: 800; }
+.refund-summary-card strong { margin-top: 8px; font-size: 27px; }
+.refund-summary-card em { margin-left: 3px; color: #927460; font-size: 14px; font-style: normal; }
+.refund-summary-pending { margin-top: 4px; color: #aa6b25; font-size: 12px; font-weight: 800; }
 .orders-summary-grid small { display: block; color: #97765e; font-weight: 800; }
 .orders-summary-grid strong { display: block; margin-top: 10px; font-size: 27px; }
 .orders-summary-grid em { margin-left: 3px; color: #927460; font-size: 14px; font-style: normal; }
@@ -265,7 +404,7 @@ onMounted(loadOrders);
 .orders-table-wrap th { background: #fff9f4; color: #94755f; font-size: 13px; }
 .status-lock { color: #967966; font-size: 12px; }
 .status-select { position: relative; display: inline-block; min-width: 138px; }
-.status-select-trigger { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 42px; gap: 18px; border: 1px solid #d9c0ad; border-radius: 10px; background: #fffdfb; padding: 9px 34px 9px 15px; color: #4b3425; font: inherit; font-weight: 800; text-align: center; cursor: pointer; }
+.status-select-trigger { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 42px; gap: 18px; border: 1px solid #d9c0ad; border-radius: 10px; background: #fffdfb; padding: 9px 34px; color: #4b3425; font: inherit; font-weight: 800; text-align: center; cursor: pointer; }
 .status-select-trigger span { width: 100%; text-align: center; }
 .status-select-trigger i { position: absolute; right: 14px; width: 0; height: 0; border-right: 5px solid transparent; border-left: 5px solid transparent; border-top: 7px solid #805737; transition: transform .16s ease; }
 .status-select.open .status-select-trigger i { transform: rotate(180deg); }
@@ -277,6 +416,8 @@ onMounted(loadOrders);
 .orders-message { margin: 14px 0; color: #866e5e; }.orders-message.error { color: #b54f3d; }.empty-row { padding: 30px !important; color: #947a66; text-align: center !important; }
 .orders-pagination{display:flex;justify-content:center;gap:6px;margin-top:16px}.orders-pagination button{min-width:34px;border:1px solid #dfc8b4;border-radius:8px;background:#fff;padding:7px 9px;color:#68452e;font:inherit;font-size:13px;font-weight:800;cursor:pointer}.orders-pagination button.active{border-color:#ac6a3d;background:#ac6a3d;color:#fff}.orders-pagination button:disabled{cursor:not-allowed;opacity:.45}
 .orders-api-note { margin: 14px 2px 0; color: #927765; font-size: 13px; }
+.refund-workspace{margin-top:18px}.refund-workspace h2{margin:7px 0;font-size:22px}.refund-workspace>header>strong{border-radius:999px;background:#fff0d9;padding:7px 10px;color:#aa6b25;font-size:13px}.refund-list{display:grid;gap:8px;margin-top:18px}.refund-list article{display:grid;grid-template-columns:minmax(0,1fr) 160px 100px;align-items:center;gap:14px;border-top:1px solid #f0e4da;padding:13px 2px}.refund-list div{display:grid;gap:4px}.refund-list span,.refund-list small{color:#8f7562;font-size:13px}.refund-list button{border:0;border-radius:8px;background:#ac6a3d;padding:9px;color:#fff;font:inherit;font-weight:800;cursor:pointer}.refund-list em{color:#66835e;font-size:13px;font-style:normal;font-weight:800}
+.refund-table-wrap{margin-top:18px;overflow-x:auto;border:1px solid #eee2d8;border-radius:12px}.refund-table-wrap table{width:100%;min-width:820px;border-collapse:collapse}.refund-table-wrap th,.refund-table-wrap td{border-bottom:1px solid #f1e8e1;padding:14px 12px;text-align:center}.refund-table-wrap th{background:#fff9f4;color:#94755f;font-size:13px}.refund-status{display:inline-flex;border-radius:999px;padding:5px 9px;background:#eee7dd;color:#755945;font-size:12px;font-weight:800}.refund-status.pending{background:#fff0d9;color:#9a611e}.refund-status.completed{background:#e2f0df;color:#568150}.refund-status.rejected,.refund-status.failed{background:#fae2df;color:#b14f45}.refund-actions{display:flex;justify-content:center;gap:6px}.refund-actions button{border:0;border-radius:8px;background:#ac6a3d;padding:8px 12px;color:#fff;font:inherit;font-weight:800;cursor:pointer}.refund-actions button.reject{background:#7f746c}.refund-actions button:disabled{cursor:wait;opacity:.55}
 @media (max-width: 1120px) { .orders-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .admin-orders { padding: 24px 16px; }.orders-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.workspace-header, .refund-workspace > header { align-items: flex-start; flex-direction: column; }.orders-search-row { grid-template-columns: 1fr; } }
 </style>

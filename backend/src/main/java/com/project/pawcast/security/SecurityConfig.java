@@ -7,6 +7,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.List;
+import jakarta.servlet.http.HttpServletResponse;
 
 @Configuration
 @EnableMethodSecurity
@@ -47,32 +50,58 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // exceptionHandler 사용 안하는 방향으로
-                //.exceptionHandling(handler -> handler.authenticationEntryPoint(entryPoint))
+                // 만료·누락 토큰은 401, 인증되었지만 권한이 없으면 403으로 구분합니다.
+                .exceptionHandling(handler -> handler
+                        .authenticationEntryPoint((request, response, exception) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, exception) ->
+                                response.sendError(HttpServletResponse.SC_FORBIDDEN)))
                 .authorizeHttpRequests(auth -> auth
-                        // 프리플라이트는 항상 통과
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // 공개 조회
+                        // QnA 관리 목록은 공개 QnA 조회 규칙보다 먼저 역할을 확인합니다.
+                        .requestMatchers(HttpMethod.GET, "/api/qna/manage", "/api/qna/manage/**")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        // 공개 조회 API는 회원·매니저 모두 계속 사용할 수 있습니다.
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products/**", "/api/categories/**",
                                 "/api/brands/**", "/api/notices/**",
                                 "/api/reviews/**", "/api/qna/**",
                                 "/api/banners/**", "/api/recommendations/popular",
                                 "/api/search/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/google").permitAll()   // 구글 소셜 로그인 관련 허용
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/logs/**").permitAll()
-                        // 비회원은 장바구니의 로컬 상품으로 주문을 만들고, 서버가 발급한 주문번호로 결제를 승인한다.
+                        .requestMatchers("/api/auth/**", "/api/logs/**").permitAll()
+                        // 비회원 주문 생성과 결제 승인은 기존 공개 계약을 유지합니다.
                         .requestMatchers(HttpMethod.POST, "/api/orders", "/api/orders/*/payments/confirm").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/orders/guest").permitAll()
-                        // 회원 목록·상태·역할 변경은 관리자 전용이다. 반드시 포괄 /api/admin/** 규칙보다 먼저 둔다.
+                        // 회원 역할 변경과 AI 모델 재학습 진입점은 ADMIN 전용입니다.
                         .requestMatchers("/api/admin/members/**", "/api/admin").hasRole("ADMIN")
-                        // 모델 재학습은 운영 데이터에 영향을 주므로 관리자만 실행할 수 있다.
                         .requestMatchers("/api/admin/ai/**").hasRole("ADMIN")
-                        // 매출·주문·상품·공지·Q&A 운영은 관리자와 매니저가 함께 사용한다.
-                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "MANAGER")
-                        // 그 밖의 API 는 로그인 필요
-                        .anyRequest().authenticated())
+                        // 매니저는 요청된 운영 영역만 허용합니다. 새 관리자 경로는 아래 기본 ADMIN 규칙에 걸립니다.
+                        .requestMatchers(
+                                "/api/admin/sales/**",
+                                "/api/admin/dashboard/**",
+                                "/api/admin/refunds", "/api/admin/refunds/**",
+                                "/api/admin/products/**",
+                                "/api/admin/variants/**",
+                                "/api/orders/admin", "/api/orders/admin/**",
+                                "/api/notices", "/api/notices/**",
+                                "/api/inquiries/**")
+                        .hasAnyRole("ADMIN", "MANAGER")
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 허용 목록에 없는 인증 API는 매니저에게 403으로 닫고,
+                        // USER와 ADMIN의 기존 로그인 기반 API 동작은 유지합니다.
+                        .anyRequest().access((authentication, context) -> {
+                            var current = authentication.get();
+                            if (current == null
+                                    || current instanceof AnonymousAuthenticationToken
+                                    || !current.isAuthenticated()) {
+                                return new AuthorizationDecision(false);
+                            }
+
+                            boolean isManager = current.getAuthorities().stream()
+                                    .anyMatch(authority ->
+                                            "ROLE_MANAGER".equals(authority.getAuthority()));
+                            return new AuthorizationDecision(!isManager);
+                        }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .httpBasic(basic -> basic.disable())
                 .formLogin(form -> form.disable());
@@ -99,3 +128,6 @@ public class SecurityConfig {
         return source;
     }
 }
+
+
+

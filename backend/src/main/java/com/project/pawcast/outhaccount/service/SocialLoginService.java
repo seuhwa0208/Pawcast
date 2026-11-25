@@ -1,6 +1,8 @@
 package com.project.pawcast.outhaccount.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.project.pawcast.auth.entity.RefreshTokens;
+import com.project.pawcast.auth.repository.RefreshTokenRepository;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
@@ -16,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -27,6 +31,7 @@ public class SocialLoginService {
     private final OauthAccountRepository oauthAccountRepository;
     private final MembersRepository membersRepository;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
     // Google ID Token 검증 후 기존 계정 로그인 또는 후속 단계("LINK" / "SIGNUP") 반환
@@ -143,6 +148,15 @@ public class SocialLoginService {
                 member.getRole().toString()
         );
 
+        // Google login follows the same persisted refresh-token rotation contract as password login.
+        refreshTokenRepository.revokeAllByMember(member.getId());
+        refreshTokenRepository.save(RefreshTokens.builder()
+                .member(member)
+                .token(refreshToken)
+                .expiresAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.refreshTokenValiditySeconds()))
+                .revoked(false)
+                .build());
+
         return new SocialLoginResponse(
                 accessToken,
                 refreshToken,
@@ -204,3 +218,4 @@ public class SocialLoginService {
         return membersRepository.save(member);
     }
 }
+

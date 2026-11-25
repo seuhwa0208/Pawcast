@@ -1,6 +1,12 @@
 # PAWCAST Sentiment AI
 
-리뷰 문장을 긍정 또는 부정으로 분류하는 독립 FastAPI 서비스입니다.
+Vue가 직접 호출하는 PAWCAST 통합 FastAPI 서비스입니다.
+
+- 리뷰 긍정·부정 분석 및 DB 저장
+- 회원 반려동물 기반 상품 추천
+- PostgreSQL 매출 집계·판매 예측·재학습
+- 재고 부족 예측
+- CSV·Excel 통계 다운로드
 
 기존 리뷰·추천·매출 AI 프로젝트는 `D:\pawcast-fin\ai_old`에 보존되어 있습니다.
 
@@ -48,6 +54,22 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 Swagger 문서는 `http://127.0.0.1:8000/docs`에서 확인합니다.
+
+Vue는 `.env`의 `VITE_AI_BASE_URL=http://127.0.0.1:8000`을 사용하며,
+관리자 API 호출에는 Spring이 발급한 JWT를 `Authorization: Bearer ...` 형식으로 전달합니다.
+
+주요 API:
+
+```text
+POST /predict
+POST /api/reviews/{review_id}/analyze
+GET  /api/reviews/sentiment-summary
+POST /api/recommendations
+GET  /api/sales/dashboard
+POST /api/sales/retrain
+GET  /api/sales/inventory-forecast
+GET  /api/sales/export
+```
 
 ## 예측 요청
 

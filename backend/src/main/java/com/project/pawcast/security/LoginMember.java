@@ -27,7 +27,12 @@ public class LoginMember implements UserDetails {
 
     /** 토큰 인증용: 비밀번호 없이 만든다. */
     public static LoginMember ofToken(Long id, String email, String role) {
-        return new LoginMember(id, email, "", role, true);
+        // DB와 발급 토큰은 MANAGER를 쓰지만, 접두사가 포함된 기존 토큰도
+        // ROLE_ROLE_MANAGER 권한으로 잘못 변환되지 않도록 정규화합니다.
+        String normalizedRole = role != null && role.startsWith("ROLE_")
+                ? role.substring("ROLE_".length())
+                : role;
+        return new LoginMember(id, email, "", normalizedRole, true);
     }
 
     @Override
@@ -45,3 +50,4 @@ public class LoginMember implements UserDetails {
         return email;
     }
 }
+

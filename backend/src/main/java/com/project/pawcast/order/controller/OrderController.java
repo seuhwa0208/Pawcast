@@ -81,7 +81,7 @@ public class OrderController {
     }
     // 상태 변경 - 주문
     @PostMapping("/admin/{orderId}/status")
-    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @Valid @RequestBody OrderStatusRequest request){
-        orderService.changeOrderStatus(member.getId(),orderId,request);
+    public OrderResponse changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @Valid @RequestBody OrderStatusRequest request){
+        return orderService.changeOrderStatus(member.getId(),orderId,request);
     }
 }

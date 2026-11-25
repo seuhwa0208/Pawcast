@@ -24,33 +24,42 @@ public class WishListService {
     private final MembersRepository membersRepository;
     private final ProductRepository productRepository;
 
-    //단순 찜_ID와 멤버_ID로 배송지 조회
-    public WishList findByIdAndMemberId(Long wishListId, Long memberId){
+    // 단순 찜 ID와 멤버 ID로 조회
+    public WishList findByIdAndMemberId(Long wishListId, Long memberId) {
         return wishListsRepository.findByIdAndMember_Id(wishListId, memberId)
-                .orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_WISHLIST));
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_WISHLIST));
     }
 
     // 찜 목록 조회
-    public List<WishListResponse> listWishList(Long memberId){
-        return wishListsRepository.findAllByMember_Id(memberId).stream().map(WishListResponse::from).toList();
+    public List<WishListResponse> listWishList(Long memberId) {
+        return wishListsRepository.findAllByMember_Id(memberId)
+                .stream()
+                .map(WishListResponse::from)
+                .toList();
     }
-    
+
     // 찜 추가
     @Transactional
-    public WishListResponse createWishList(Long memberId, Long productId){
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        Product product = productRepository.findById(productId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
+    public WishListResponse createWishList(Long memberId, Long productId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
 
-        WishList wishList = WishList.builder()
-                .member(member)
-                .product(product)
-                .build();
-        return WishListResponse.from(wishListsRepository.save(wishList));
+        return wishListsRepository.findByMember_IdAndProduct_Id(memberId, productId)
+                .map(WishListResponse::from)
+                .orElseGet(() -> {
+                    WishList wishList = WishList.builder()
+                            .member(member)
+                            .product(product)
+                            .build();
+                    return WishListResponse.from(wishListsRepository.save(wishList));
+                });
     }
-    
-    // 삭제
+
+    // 찜 삭제
     @Transactional
-    public void deleteWishList(Long productId, Long memberId){
-        wishListsRepository.deleteByMember_IdAndProduct_Id(memberId,productId);
+    public void deleteWishList(Long productId, Long memberId) {
+        wishListsRepository.deleteByMember_IdAndProduct_Id(memberId, productId);
     }
 }

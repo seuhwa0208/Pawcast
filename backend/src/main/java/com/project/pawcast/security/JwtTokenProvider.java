@@ -11,6 +11,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -71,7 +72,11 @@ public class JwtTokenProvider {
                 .claim(CLAIM_TYPE, type)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(key)
+                // JWT NumericDate는 초 단위 정밀도이므로 같은 초에 회전한 토큰이 같아질 수 있습니다.
+                // JTI를 넣어 동일 회원·역할·발급 시각이어도 토큰 문자열이 항상 달라지게 합니다.
+                .id(UUID.randomUUID().toString())
+                // Python FastAPI 검증기와 서명 알고리즘을 고정해 라이브러리 자동 선택 차이를 없앱니다.
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 

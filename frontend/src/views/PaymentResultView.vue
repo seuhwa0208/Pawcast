@@ -1,4 +1,3 @@
-<!-- 토스페이먼츠 리다이렉트 결과를 백엔드에서 최종 승인하고 성공·실패 상태를 안내합니다. -->
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -8,15 +7,16 @@ import { paymentService } from "@/services/paymentService";
 const route = useRoute();
 const router = useRouter();
 const { clear } = useCart();
+
 const state = ref("loading");
 const message = ref("결제 결과를 확인하고 있습니다.");
 const orderNumber = ref("");
 const orderEmail = ref("");
 const memberOrder = ref(false);
 const copyState = ref("");
+const retryMode = ref("cart");
 const isGuestOrder = computed(() => !memberOrder.value);
 
-// 조회 API가 준비되기 전에도 비회원이 이메일과 함께 보관할 수 있도록 주문번호 복사를 제공합니다.
 async function copyOrderNumber() {
   if (!orderNumber.value) return;
   try {
@@ -27,39 +27,63 @@ async function copyOrderNumber() {
   }
 }
 
-// PG 성공 리다이렉트도 서버 승인에 성공해야만 최종 결제완료로 표시합니다.
+function retryPayment() {
+  if (retryMode.value === "buy-now" && sessionStorage.getItem("powcast-buy-now")) {
+    router.push({ path: "/checkout", query: { mode: "buy-now" } });
+    return;
+  }
+
+  const hasSelected = Boolean(sessionStorage.getItem("powcast-selected-checkout"));
+  router.push(
+    hasSelected
+      ? { path: "/checkout", query: { mode: "selected" } }
+      : "/checkout"
+  );
+}
+
 onMounted(async () => {
+  const savedContext = JSON.parse(
+    sessionStorage.getItem("powcast-payment-context") || "{}",
+  );
+  retryMode.value = savedContext.mode || "cart";
+
   if (route.query.status !== "success") {
     state.value = "fail";
     message.value =
       route.query.message || "결제가 취소되었거나 인증에 실패했습니다.";
     return;
   }
+
   try {
-    const context = JSON.parse(
-      sessionStorage.getItem("powcast-payment-context") || "{}",
-    );
-    orderNumber.value = context.orderNumber || route.query.orderId || "";
-    orderEmail.value = context.orderEmail || "";
-    memberOrder.value = Boolean(context.isMember);
-    if (!context.orderId) {
+    orderNumber.value = savedContext.orderNumber || route.query.orderId || "";
+    orderEmail.value = savedContext.orderEmail || "";
+    memberOrder.value = Boolean(savedContext.isMember);
+
+    if (!savedContext.orderId) {
       throw new Error("저장된 주문 정보를 찾지 못했습니다.");
     }
+
     await paymentService.confirmPayment(
-      context.orderId,
+      savedContext.orderId,
       {
         paymentKey: route.query.paymentKey,
         orderNumber: route.query.orderId,
         amount: Number(route.query.amount),
       },
-      context.orderAccessToken,
+      savedContext.orderAccessToken,
     );
+
+    if (savedContext.mode !== "buy-now") {
+      await clear();
+    }
     sessionStorage.removeItem("powcast-payment-context");
-    if (context.mode !== "buy-now") refresh();
     sessionStorage.removeItem("powcast-buy-now");
+    sessionStorage.removeItem("powcast-selected-checkout");
+
     state.value = "success";
     message.value = "결제가 완료되었습니다.";
   } catch (error) {
+    // 결제 승인 실패 시 장바구니와 선택 목록을 비우지 않아 상품이 그대로 남도록 둡니다.
     state.value = "fail";
     message.value = error.message || "결제 승인에 실패했습니다.";
   }
@@ -125,7 +149,7 @@ onMounted(async () => {
         >
           주문 내역 보기
         </button>
-        <button v-else type="button" @click="router.push('/checkout')">
+        <button v-else type="button" @click="retryPayment">
           결제 다시 시도
         </button>
         <button type="button" class="secondary" @click="router.push('/')">

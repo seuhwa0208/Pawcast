@@ -55,6 +55,13 @@ export const authService = {
             email,
         }),
 
+    refresh: (refreshTokenValue) =>
+        postQuery("/auth/token/refresh", {
+            refreshTokenValue,
+        }),
+
+    // Browser GIS credentials are ID tokens; Spring verifies the Google signature and audience,
+    // then returns POWCAST access/refresh JWTs without a Google client secret.
     googleLogin: (idToken) =>
         post("/auth/google", {
             idToken,

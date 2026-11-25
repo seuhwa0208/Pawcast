@@ -2,6 +2,7 @@
 <script setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import { getRoleLandingPath, readUserRole } from "@/utils/roles";
 
 const props = defineProps({ status: { type: String, default: "404" } });
 const router = useRouter();
@@ -36,7 +37,7 @@ function primaryAction() {
     window.location.reload();
     return;
   }
-  router.push("/");
+  router.push(getRoleLandingPath(readUserRole()));
 }
 </script>
 

@@ -1,5 +1,6 @@
 package com.project.pawcast.member.admin.service;
 
+import com.project.pawcast.auth.repository.RefreshTokenRepository;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.admin.dto.MemberRoleRequest;
@@ -22,6 +23,7 @@ public class AdminService {
 
     private final AuthorizationValidator validator;
     private final MembersRepository membersRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // 회원 전체 목록 - 반려동물 종류별로 수 까지 표현
     public List<MemberListResponse> getMemberList(Long memberId) {
@@ -43,6 +45,8 @@ public class AdminService {
         Members user = membersRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         user.setRole(request.role());
+        // 기존 JWT에는 이전 role이 서명되어 있으므로 역할 변경 즉시 refresh 세션을 끊습니다.
+        refreshTokenRepository.revokeAllByMember(user.getId());
     }
 
     // 회원 상태 변경

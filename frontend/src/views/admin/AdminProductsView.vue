@@ -5,14 +5,20 @@ import { RouterLink } from "vue-router";
 import { aiAnalyticsService } from "@/services/aiAnalyticsService";
 import { adminManagementService } from "@/services/adminManagementService";
 import PaginationBar from "@/components/PaginationBar.vue";
+import { isAdminRole, readUserRole } from "@/utils/roles";
 
+const isAdmin = isAdminRole(readUserRole());
 const products = ref([]);
 const bestProducts = ref([]);
 const worstProducts = ref([]);
 const inventoryForecast = ref(null);
 const sentimentSummary = ref(null);
+const sentimentLoading = ref(false);
+const sentimentMessage = ref("");
 const loading = ref(false);
 const error = ref("");
+const statusError = ref("");
+const statusUpdatingId = ref(null);
 const aiNotice = ref("");
 const keyword = ref("");
 const page = ref(1);
@@ -70,9 +76,92 @@ const formatRating = (value) => Number(value || 0).toFixed(1);
 const stockoutLabel = (item) =>
   item.daysUntilStockout == null ? "계산 불가" : `${item.daysUntilStockout}일`;
 
+function rankProducts(direction) {
+  const factor = direction === "best" ? -1 : 1;
+  return [...products.value]
+    .sort(
+      (left, right) =>
+        factor * (Number(left.salesCount || 0) - Number(right.salesCount || 0)) ||
+        Number(right.id || 0) - Number(left.id || 0),
+    )
+    .slice(0, 3);
+}
+
+async function changeProductStatus(product, status) {
+  if (
+    !product.id ||
+    status === product.status ||
+    statusUpdatingId.value != null
+  ) {
+    return;
+  }
+
+  statusError.value = "";
+  statusUpdatingId.value = product.id;
+
+  try {
+    // 상품 한 행의 선택은 상품 전체 옵션에 적용되며, 서버가 돌려준 집계 상태를
+    // 사용해 화면의 값이 DB의 실제 저장 결과와 정확히 일치하게 합니다.
+    const updatedProduct = await adminManagementService.changeProductStatus(
+      product.id,
+      status,
+    );
+    Object.assign(product, updatedProduct);
+  } catch (cause) {
+    statusError.value = cause.message || "상품 상태를 변경하지 못했습니다.";
+
+    // API 실패 시 선택값이 브라우저 DOM에 남지 않도록 목록을 재조회합니다.
+    // 재조회마저 실패하면 Vue 상태의 기존 값으로 셀렉트를 되돌립니다.
+    try {
+      products.value = await adminManagementService.getProducts();
+    } catch (refreshCause) {
+      statusError.value += " 상품 목록을 새로고침하지 못해 기존 상태를 유지합니다.";
+      product.status = product.status || (product.soldOut ? "SOLD_OUT" : "ON_SALE");
+    }
+  } finally {
+    statusUpdatingId.value = null;
+  }
+}
+
+async function analyzeRecentSentiments() {
+  if (sentimentLoading.value) {
+    return;
+  }
+
+  sentimentLoading.value = true;
+  sentimentMessage.value = "";
+  aiNotice.value = "";
+
+  try {
+    let analyzedCount = 0;
+    let remainingCount = 0;
+
+    // 서버가 100건씩 처리하므로 리뷰가 많아도 브라우저 요청 하나가 과도하게
+    // 오래 걸리지 않습니다. 아직 누락·레거시 라벨이 남아 있으면 다음 배치를 요청합니다.
+    do {
+      const result = await aiAnalyticsService.analyzeRecentReviewSentiments(28, 100);
+      analyzedCount += Number(result?.analyzedCount || 0);
+      remainingCount = Number(result?.remainingCount || 0);
+    } while (remainingCount > 0);
+
+    // 쓰기 응답의 단순 건수 대신 DB에서 다시 계산한 요약을 사용해
+    // 비율과 상품별 부정 현황이 실제 저장 결과와 함께 바뀌도록 합니다.
+    sentimentSummary.value = await aiAnalyticsService.getReviewSentimentSummary(5, 28);
+    sentimentMessage.value = analyzedCount > 0
+      ? `최근 28일 리뷰 ${formatNumber(analyzedCount)}건 분석 완료`
+      : "최근 28일 AI 감성 분석 결과가 최신 상태입니다.";
+  } catch (cause) {
+    sentimentMessage.value = "";
+    aiNotice.value = cause.message || "리뷰 감정 분석을 완료하지 못했습니다.";
+  } finally {
+    sentimentLoading.value = false;
+  }
+}
+
 async function loadProducts() {
   loading.value = true;
   error.value = "";
+  statusError.value = "";
   aiNotice.value = "";
 
   try {
@@ -87,7 +176,9 @@ async function loadProducts() {
       adminManagementService.getBestProducts(),
       adminManagementService.getWorstProducts(),
       aiAnalyticsService.getInventoryForecast(8),
-      aiAnalyticsService.getReviewSentimentSummary(5),
+      isAdmin
+        ? aiAnalyticsService.getReviewSentimentSummary(5, 28)
+        : Promise.resolve(null),
     ]);
 
     if (productsResult.status === "rejected") {
@@ -99,21 +190,23 @@ async function loadProducts() {
       : [];
     page.value = 1;
     bestProducts.value =
-      bestResult.status === "fulfilled" && Array.isArray(bestResult.value)
+      bestResult.status === "fulfilled" && bestResult.value?.length
         ? bestResult.value
-        : [];
+        : rankProducts("best");
     worstProducts.value =
-      worstResult.status === "fulfilled" && Array.isArray(worstResult.value)
+      worstResult.status === "fulfilled" && worstResult.value?.length
         ? worstResult.value
-        : [];
+        : rankProducts("worst");
     inventoryForecast.value =
       forecastResult.status === "fulfilled" ? forecastResult.value : null;
     sentimentSummary.value =
-      sentimentResult.status === "fulfilled" ? sentimentResult.value : null;
+      isAdmin && sentimentResult.status === "fulfilled"
+        ? sentimentResult.value
+        : null;
 
     if (
       forecastResult.status === "rejected" ||
-      sentimentResult.status === "rejected"
+      (isAdmin && sentimentResult.status === "rejected")
     ) {
       aiNotice.value = "AI 분석 결과는 현재 확인 중입니다.";
     }
@@ -201,7 +294,7 @@ onMounted(loadProducts);
                     <small>{{ item.optionLabel }}</small>
                   </td>
                   <td>{{ formatNumber(item.stock) }}</td>
-                  <td>{{ formatNumber(item.sold_quantity) }}</td>
+                  <td>{{ formatNumber(item.soldQuantity) }}</td>
                   <td>{{ item.averageDailySales }}</td>
                   <td>
                     <span class="stockout-pill">{{ stockoutLabel(item) }}</span>
@@ -214,14 +307,26 @@ onMounted(loadProducts);
           <p v-else class="empty-panel">AI 재고 소진 예측 데이터가 없습니다.</p>
         </article>
 
-        <article class="product-panel compact-panel">
+        <article v-if="isAdmin" class="product-panel compact-panel">
           <header class="panel-heading">
             <div>
               <small>AI REVIEW SENTIMENT</small>
               <h2>리뷰 감성 비율</h2>
-              <p>AI 분석이 완료된 리뷰 기준</p>
+              <p>최근 28일 · AI 분석 완료 리뷰 기준</p>
             </div>
+            <button
+              type="button"
+              class="sentiment-analyze-button"
+              :disabled="sentimentLoading"
+              @click="analyzeRecentSentiments"
+            >
+              {{ sentimentLoading ? "감정 분석 중..." : "감정 분석하기" }}
+            </button>
           </header>
+
+          <p v-if="sentimentMessage" class="sentiment-message" role="status">
+            {{ sentimentMessage }}
+          </p>
 
           <template v-if="sentiment?.analyzedCount">
             <div class="sentiment-bar">
@@ -249,7 +354,12 @@ onMounted(loadProducts);
               </li>
             </ol>
           </template>
-          <p v-else class="empty-panel">AI 감성 분석 데이터가 없습니다.</p>
+          <p v-else class="empty-panel">
+            최근 28일에 분석 완료된 AI 감성 데이터가 없습니다. 감정 분석하기를 눌러 분석하세요.
+          </p>
+          <p v-if="aiNotice" class="sentiment-error" role="alert">
+            {{ aiNotice }}
+          </p>
         </article>
       </section>
 
@@ -259,7 +369,6 @@ onMounted(loadProducts);
           <div>
             <small>SALES PERFORMANCE</small>
             <h2>상품 성과 · 베스트 3 / 워스트 3</h2>
-            <p>백엔드 판매량 집계 기준</p>
           </div>
         </header>
 
@@ -315,6 +424,10 @@ onMounted(loadProducts);
           </div>
         </header>
 
+        <p v-if="statusError" class="products-message error" role="alert">
+          {{ statusError }}
+        </p>
+
         <div class="table-scroll">
           <table>
             <thead>
@@ -323,6 +436,7 @@ onMounted(loadProducts);
                 <th>브랜드</th>
                 <th>분류</th>
                 <th>가격</th>
+                <th>재고</th>
                 <th>판매</th>
                 <th>찜</th>
                 <th>리뷰</th>
@@ -343,21 +457,27 @@ onMounted(loadProducts);
                   </span>
                 </td>
                 <td>{{ formatCurrency(product.price) }}</td>
+                <td>{{ product.stock == null ? "-" : formatNumber(product.stock) }}</td>
                 <td>{{ formatNumber(product.salesCount) }}</td>
                 <td>{{ formatNumber(product.wishCount) }}</td>
                 <td>{{ formatNumber(product.reviewCount) }}</td>
                 <td>{{ formatRating(product.averageRating) }}</td>
                 <td>
-                  <span
-                    class="product-status"
-                    :class="{ 'product-sold-out': product.soldOut }"
-                  >
-                    {{ product.soldOut ? "품절" : "판매 중" }}
+                  <span class="product-status-select">
+                    <select
+                      :value="product.status || (product.soldOut ? 'SOLD_OUT' : 'ON_SALE')"
+                      :disabled="statusUpdatingId != null"
+                      @change="changeProductStatus(product, $event.target.value)"
+                    >
+                      <option value="ON_SALE">판매 중</option>
+                      <option value="SOLD_OUT">품절</option>
+                      <option value="DISCONTINUED">판매 종료</option>
+                    </select>
                   </span>
                 </td>
               </tr>
               <tr v-if="!pagedProducts.length">
-                <td colspan="9" class="empty-row">
+                <td colspan="10" class="empty-row">
                   검색 조건에 맞는 상품이 없습니다.
                 </td>
               </tr>
@@ -530,6 +650,54 @@ onMounted(loadProducts);
   color: #b15349;
 }
 
+.product-status-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 98px;
+}
+
+.product-status-select select {
+  width: 100%;
+  height: 36px;
+  appearance: none;
+  border: 1px solid #d9b99e;
+  border-radius: 9px;
+  background: #fffaf5;
+  padding: 0 34px 0 12px;
+  color: #5a3b29;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.product-status-select::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  width: 0;
+  height: 0;
+  border-right: 5px solid transparent;
+  border-left: 5px solid transparent;
+  border-top: 6px solid #805737;
+  pointer-events: none;
+  transform: translateY(-25%);
+}
+
+.product-status-select:focus-within::after {
+  border-top: 0;
+  border-bottom: 6px solid #805737;
+  transform: translateY(-50%);
+}
+
+.product-status-select select:hover,
+.product-status-select select:focus {
+  border-color: #a66a42;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(166 106 66 / 12%);
+}
+
 .empty-panel {
   margin: 28px 0 8px;
   color: #947a66;
@@ -538,6 +706,39 @@ onMounted(loadProducts);
 
 .compact-panel {
   min-height: 300px;
+}
+
+.sentiment-analyze-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  border: 1px solid #bd8965;
+  border-radius: 9px;
+  padding: 0 12px;
+  background: #fff8f2;
+  color: #70482e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sentiment-analyze-button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.sentiment-message,
+.sentiment-error {
+  margin: 12px 0 0;
+  font-size: 13px;
+}
+
+.sentiment-message {
+  color: #587348;
+}
+
+.sentiment-error {
+  color: #b54f3d;
 }
 
 .sentiment-bar {
@@ -591,6 +792,13 @@ onMounted(loadProducts);
 
 .negative-products b {
   color: #b95d51;
+}
+
+@media (max-width: 560px) {
+  .compact-panel .panel-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .performance-panel {
@@ -761,3 +969,5 @@ onMounted(loadProducts);
   }
 }
 </style>
+
+

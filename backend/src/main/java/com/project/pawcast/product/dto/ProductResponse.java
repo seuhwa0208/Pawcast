@@ -22,7 +22,9 @@ public record ProductResponse(
         Long reviewCount,
         BigDecimal averageRating,
         Boolean soldOut,
-        BestReviewResponse bestReview
+        BestReviewResponse bestReview,
+        Integer stock,
+        String status
 ) {
     public static ProductResponse from(ProductListView product) {
         return from(product, null);
@@ -35,7 +37,7 @@ public record ProductResponse(
                 product.getImagePath(), product.getVariantId(), product.getPrice(),
                 product.getSalesCount(),
                 product.getWishCount(), product.getReviewCount(), product.getAverageRating(),
-                product.getSoldOut(), bestReview
+                product.getSoldOut(), bestReview, null, null
         );
     }
 }

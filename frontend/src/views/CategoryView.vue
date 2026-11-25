@@ -409,7 +409,7 @@ const list = computed(() => {
           <label class="side-keyword"
             ><span class="side-search-icon" aria-hidden="true" /><input
               v-model="keyword"
-              placeholder="예) 연어 사료"
+              placeholder="예) 연어 사료, 츄르"
           /></label>
           <button
             class="side-detail"

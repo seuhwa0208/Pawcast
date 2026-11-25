@@ -6,6 +6,7 @@ import { useCart } from "@/stores/cart";
 import { useAuthSession } from "@/stores/auth";
 import { addressService } from "@/services/addressService";
 import { paymentService } from "@/services/paymentService";
+import { getMyProfile } from "@/services/memberService";
 
 const TOSS_CLIENT_KEY =
   import.meta.env.VITE_TOSS_CLIENT_KEY ||
@@ -23,12 +24,23 @@ const isMember = computed(() => Boolean(accessToken.value));
 const buyNowItem = ref(
   JSON.parse(sessionStorage.getItem("powcast-buy-now") || "null"),
 );
+const selectedCheckoutItems = ref(
+  JSON.parse(sessionStorage.getItem("powcast-selected-checkout") || "[]"),
+);
 const isBuyNow = computed(
   () => route.query.mode === "buy-now" && Boolean(buyNowItem.value),
 );
-const checkoutItems = computed(() =>
-  isBuyNow.value ? [buyNowItem.value] : items.value,
+const isSelectedMode = computed(
+  () =>
+    route.query.mode === "selected" &&
+    Array.isArray(selectedCheckoutItems.value) &&
+    selectedCheckoutItems.value.length > 0,
 );
+const checkoutItems = computed(() => {
+  if (isBuyNow.value) return [buyNowItem.value];
+  if (isSelectedMode.value) return selectedCheckoutItems.value;
+  return items.value;
+});
 const checkoutTotal = computed(() =>
   checkoutItems.value.reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
@@ -108,6 +120,34 @@ async function loadAddresses() {
     errorMessage.value = error.message || "배송지를 불러오지 못했습니다.";
   } finally {
     addressLoading.value = false;
+  }
+}
+
+async function loadMemberProfile() {
+  if (!isMember.value) return;
+  try {
+    const res = await getMyProfile();
+    const profile = res?.member || res?.profile || res?.data || res;
+    if (!profile) return;
+
+    member.value = profile;
+
+    const name = profile.username || profile.name || profile.nickname || "";
+    const tel = profile.tel || profile.phone || profile.phoneNumber || "";
+    const email = profile.email || "";
+
+    if (!ordererName.value && name) {
+      ordererName.value = name;
+    }
+    if (!ordererPhone.value && tel) {
+      ordererPhone.value = formatPhoneNumber(tel);
+    }
+    if (!buyerEmail.value && email) {
+      buyerEmail.value = email;
+    }
+  } catch (error) {
+    // 주문서 작성 자체를 막지 않도록 조용히 넘기거나 필요 시 콘솔만 남깁니다.
+    console.warn("회원 정보를 불러오지 못했습니다:", error);
   }
 }
 
@@ -286,7 +326,11 @@ async function requestPayment() {
         orderAccessToken,
         orderEmail: buyerEmail.value,
         isMember: isMember.value,
-        mode: isBuyNow.value ? "buy-now" : "cart",
+        mode: isBuyNow.value
+          ? "buy-now"
+          : isSelectedMode.value
+            ? "selected"
+            : "cart",
       }),
     );
     const TossPayments = await loadTossSdk();
@@ -330,9 +374,14 @@ async function requestPayment() {
 }
 
 onMounted(() => {
-  if (!checkoutItems.value.length) router.replace("/cart");
-  else if (isMember.value) loadAddresses();
-  else initializeGuestOrder();
+  if (!checkoutItems.value.length) {
+    router.replace("/cart");
+  } else if (isMember.value) {
+    loadMemberProfile();
+    loadAddresses();
+  } else {
+    initializeGuestOrder();
+  }
 });
 </script>
 

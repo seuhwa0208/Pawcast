@@ -3,7 +3,6 @@ package com.project.pawcast.member.admin.controller;
 import com.project.pawcast.member.admin.dto.MemberRoleRequest;
 import com.project.pawcast.member.admin.dto.MemberStatusRequest;
 import com.project.pawcast.member.admin.service.AdminService;
-import com.project.pawcast.refund.service.RefundService;
 import com.project.pawcast.security.LoginMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,7 +16,6 @@ import java.util.List;
 @RequestMapping("/api/admin")
 public class AdminController {
     private final AdminService adminService;
-    private final RefundService refundService;
     
     // 회원 전체목록 - 강아지수 고양이수 반영
     @GetMapping
@@ -36,9 +34,4 @@ public class AdminController {
         adminService.changeMemberRole(member.getId(),userId, request);
     }
 
-    // 환불 승인
-    @PatchMapping("/refunds/{refundId}/approve")
-    public void approveRefund(@PathVariable Long refundId, @AuthenticationPrincipal LoginMember member) {
-        refundService.approveRefund(refundId, member.getId());
-    }
 }

@@ -480,7 +480,7 @@ public class OrderService {
 
     // 관리자/매니저용 주문 상태 변경 (최초 배송 완료 전환 시 상품 판매량 반영)
     @Transactional
-    public void changeOrderStatus(
+    public OrderResponse changeOrderStatus(
             Long memberId,
             Long orderId,
             OrderStatusRequest request
@@ -494,15 +494,21 @@ public class OrderService {
 
         validator.validateManager(member);
 
-        Order order = orderRepository.findById(orderId)
+        Order order = orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(
                         () -> new BusinessException(
                                 ErrorCode.NOT_FOUND_ORDER
                         )
                 );
 
-        if (order.getStatus() != OrderStatus.DELIVERED
-                && request.orderStatus() == OrderStatus.DELIVERED) {
+        OrderStatus currentStatus = order.getStatus();
+        OrderStatus nextStatus = request.orderStatus();
+
+        if (!isAllowedAdminTransition(currentStatus, nextStatus)) {
+            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+
+        if (nextStatus == OrderStatus.DELIVERED) {
 
             List<OrderItem> orderItems =
                     orderItemRepository.findAllByOrder_Id(orderId);
@@ -518,6 +524,34 @@ public class OrderService {
             }
         }
 
-        order.setStatus(request.orderStatus());
+        order.setStatus(nextStatus);
+        return toOrderResponse(
+                order,
+                orderItemRepository.findAllByOrder_Id(orderId)
+        );
+    }
+
+    private boolean isAllowedAdminTransition(
+            OrderStatus currentStatus,
+            OrderStatus nextStatus
+    ) {
+        if (nextStatus != OrderStatus.PAID
+                && nextStatus != OrderStatus.SHIPPING
+                && nextStatus != OrderStatus.DELIVERED) {
+            return false;
+        }
+        if (currentStatus == nextStatus
+                || currentStatus == OrderStatus.DELIVERED
+                || currentStatus == OrderStatus.CANCELLED) {
+            return false;
+        }
+        return switch (currentStatus) {
+            case PENDING_PAYMENT -> nextStatus == OrderStatus.PAID;
+            // 운영자가 배송을 이미 완료한 주문은 PAID 단계에서 바로 완료 처리할 수 있습니다.
+            case PAID -> nextStatus == OrderStatus.SHIPPING
+                    || nextStatus == OrderStatus.DELIVERED;
+            case PREPARING, SHIPPING -> nextStatus == OrderStatus.DELIVERED;
+            default -> false;
+        };
     }
 }

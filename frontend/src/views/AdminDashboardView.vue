@@ -1,5 +1,5 @@
 
-<!-- 관리자 매출 분석: Spring Boot API 응답 기반 -->
+<!-- 관리자 매출 분석: FastAPI가 PostgreSQL을 직접 집계한 응답 기반 -->
 <script setup>
 import {
   computed,
@@ -10,9 +10,11 @@ import {
   watch,
 } from "vue";
 import { adminDashboardService } from "@/services/adminDashboardService";
+import { isAdminRole, readUserRole } from "@/utils/roles";
 import "@/styles/admin-sales-analytics.css";
 import salesExportSchema from "@shared/export-schemas/sales.json";
 
+const isAdmin = isAdminRole(readUserRole());
 const today = new Date();
 const currentYear = today.getFullYear();
 const currentMonth = today.getMonth() + 1;
@@ -153,6 +155,19 @@ const forecast = computed(() => ({
       ? null
       : Number(dashboard.value.forecast.predictedSales),
   growthRate: dashboard.value?.forecast?.growthRate ?? null,
+  forecastBaseDate: dashboard.value?.forecast?.forecastBaseDate || "",
+  targetMonth: dashboard.value?.forecast?.targetMonth || "",
+  forecastStartDate: dashboard.value?.forecast?.forecastStartDate || "",
+  forecastEndDate: dashboard.value?.forecast?.forecastEndDate || "",
+  forecastDays: Number(dashboard.value?.forecast?.forecastDays ?? 0),
+  isCumulative: dashboard.value?.forecast?.isCumulative === true,
+  growthComparison: dashboard.value?.forecast?.growthComparison || "",
+  previousDailyAverage: Number(
+    dashboard.value?.forecast?.previousDailyAverage ?? 0,
+  ),
+  recentDailyAverage: Number(
+    dashboard.value?.forecast?.recentDailyAverage ?? 0,
+  ),
   insight:
     dashboard.value?.forecast?.insight ||
     "제공된 판매 인사이트가 없습니다.",
@@ -211,6 +226,11 @@ function formatDate(date) {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+function getForecastDate() {
+  // FastAPI 계약에서 기준일은 학습에 포함되는 마지막 날(오늘)입니다.
+  return formatDate(new Date());
 }
 
 function formatDateTime(date) {
@@ -294,11 +314,14 @@ async function loadDashboard() {
   error.value = "";
 
   const filters = buildFilters();
+  const forecastDate = getForecastDate();
 
   try {
-    const result = await adminDashboardService.getSalesDashboard(filters);
-    // Spring이 내부 API 키로 AI를 호출한 응답이다. 브라우저가 AI 서버에 직접
-    // JWT를 전달하지 않으므로 로그인 토큰 검증 실패가 매출 화면에 영향을 주지 않는다.
+    const result = await adminDashboardService.getSalesDashboard(
+      filters,
+      forecastDate,
+    );
+    // Vue가 관리자 JWT를 전달해 FastAPI의 실제 PostgreSQL 집계를 직접 조회한다.
     dashboard.value = {
       ...result,
       forecast: {
@@ -326,14 +349,53 @@ async function retrainModel() {
 
   try {
     const result = await adminDashboardService.retrainSalesModel(
-      formatDate(new Date()),
+      getForecastDate(),
     );
 
-    retrainMessage.value = result?.trainingDays
-      ? `재학습 요청 완료 · ${result.trainingDays}일 데이터 반영`
-      : "재학습 요청이 처리되었습니다. 실제 모델 반영 상태는 서버에서 확인해 주세요.";
-
-    await loadDashboard();
+    // POST 응답이 이번 재학습의 최종 결과입니다. 전체 dashboard를 다시 조회하면
+    // 선택 기간 기준 예측이 다시 내려와 방금 계산한 예측값을 덮을 수 있습니다.
+    const trainedProducts = Array.isArray(result?.top_products)
+      ? result.top_products
+      : [];
+    dashboard.value = {
+      ...(dashboard.value || {}),
+      forecast: {
+        predictedSales:
+          result?.predicted_sales == null
+            ? null
+            : Number(result.predicted_sales),
+        growthRate:
+          result?.growth_rate == null
+            ? null
+            : Number(result.growth_rate),
+        forecastBaseDate:
+          result?.forecastBaseDate || result?.forecast_date || getForecastDate(),
+        insight:
+          result?.insight || "재학습 응답에 판매 인사이트가 없습니다.",
+        forecastDate: result?.forecast_date || getForecastDate(),
+        trainingDays: Number(result?.training_days ?? 0),
+        targetMonth: result?.targetMonth || "",
+        forecastStartDate: result?.forecastStartDate || "",
+        forecastEndDate: result?.forecastEndDate || "",
+        forecastDays: Number(result?.forecastDays ?? 0),
+        isCumulative: result?.isCumulative === true,
+        growthComparison:
+          result?.growthComparison || "",
+        previousDailyAverage: Number(result?.previousDailyAverage ?? 0),
+        recentDailyAverage: Number(result?.recentDailyAverage ?? 0),
+        topProducts: trainedProducts.map((product) => ({
+          name: product.name || "이름 없는 상품",
+          sales: Number(product.sales ?? 0),
+          quantity: Number(product.quantity ?? 0),
+          growthRate: Number(product.growthRate ?? 0),
+        })),
+      },
+    };
+    appliedAt.value = formatDateTime(new Date());
+    retrainMessage.value =
+      "재학습 완료 · 최근 " +
+      Number(result?.training_days ?? 0) +
+      "일 데이터 반영";
   } catch (cause) {
     retrainMessage.value =
       cause.message || "재학습 요청에 실패했습니다.";
@@ -940,6 +1002,7 @@ onBeforeUnmount(() => {
           카테고리별 매출 데이터가 없습니다.
         </p>
       </article>
+
     </section>
 
     <section class="sales-panel sales-ai-panel">
@@ -952,12 +1015,13 @@ onBeforeUnmount(() => {
           <h2>다음 달 판매 예측</h2>
 
           <p>
-            서버에서 제공하는 예측 결과입니다.
-            단순 추정치일 수 있습니다.
+            최근 28일 DB 주문을 바탕으로 한 추정치입니다.
+            시드·테스트 주문이 포함되어 있을 수 있습니다.
           </p>
         </section>
 
         <button
+          v-if="isAdmin"
           type="button"
           class="sales-primary-button"
           :disabled="retraining"
@@ -970,7 +1034,7 @@ onBeforeUnmount(() => {
       <section class="sales-ai-grid">
         <article class="sales-ai-result">
           <small>
-            다음 달 예상 매출
+            {{ forecast.targetMonth ? `${forecast.targetMonth} 예상 매출` : "다음 달 예상 매출" }}
           </small>
 
           <strong>
@@ -978,11 +1042,18 @@ onBeforeUnmount(() => {
           </strong>
 
           <p v-if="forecast.growthRate != null">
-            현재 조회 기간 대비
+            14일 일평균: {{ formatWon(forecast.previousDailyAverage) }} →
+            {{ formatWon(forecast.recentDailyAverage) }} · 증감
             <b>
               {{ formatPercent(forecast.growthRate) }}
             </b>
-            예상
+          </p>
+          <p v-if="forecast.forecastStartDate && forecast.forecastEndDate">
+            예측 대상: {{ forecast.forecastStartDate }} ~ {{ forecast.forecastEndDate }}
+            ({{ forecast.forecastDays }}일 · 누적값 아님)
+          </p>
+          <p v-if="forecast.forecastBaseDate">
+            학습 기준일: {{ forecast.forecastBaseDate }} · 최근 28일 일별 매출 기준
           </p>
         </article>
 
@@ -1068,30 +1139,11 @@ onBeforeUnmount(() => {
               <td>
                 {{ formatWon(category.sales) }}
               </td>
+              <td>{{ formatNumber(category.orders) }}건</td>
+              <td>{{ category.orders ? formatWon(category.sales / category.orders) : '-' }}</td>
+              <td>{{ formatWon(category.refund) }}</td>
+              <td>{{ formatPercent(category.growth) }}</td>
 
-              <td>
-                {{
-                  category.orders == null
-                    ? "-"
-                    : `${formatNumber(category.orders)}건`
-                }}
-              </td>
-
-              <td>
-                {{
-                  category.orders
-                    ? formatWon(category.sales / category.orders)
-                    : "-"
-                }}
-              </td>
-
-              <td>
-                {{ formatWon(category.refund) }}
-              </td>
-
-              <td>
-                {{ formatPercent(category.growth) }}
-              </td>
             </tr>
 
             <tr v-if="!categories.length">
@@ -1111,20 +1163,11 @@ onBeforeUnmount(() => {
               <td>
                 {{ formatWon(summary.totalSales) }}
               </td>
-
-              <td>
-                {{ formatNumber(summary.totalOrders) }}건
-              </td>
-
-              <td>
-                {{ formatWon(summary.averageOrderAmount) }}
-              </td>
-
-              <td>
-                {{ formatWon(summary.refundAmount) }}
-              </td>
-
+              <td>{{ formatNumber(summary.totalOrders) }}건</td>
+              <td>{{ formatWon(summary.averageOrderAmount) }}</td>
+              <td>{{ formatWon(summary.refundAmount) }}</td>
               <td>-</td>
+
             </tr>
           </tfoot>
         </table>
@@ -1174,7 +1217,7 @@ onBeforeUnmount(() => {
         </label>
 
         <button
-          type="button"
+                    type="button"
           class="sales-primary-button"
           :disabled="exporting"
           @click="downloadStatistics"
@@ -1193,5 +1236,9 @@ onBeforeUnmount(() => {
     </section>
   </main>
 </template>
+
+
+
+
 
 

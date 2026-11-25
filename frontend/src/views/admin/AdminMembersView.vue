@@ -14,6 +14,7 @@ const search = ref("");
 const statusFilter = ref("ALL");
 const roleFilter = ref("ALL");
 const page = ref(1);
+const fetchedAt = ref("");
 
 const statusLabel = {
   ACTIVE: "활성",
@@ -110,6 +111,14 @@ const distribution = computed(() => [
   },
 ]);
 
+const distributionWithPercent = computed(() => {
+  const total = stats.value.total || 1;
+  return distribution.value.map((item) => ({
+    ...item,
+    percent: ((item.count / total) * 100).toFixed(1),
+  }));
+});
+
 const donutStyle = computed(() => {
   const total = stats.value.total || 1;
   let position = 0;
@@ -126,6 +135,12 @@ const donutStyle = computed(() => {
 
 const formatDate = (value) =>
   value ? String(value).slice(0, 10).replaceAll("-", ".") : "-";
+const formatFetchedAt = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")} (${weekday})`;
+};
 
 watch([search, statusFilter, roleFilter], () => {
   page.value = 1;
@@ -144,6 +159,7 @@ async function loadMembers() {
   try {
     const result = await adminManagementService.getMembers();
     members.value = Array.isArray(result) ? result : [];
+    fetchedAt.value = new Date().toISOString();
     page.value = 1;
   } catch (cause) {
     members.value = [];
@@ -234,7 +250,7 @@ onMounted(loadMembers);
             <h2>회원 목록</h2>
             <p>검색과 필터 결과를 10명씩 표시합니다.</p>
           </div>
-          <button type="button" @click="loadMembers">새로고침</button>
+          <small class="data-fetched-at">조회 시간: {{ formatFetchedAt(fetchedAt) }}</small>
         </header>
 
         <div class="member-filters">
@@ -345,10 +361,11 @@ onMounted(loadMembers);
           </span>
         </div>
         <ul>
-          <li v-for="item in distribution" :key="item.key">
+          <li v-for="item in distributionWithPercent" :key="item.key">
             <i :style="{ background: item.color }" />
             <span>{{ item.label }}</span>
             <b>{{ item.count.toLocaleString() }}명</b>
+            <small>{{ item.percent }}%</small>
           </li>
         </ul>
       </aside>

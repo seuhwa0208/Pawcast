@@ -447,8 +447,19 @@ public class ProductService {
                 ? BigDecimal.ZERO.setScale(1)
                 : BigDecimal.valueOf(product.getRatingSum())
                 .divide(BigDecimal.valueOf(product.getReviewCount()), 1, RoundingMode.HALF_UP);
-        boolean soldOut = variants.stream().noneMatch(option ->
-                option.getProductVariantStatus() == ProductVariantStatus.ON_SALE && option.getStock() > 0);
+        boolean hasSellableVariant = variants.stream().anyMatch(option ->
+                option.getProductVariantStatus() == ProductVariantStatus.ON_SALE
+                        && option.getStock() > 0);
+        boolean allDiscontinued = !variants.isEmpty() && variants.stream().allMatch(option ->
+                option.getProductVariantStatus() == ProductVariantStatus.DISCONTINUED);
+        boolean soldOut = !hasSellableVariant;
+        String productStatus = variants.isEmpty()
+                ? null
+                : hasSellableVariant
+                        ? ProductVariantStatus.ON_SALE.name()
+                        : allDiscontinued
+                                ? ProductVariantStatus.DISCONTINUED.name()
+                                : ProductVariantStatus.SOLD_OUT.name();
         return new ProductResponse(
                 product.getId(), product.getName(), product.getBrand(),
                 product.getCategory() == null ? null : product.getCategory().getName(),
@@ -459,8 +470,62 @@ public class ProductService {
                 variant == null ? null : variant.getId(),
                 variant == null ? null : variant.getPrice(),
                 product.getSalesCount(), product.getWishCount(), product.getReviewCount(),
-                average, soldOut, null
+                average, soldOut, null,
+                variants.stream().mapToInt(ProductVariant::getStock).sum(),
+                productStatus
         );
+    }
+
+    @Transactional
+    public ProductResponse changeProductStatus(
+            Long memberId,
+            Long productId,
+            ProductVariantStatus requestedStatus
+    ) {
+        validateManager(memberId);
+
+        // 관리자 목록의 셀렉트는 상품 한 행을 제어하므로 해당 상품의 옵션을
+        // 모두 잠그고 한 트랜잭션에서 변경해 고객 목록의 판매 가능 여부와 맞춥니다.
+        Product product = productRepository.findManagementProductById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
+        List<ProductVariant> variants = variantRepository.findAllByProductIdForUpdate(productId);
+        if (variants.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT);
+        }
+
+        if (requestedStatus == ProductVariantStatus.ON_SALE) {
+            boolean hasStock = variants.stream().anyMatch(variant -> variant.getStock() > 0);
+            if (!hasStock) {
+                throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+            }
+
+            // 재고 없는 옵션은 판매 중으로 노출하지 않고 품절로 유지합니다.
+            // 재고가 있는 옵션만 판매 가능하게 하여 공개 조회의 재고 조건과 일치시킵니다.
+            for (ProductVariant variant : variants) {
+                variant.setProductVariantStatus(
+                        variant.getStock() > 0
+                                ? ProductVariantStatus.ON_SALE
+                                : ProductVariantStatus.SOLD_OUT
+                );
+            }
+        } else {
+            // 품절·판매 종료는 상품 전체에 적용해 다른 옵션이 상태를 우회하지 못하게 합니다.
+            for (ProductVariant variant : variants) {
+                variant.setProductVariantStatus(requestedStatus);
+            }
+        }
+
+        return managementResponse(product);
+    }
+
+    @Transactional
+    public void changeVariantStatus(Long memberId, Long variantId, ProductVariantStatus status) {
+        validateManager(memberId);
+        ProductVariant variant = lockedVariant(variantId);
+        if (status == ProductVariantStatus.ON_SALE && variant.getStock() == 0) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+        }
+        variant.setProductVariantStatus(status);
     }
 
     // 베스트3 판매량 기준

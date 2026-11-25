@@ -2,7 +2,6 @@ package com.project.pawcast.member.admin.service;
 
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
-import com.project.pawcast.member.admin.client.SalesForecastClient;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
 import com.project.pawcast.security.AuthorizationValidator;
@@ -29,7 +28,6 @@ public class AdminDashboardService {
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final NamedParameterJdbcTemplate jdbc;
-    private final SalesForecastClient salesForecastClient;
 
     public Map<String, Object> getSalesDashboard(
             Long adminId, String unit, Integer year, LocalDate from, LocalDate to) {
@@ -124,19 +122,11 @@ public class AdminDashboardService {
         trend.put("sales", trendRows.stream().map(row -> row.get("sales")).toList());
         trend.put("orders", trendRows.stream().map(row -> row.get("orders")).toList());
 
-        // # 매출 분석: 화면에서 임의로 5%를 더하던 값을 없애고 FastAPI의 실제 판매 예측을 사용한다.
+        // AI 예측은 Vue가 FastAPI에서 직접 조회한다. 이 Spring 응답은 일반 DB 집계만 담당한다.
         Map<String, Object> forecast = new LinkedHashMap<>();
-        try {
-            SalesForecastClient.ForecastResponse forecastResult = salesForecastClient.retrain(end.plusDays(1));
-            forecast.put("predictedSales", forecastResult.predicted_sales());
-            forecast.put("growthRate", forecastResult.growth_rate());
-            forecast.put("insight", forecastResult.insight());
-        } catch (BusinessException exception) {
-            // 매출 집계 자체는 DB에서 계속 제공하고, AI 서버 미기동은 임의 수치 대신 명확히 알린다.
-            forecast.put("predictedSales", null);
-            forecast.put("growthRate", null);
-            forecast.put("insight", "AI 판매 예측 서버에 연결하지 못했습니다. AI 서버 실행과 내부 API 키 설정을 확인해 주세요.");
-        }
+        forecast.put("predictedSales", null);
+        forecast.put("growthRate", null);
+        forecast.put("insight", "AI 예측은 FastAPI에서 직접 제공합니다.");
         forecast.put("topProducts", topProducts);
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -158,47 +148,6 @@ public class AdminDashboardService {
                 WHERE created_at IS NOT NULL
                 ORDER BY sales_year DESC
                 """, new MapSqlParameterSource(), Integer.class);
-    }
-
-    public Map<String, Object> reforecastSales(Long adminId, LocalDate forecastDate) {
-        Members admin = membersRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        authorizationValidator.validateAdmin(admin);
-        SalesForecastClient.ForecastResponse result = salesForecastClient.retrain(forecastDate);
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("predictedSales", result.predicted_sales());
-        response.put("growthRate", result.growth_rate());
-        response.put("forecastDate", result.forecast_date());
-        response.put("trainedAt", result.trained_at());
-        response.put("trainingDays", result.training_days());
-        response.put("insight", result.insight());
-        return response;
-    }
-
-    public SalesForecastClient.ExportFile exportSalesStatistics(
-            Long adminId, LocalDate startDate, LocalDate endDate, String format, String section) {
-        Members admin = membersRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        authorizationValidator.validateManager(admin);
-        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
-        return salesForecastClient.export(startDate, endDate, format, section);
-    }
-
-    /** 개요 화면의 AI 카드는 Spring이 내부 키로 호출해 브라우저 인증 오류와 분리한다. */
-    public Map<String, Object> getReviewSentimentSummary(Long adminId, int limit) {
-        Members admin = membersRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        authorizationValidator.validateManager(admin);
-        return salesForecastClient.reviewSentimentSummary(limit);
-    }
-
-    public Map<String, Object> getInventoryForecast(Long adminId, int limit) {
-        Members admin = membersRepository.findById(adminId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
-        authorizationValidator.validateManager(admin);
-        return salesForecastClient.inventoryForecast(limit);
     }
 
     private String labelFormat(String unit) {
