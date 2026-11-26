@@ -63,11 +63,19 @@ public class SecurityConfig {
                         .hasAnyRole("ADMIN", "MANAGER")
                         // 공개 조회 API는 회원·매니저 모두 계속 사용할 수 있습니다.
                         .requestMatchers(HttpMethod.GET,
+<<<<<<< HEAD
                                 "/api/products/**", "/api/categories/**",
                                 "/api/brands/**", "/api/notices/**",
                                 "/api/reviews/**", "/api/qna/**",
                                 "/api/banners/**", "/api/recommendations/popular",
                                 "/api/search/**","/uploads/**", "/images/**").permitAll()
+=======
+                                "/api/products/", "/api/categories/",
+                                "/api/brands/", "/api/notices/",
+                                "/api/reviews/", "/api/qna/",
+                                "/api/banners/", "/api/recommendations/popular",
+                                "/api/search/","/uploads/", "/images/").permitAll()
+>>>>>>> 5fec682e3c26503bcf854e0cd8206106a5f5d8f9
                         .requestMatchers("/api/auth/**", "/api/logs/**").permitAll()
                         // 비회원 주문 생성과 결제 승인은 기존 공개 계약을 유지합니다.
                         .requestMatchers(HttpMethod.POST, "/api/orders", "/api/orders/*/payments/confirm").permitAll()

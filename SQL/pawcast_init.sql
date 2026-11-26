@@ -264,7 +264,7 @@ CREATE TABLE refunds (
     idempotency_key     varchar(255)  NOT NULL UNIQUE,
     refund_amount       numeric(38,2) NOT NULL,
     reason              varchar(255)  NOT NULL,
-    status              varchar(255)  NOT NULL CHECK (status IN ('PENDING','COMPLETED','FAILED')),
+    status              varchar(255)  NOT NULL CHECK (status IN ('PENDING','COMPLETED','REJECTED','FAILED')),
     created_at          timestamp(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at        timestamp(6)
 );

@@ -32,6 +32,7 @@ public enum ErrorCode {
     MEMBER_DELETED(HttpStatus.FORBIDDEN, "탈퇴한 회원입니다."),
     MEMBER_INACTIVE(HttpStatus.FORBIDDEN, "비활성화된 회원입니다."),
     NOT_FOUND_MEMBER(HttpStatus.NOT_FOUND, "회원을 찾을 수 없습니다."),
+    LOGIN_MEMBER_NOT_FOUND(HttpStatus.UNAUTHORIZED, "없는 사용자입니다."),
     LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "아이디 또는 비밀번호가 일치하지 않습니다."),
     PASSWORD_MISMATCH(HttpStatus.BAD_REQUEST, "현재 비밀번호가 일치하지 않습니다."),
     NEW_PASSWORD_REQUIRED(HttpStatus.BAD_REQUEST, "새 비밀번호를 입력해주세요."),
