@@ -100,3 +100,79 @@ curl -X POST "http://127.0.0.1:8000/predict" -H "Content-Type: application/json"
 - 출력: `POSITIVE` 또는 `NEGATIVE`
 - 특징 추출: 문자 단위 TF-IDF
 - 분류기: Logistic Regression
+
+## 리뷰 상품 5개 추리기
+
+홈 화면의 **BEST 5 리뷰 상품**은 공개 리뷰의 평점과 AI 감성 분석 결과를
+함께 사용해 상품과 대표 리뷰를 한 번에 조회합니다.
+
+### 전체 흐름
+
+1. `frontend/src/views/HomeView.vue`가 마운트될 때
+   `productService.bestReviews({ ..., limit: 5 })`를 호출합니다.
+2. `frontend/src/services/productService.js`가 Vue의 인증 헤더를 포함해
+   `GET /api/reviews/best-products?limit=5`를 FastAPI에 직접 요청합니다.
+3. `app/review/api.py`의 `best_review_products` 라우터가 요청을 받고,
+   `app/review/service.py`의 `get_best_review_products`를 호출합니다.
+4. 서비스는 `app/review/repository.py`의 `find_best_review_products` SQL 결과를
+   `BestReviewProductResponse`, `BestReviewResponse` 응답 모델로 조립합니다.
+5. HomeView는 받은 결과를 `bestReviewProducts` 상태에 저장하고 최대 5개를 렌더링합니다.
+
+```text
+HomeView.vue
+  → productService.bestReviews(limit=5)
+  → GET /api/reviews/best-products?limit=5
+  → review/api.py
+  → review/service.py
+  → review/repository.py
+  → PostgreSQL (products, product_reviews, review_sentiments)
+  → BEST 5 리뷰 상품 렌더링
+```
+
+이 기능은 현재 Spring Boot를 경유하지 않습니다. Vue가 FastAPI에 직접 요청하고,
+FastAPI가 PostgreSQL의 리뷰와 감성 분석 결과를 조회합니다.
+
+### 베스트 상품 5개 선정 기준
+
+`find_best_review_products`의 `top_products` CTE는 공개 리뷰
+(`product_reviews.is_visible = TRUE`)가 하나 이상 있는 상품만 대상으로 합니다.
+
+정렬 우선순위는 다음과 같습니다.
+
+1. 평균 평점 `AVG(pr.rating)` 내림차순
+2. 공개 리뷰 수 `COUNT(pr.id)` 내림차순
+3. 상품 ID `p.id` 내림차순
+
+즉, 평균 평점이 높은 상품을 먼저 고르고, 평점이 같으면 공개 리뷰가 많은 상품,
+그마저 같으면 ID가 큰 상품을 우선합니다. 현재 ID는 생성 순서를 따르는 구조이므로
+동률일 때 비교적 최근에 생성된 상품이 우선될 수 있습니다.
+
+### 상품별 대표 리뷰 1건 선정 기준
+
+`ranked_reviews` CTE는 선정된 각 상품 안에서
+`ROW_NUMBER() OVER (PARTITION BY pr.product_id ...)`로 대표 리뷰 한 건을 고릅니다.
+
+정렬 우선순위는 다음과 같습니다.
+
+1. 별점 `pr.rating` 내림차순
+2. AI 긍정도 `positive_probability` 내림차순
+3. 작성일 `pr.created_at` 내림차순
+4. 리뷰 ID `pr.id` 내림차순
+
+AI 긍정도는 `review_sentiments`의 결과를 사용합니다.
+
+- `POSITIVE`: `confidence`
+- `NEGATIVE`: `1 - confidence`
+- 분석 결과가 없거나 기존 레거시 값인 경우: `0`
+
+별점이 높으면서 AI가 더 긍정적으로 판단한 리뷰를 먼저 보여 주고, 동률이면
+최신 리뷰를 대표 리뷰로 선택하는 방식입니다.
+
+### 설계 의도와 한계
+
+- 리뷰 감성 분석 결과와 대표 리뷰 선정 규칙을 FastAPI 리뷰 도메인에 모아,
+  홈 화면은 완성된 상품·리뷰 응답만 렌더링합니다.
+- 상품과 대표 리뷰를 SQL의 CTE와 윈도우 함수로 함께 가져와 상품별 반복 조회를 줄입니다.
+- 현재는 최소 리뷰 수 조건이 없습니다. 따라서 리뷰 1개인 5점 상품도 상위에 노출될 수 있습니다.
+- 필요해지면 `HAVING COUNT(pr.id) >= :minimum_review_count` 또는 `inStockOnly` 같은
+  요청 조건을 추가해 노출 기준을 강화할 수 있습니다.

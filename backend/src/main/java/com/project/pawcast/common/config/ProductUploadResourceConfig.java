@@ -6,12 +6,14 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Path;
 
-/** 상품 이미지만 브라우저에 공개한다. 리뷰 업로드 파일은 이 경로에 포함되지 않는다. */
+/** 상품·리뷰 이미지를 브라우저가 읽을 수 있는 정적 경로로 공개한다. */
 @Configuration
 public class ProductUploadResourceConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String location = Path.of("uploads/products").toAbsolutePath().normalize().toUri().toString();
-        registry.addResourceHandler("/uploads/products/**").addResourceLocations(location);
+        String productLocation = Path.of("uploads/products").toAbsolutePath().normalize().toUri().toString();
+        String reviewLocation = Path.of("uploads/images").toAbsolutePath().normalize().toUri().toString();
+        registry.addResourceHandler("/uploads/products/**").addResourceLocations(productLocation);
+        registry.addResourceHandler("/uploads/images/**").addResourceLocations(reviewLocation);
     }
 }

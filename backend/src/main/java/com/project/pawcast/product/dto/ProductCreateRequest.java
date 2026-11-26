@@ -33,15 +33,11 @@ public record ProductCreateRequest(
                 max = 100,
                 message = "옵션은 최대 100개까지 등록할 수 있습니다."
         )
-        @Valid
-        List<@NotNull VariantCreateRequest> variants,
 
-        @Size(
-                max = 20,
-                message = "이미지는 최대 20개까지 등록할 수 있습니다."
-        )
-        @Valid
-        List<@NotNull ImageCreateRequest> images,
+        List<@NotNull @Valid VariantCreateRequest> variants,
+
+        @Size(max = 20, message = "이미지는 최대 20개까지 등록할 수 있습니다.")
+        List<@NotNull @Valid ImageCreateRequest> images,
 
         @Valid
         FoodDetailCreateRequest foodDetail,

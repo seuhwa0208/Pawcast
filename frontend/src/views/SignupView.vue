@@ -174,14 +174,16 @@ const canSubmit = computed(() => {
     agreed.terms &&
     agreed.privacy &&
     agreed.efinance;
+  // 이메일 인증번호 절차를 생략하므로 일반 가입은 이메일 중복 확인 통과만으로 진행합니다.
   return oauthSignup.value
-    ? required
-    : required &&
-        state.emailChecked &&
-        emailValid.value &&
-        state.emailVerified &&
-        passwordValid.value &&
-        passwordMatches.value;
+    ? Boolean(required)
+    : Boolean(
+        required &&
+          state.emailChecked &&
+          emailValid.value &&
+          passwordValid.value &&
+          passwordMatches.value,
+      );
 });
 
 function showNotice(text, type = "error") {
@@ -212,7 +214,7 @@ async function checkEmail() {
     state.emailChecked = result.available === true;
     state.emailCheckStatus = state.emailChecked ? "valid" : "invalid";
     state.emailCheckMessage = state.emailChecked
-      ? "가입 가능한 이메일입니다. 인증번호를 발송해주세요."
+      ? "사용 가능한 이메일입니다."
       : "이미 가입된 이메일입니다.";
   } catch (error) {
     state.emailChecked = false;
@@ -304,7 +306,7 @@ async function confirmEmailCode() {
 
 async function submit() {
   if (!canSubmit.value)
-    return showNotice("필수 입력과 인증, 약관 동의를 모두 확인해주세요.");
+    return showNotice("필수 입력과 중복 확인, 약관 동의를 모두 확인해주세요.");
   const payload = {
     userId: form.userId,
     username: form.username,
@@ -351,13 +353,13 @@ async function submit() {
 const { mergeGuestCart } = useCart();
 
 async function mergeCartAfterLogin() {
-    try {
-        await mergeGuestCart();
-    } catch (error) {
-        console.error("비회원 장바구니 병합 실패:", error);
-        errorMessage.value =
-            "로그인은 완료됐지만 장바구니 병합에 실패했습니다. 비회원 상품은 브라우저에 보관되어 있습니다.";
-    }
+  try {
+    await mergeGuestCart();
+  } catch (error) {
+    console.error("비회원 장바구니 병합 실패:", error);
+    errorMessage.value =
+      "로그인은 완료됐지만 장바구니 병합에 실패했습니다. 비회원 상품은 브라우저에 보관되어 있습니다.";
+  }
 }
 </script>
 
@@ -382,12 +384,8 @@ async function mergeCartAfterLogin() {
         </div>
         <fieldset>
           <legend>계정 정보</legend>
-          <label v-if="oauthSignup" class="form-field"
-            ><span>이메일 <b>*</b></span>
-            <input v-model="form.email" type="email" readonly aria-readonly="true" />
-            <small>Google 계정으로 확인된 이메일입니다. 보안을 위해 변경할 수 없습니다.</small>
-          </label>
-          <label v-else class="form-field"
+          <!-- Google OAuth 추가정보 가입에서도 userId가 필수이므로 아이디 입력과 중복 확인을 항상 노출합니다. -->
+          <label class="form-field"
             ><span>아이디 <b>*</b></span>
             <div class="input-action">
               <input
@@ -410,6 +408,11 @@ async function mergeCartAfterLogin() {
               >영문 소문자로 시작하고 소문자와 숫자만 사용할 수 있어요.</small
             ></label
           >
+          <label v-if="oauthSignup" class="form-field"
+            ><span>이메일 <b>*</b></span>
+            <input v-model="form.email" type="email" readonly aria-readonly="true" />
+            <small>Google 계정으로 확인된 이메일입니다. 보안을 위해 변경할 수 없습니다.</small>
+          </label>
           <label class="form-field"
             ><span>이메일 <b>*</b></span>
             <div class="input-action">
@@ -435,37 +438,6 @@ async function mergeCartAfterLogin() {
               >가입에 사용할 이메일 주소를 입력해주세요.</small
             ></label
           >
-          <div v-if="!oauthSignup && state.emailChecked" class="email-verification">
-            <div class="input-action">
-              <input
-                v-model.trim="form.verificationCode"
-                inputmode="numeric"
-                maxlength="6"
-                placeholder="이메일로 받은 6자리 인증번호"
-                :disabled="state.emailVerified"
-              /><button
-                type="button"
-                :disabled="state.loading || state.emailVerified"
-                @click="sendEmailCode"
-              >
-                {{ state.emailSent ? "인증번호 재발송" : "인증번호 발송" }}
-              </button>
-            </div>
-            <div v-if="state.emailSent" class="input-action">
-              <span class="verification-guide"
-                >5분 안에 인증번호를 입력해주세요.</span
-              ><button
-                type="button"
-                :disabled="state.loading || state.emailVerified"
-                @click="confirmEmailCode"
-              >
-                {{ state.emailVerified ? "인증 완료" : "인증 확인" }}
-              </button>
-            </div>
-            <small v-if="state.emailVerified" class="valid"
-              >이메일 인증이 완료되었습니다.</small
-            >
-          </div>
           <div class="form-grid">
             <label class="form-field"
               ><span>비밀번호 <b>*</b></span>

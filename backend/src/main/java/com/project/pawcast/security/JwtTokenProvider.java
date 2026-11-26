@@ -42,8 +42,19 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(PetmallProperties properties) {
         this.config = properties.jwt();
+
+        // JWT 환경변수와 Spring 설정값 길이 확인
+        String envSecret = System.getenv("JWT_SECRET");
+
+        log.info("JWT 환경변수 길이: {}",
+                envSecret == null ? -1 : envSecret.getBytes(StandardCharsets.UTF_8).length);
+
+        log.info("JWT 설정값 길이: {}",
+                config.secret() == null ? -1 : config.secret().getBytes(StandardCharsets.UTF_8).length);
+
         byte[] secret = config.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
+
             // HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
             // 첫 로그인에서야 터지므로, 기동 시점에 막는다.
             throw new IllegalStateException(
