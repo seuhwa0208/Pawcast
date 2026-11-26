@@ -740,4 +740,4 @@ async function mergeCartAfterLogin() {
     />
   </main>
 </template>
-<style scoped src="./signup-email-verification.css"></style>
+<style scoped src="@/styles/signup-email-verification.css"></style>

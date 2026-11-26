@@ -1,48 +1,108 @@
-/* 회원가입 이메일 인증 영역 전용 스타일 */
-.email-verification {
+/* 회원가입 이메일 인증 영역: corrections.css 공통 디자인 기준 */
+.signup-form .email-verification {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  margin-top: -4px;
 }
-.email-send-button {
+
+.email-verification .form-field > label b {
+  color: #c76e2a;
+}
+
+.email-verification .email-send-button {
   width: 100%;
-  min-height: 44px;
-  border: 1px solid #d1d5db;
+  min-height: 46px;
+  border: 1px solid #8d623d;
   border-radius: 8px;
-  background: #fff;
-  font-size: 14px;
-  font-weight: 600;
+  background: #fffaf5;
+  color: #6d492f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
   cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
 }
-.email-send-button:disabled {
-  opacity: 0.5;
+
+.email-verification .email-send-button:hover:not(:disabled) {
+  background: #f5e7d8;
+}
+
+.email-verification .email-send-button:disabled,
+.email-verification .email-code-action button:disabled {
+  border-color: #d9d2cb;
+  background: #f7f5f2;
+  color: #81756c;
   cursor: not-allowed;
 }
-.email-code-action {
-  display: flex;
+
+.email-verification .input-action.email-code-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 145px;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 }
-.email-code-action input {
-  flex: 1;
+
+.email-verification .email-code-action > input {
   min-width: 0;
+  box-sizing: border-box;
 }
-.email-timer {
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 600;
+
+.email-verification .email-code-action > button {
+  min-height: 48px;
+}
+
+.email-verification .email-timer {
+  min-width: 44px;
+  color: #c34f3e;
+  font-size: 13px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
+  text-align: center;
   white-space: nowrap;
 }
-.email-timer.expired {
-  color: #9ca3af;
+
+.email-verification .email-timer.expired {
+  color: #81756c;
 }
-.email-verified-message {
+
+.email-verification .email-verified-message {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid #bbf7d0;
+  border: 1px solid #b9cfbd;
   border-radius: 8px;
-  background: #f0fdf4;
-  color: #15803d;
-  font-size: 14px;
-  font-weight: 600;
+  background: #edf6ef;
+  color: #477452;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.email-verification button:focus-visible {
+  outline: 2px solid #956a45;
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .email-verification .input-action {
+    grid-template-columns: minmax(0, 1fr) 104px;
+  }
+
+  .email-verification .input-action.email-code-action {
+    grid-template-columns: minmax(0, 1fr) auto 104px;
+    gap: 6px;
+  }
+
+  .email-verification .email-code-action > input {
+    padding-inline: 8px;
+  }
+}
+
+@media (max-width: 380px) {
+  .email-verification .input-action.email-code-action {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .email-verification .email-code-action > button {
+    grid-column: 1 / -1;
+  }
 }
