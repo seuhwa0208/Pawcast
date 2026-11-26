@@ -8,7 +8,7 @@ import { addressService } from "@/services/addressService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const router = useRouter();
-const { currentUserId, setAccessToken, clearAuthSession } = useAuthSession();
+const { currentUserId, setAccessToken } = useAuthSession();
 const profile = reactive({
   username: "",
   userId: currentUserId.value,
@@ -17,7 +17,9 @@ const profile = reactive({
   marketing: false,
 });
 const profileSavedOpen = ref(false);
+const profileMessage = ref("");
 const passwordMessage = ref("");
+const passwordSuccess = ref(false);
 const passwordChanging = ref(false);
 const passwordInputsReady = ref(false);
 const passwordForm = reactive({
@@ -60,6 +62,13 @@ function resetAddressForm() {
   });
   editingAddressId.value = null;
 }
+function resetPasswordForm() {
+  Object.assign(passwordForm, {
+    password: "",
+    newPassword: "",
+    newPasswordCheck: "",
+  });
+}
 function openAddAddress() {
   addressError.value = "";
   resetAddressForm();
@@ -82,21 +91,33 @@ function enablePasswordInputs() {
   passwordInputsReady.value = true;
 }
 async function saveProfile() {
-  if (
-    !profile.username.trim() ||
-    !/^\S+@\S+\.\S+$/.test(profile.email) ||
-    !/^010-\d{4}-\d{4}$/.test(profile.tel)
-  )
+  profileMessage.value = "";
+  if (!profile.username.trim()) {
+    profileMessage.value = "이름을 입력해주세요.";
     return;
-  await updateMyProfile({
-    name: profile.username,
-    tel: profile.tel.replace(/\D/g, ""),
-    isAgreedMarketing: profile.marketing,
-  });
-  profileSavedOpen.value = true;
+  }
+  if (!/^\S+@\S+\.\S+$/.test(profile.email)) {
+    profileMessage.value = "올바른 이메일 형식을 입력해주세요.";
+    return;
+  }
+  if (!/^010-\d{4}-\d{4}$/.test(profile.tel)) {
+    profileMessage.value = "휴대전화를 010-1234-5678 형식으로 입력해주세요.";
+    return;
+  }
+  try {
+    await updateMyProfile({
+      name: profile.username,
+      tel: profile.tel.replace(/\D/g, ""),
+      isAgreedMarketing: profile.marketing,
+    });
+    profileSavedOpen.value = true;
+  } catch (error) {
+    profileMessage.value = error.message || "회원정보를 저장하지 못했습니다.";
+  }
 }
 async function savePassword() {
   passwordMessage.value = "";
+  passwordSuccess.value = false;
   if (!passwordForm.password || !passwordForm.newPassword || !passwordForm.newPasswordCheck) {
     passwordMessage.value = "현재 비밀번호와 새 비밀번호를 모두 입력해주세요.";
     return;
@@ -108,8 +129,10 @@ async function savePassword() {
   try {
     passwordChanging.value = true;
     await changeMemberPassword({ ...passwordForm });
-    clearAuthSession();
-    await router.replace({ path: "/login", query: { passwordChanged: "1" } });
+    // 로그인 페이지로 이동하지 않고 현재 화면에 유지하며 입력값만 초기화합니다.
+    resetPasswordForm();
+    passwordSuccess.value = true;
+    passwordMessage.value = "비밀번호가 변경되었습니다.";
   } catch (error) {
     passwordMessage.value = error.message || "비밀번호를 변경하지 못했습니다.";
   } finally {
@@ -248,7 +271,7 @@ onMounted(async () => {
   }
   // 브라우저의 저장 비밀번호 자동 주입을 비워, 변경 의사를 가진 사용자가 직접 입력하게 한다.
   window.setTimeout(() => {
-    Object.assign(passwordForm, { password: "", newPassword: "", newPasswordCheck: "" });
+    resetPasswordForm();
   }, 0);
 });
 </script>
@@ -302,7 +325,6 @@ onMounted(async () => {
                 <b>비밀번호 관리</b>
                 <p>
                   현재 비밀번호를 확인한 뒤 새 비밀번호로 직접 변경할 수 있습니다.
-                  변경 후에는 보안을 위해 다시 로그인해야 합니다.
                 </p>
               </div>
               <div class="password-change-fields">
@@ -337,7 +359,13 @@ onMounted(async () => {
                   {{ passwordChanging ? "변경 중..." : "비밀번호 변경" }}
                 </button>
               </div>
-              <p v-if="passwordMessage" class="password-message">{{ passwordMessage }}</p>
+              <p
+                v-if="passwordMessage"
+                class="password-message"
+                :class="{ success: passwordSuccess }"
+              >
+                {{ passwordMessage }}
+              </p>
             </section>
             <div class="marketing-row">
               <div>
@@ -354,6 +382,7 @@ onMounted(async () => {
                 <i />
               </button>
             </div>
+            <p v-if="profileMessage" class="profile-message">{{ profileMessage }}</p>
             <button class="save-profile" type="submit">변경사항 저장</button>
           </form>
         </section>
