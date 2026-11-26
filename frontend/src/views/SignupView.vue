@@ -1,6 +1,6 @@
 <!-- 일반 가입과 Google 추가정보 가입을 하나의 검증·약관 동의 흐름으로 처리합니다. -->
 <script setup>
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { authService } from "@/services/authService";
 import { useAuthSession } from "@/stores/auth";
@@ -11,6 +11,7 @@ const router = useRouter();
 const {
   pendingOAuth,
   setAccessToken,
+  setRefreshToken,
   setCurrentUserId,
   setUserRole,
   clearPendingOAuth,
@@ -25,7 +26,7 @@ const form = reactive({
   verificationCode: "",
 });
 // OAuth에서 이미 받은 정보는 다시 입력하지 않도록 가입 폼의 초깃값으로 사용합니다.
-if (pendingOAuth.provider === "google") {
+if (pendingOAuth.provider === "google" && pendingOAuth.ticket) {
   form.email = pendingOAuth.email;
   form.username = pendingOAuth.name;
 }
@@ -51,6 +52,37 @@ const activeTerm = ref(null);
 const signupComplete = ref(false);
 const showPassword = ref(false);
 const showPasswordConfirm = ref(false);
+const remainingSeconds = ref(0);
+let emailExpiresAt = 0;
+let emailTimer = null;
+let disposed = false;
+
+const emailTimerText = computed(() => {
+  const minutes = Math.floor(remainingSeconds.value / 60);
+  const seconds = remainingSeconds.value % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+});
+
+function stopEmailTimer() {
+  if (emailTimer !== null) clearInterval(emailTimer);
+  emailTimer = null;
+}
+
+function startEmailTimer(expiresAt) {
+  stopEmailTimer();
+  emailExpiresAt = expiresAt;
+  function updateTimer() {
+    remainingSeconds.value = Math.max(0, Math.ceil((emailExpiresAt - Date.now()) / 1000));
+    if (!remainingSeconds.value) stopEmailTimer();
+  }
+  updateTimer();
+  if (remainingSeconds.value) emailTimer = setInterval(updateTimer, 250);
+}
+
+onUnmounted(() => {
+  disposed = true;
+  stopEmailTimer();
+});
 const termDetails = {
   terms: {
     title: "서비스 이용약관 동의",
@@ -141,7 +173,7 @@ const userIdValid = computed(() => /^[a-z][a-z0-9]{5,19}$/.test(form.userId));
 const emailValid = computed(() => /^\S+@\S+\.\S+$/.test(form.email));
 const telValid = computed(() => /^010-\d{4}-\d{4}$/.test(form.tel));
 const passwordCompositionValid = computed(() =>
-  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z\d\s])\S+$/.test(form.passwordHash),
+  /^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]+$/.test(form.passwordHash),
 );
 const passwordLengthValid = computed(
   () => form.passwordHash.length >= 8 && form.passwordHash.length <= 20,
@@ -168,22 +200,17 @@ const canSubmit = computed(() => {
   const required =
     form.username.trim() &&
     telValid.value &&
+    userIdValid.value &&
     state.idChecked &&
     passwordValid.value &&
     passwordMatches.value &&
     agreed.terms &&
     agreed.privacy &&
     agreed.efinance;
-  // 이메일 인증번호 절차를 생략하므로 일반 가입은 이메일 중복 확인 통과만으로 진행합니다.
-  return oauthSignup.value
-    ? Boolean(required)
-    : Boolean(
-        required &&
-          state.emailChecked &&
-          emailValid.value &&
-          passwordValid.value &&
-          passwordMatches.value,
-      );
+
+  return Boolean(required && (oauthSignup.value || (
+    emailValid.value && state.emailChecked && state.emailVerified
+  )));
 });
 
 function showNotice(text, type = "error") {
@@ -197,6 +224,10 @@ function resetIdCheck() {
 }
 
 function resetEmailVerification() {
+  stopEmailTimer();
+  emailExpiresAt = 0;
+  remainingSeconds.value = 0;
+  notice.value = { text: "", type: "" };
   state.emailChecked = false;
   state.emailCheckMessage = "";
   state.emailCheckStatus = "";
@@ -267,49 +298,61 @@ async function checkId() {
 }
 
 async function sendEmailCode() {
-  if (!/^\S+@\S+\.\S+$/.test(form.email))
-    return showNotice("올바른 이메일 주소를 입력해주세요.");
-  if (!state.emailChecked)
-    return showNotice("이메일 중복 확인을 먼저 해주세요.");
+  if (oauthSignup.value || state.loading || state.emailVerified) return;
+  if (!emailValid.value) return showNotice("올바른 이메일 주소를 입력해주세요.");
+  if (!state.emailChecked) return showNotice("이메일 중복 확인을 먼저 해주세요.");
+
+  const requestedEmail = form.email;
+  const requestedAt = Date.now();
   try {
     state.loading = true;
-    await authService.sendEmailCode(form.email);
+    await authService.sendEmailCode(requestedEmail);
+    if (disposed || form.email !== requestedEmail) return;
     state.emailSent = true;
     state.emailVerified = false;
-    showNotice("인증번호를 발송했습니다. 이메일을 확인해주세요.", "success");
+    form.verificationCode = "";
+    startEmailTimer(requestedAt + 300000);
+    showNotice("인증번호를 발송했습니다. 5분 이내에 입력해주세요.", "success");
   } catch (error) {
-    showNotice(error.message);
+    showNotice(error.message || "인증번호 발송에 실패했습니다.");
   } finally {
     state.loading = false;
   }
 }
 
 async function confirmEmailCode() {
-  if (!/^\d{6}$/.test(form.verificationCode))
+  if (oauthSignup.value || state.loading || state.emailVerified) return;
+  if (!state.emailSent) return showNotice("인증번호를 먼저 발송해주세요.");
+  if (Date.now() >= emailExpiresAt) {
+    return showNotice("인증시간이 만료되었습니다. 인증번호를 재발송해주세요.");
+  }
+  if (!/^\d{6}$/.test(form.verificationCode)) {
     return showNotice("6자리 인증번호를 입력해주세요.");
+  }
+
+  const requestedEmail = form.email;
   try {
     state.loading = true;
-    const result = await authService.confirmEmailCode(
-      form.email,
-      form.verificationCode,
-    );
-    if (result !== true && result?.verified !== true)
-      throw new Error("인증번호가 일치하지 않습니다.");
+    const result = await authService.confirmEmailCode(requestedEmail, form.verificationCode);
+    if (disposed || form.email !== requestedEmail) return;
+    if (result !== true) throw new Error("인증번호가 일치하지 않습니다.");
     state.emailVerified = true;
+    stopEmailTimer();
     showNotice("이메일 인증이 완료되었습니다.", "success");
   } catch (error) {
-    showNotice(error.message);
+    showNotice(error.message || "이메일 인증에 실패했습니다.");
   } finally {
     state.loading = false;
   }
 }
 
 async function submit() {
+  if (state.loading) return;
   if (!canSubmit.value)
-    return showNotice("필수 입력과 중복 확인, 약관 동의를 모두 확인해주세요.");
+    return showNotice("필수 입력, 중복 확인, 이메일 인증 및 약관 동의를 확인해주세요.");
   const payload = {
     userId: form.userId,
-    username: form.username,
+    name: form.username,
     email: form.email,
     tel: form.tel.replace(/\D/g, ""),
     passwordHash: form.passwordHash,
@@ -336,6 +379,7 @@ async function submit() {
       });
       setUserRole(result.role || "USER");
       setAccessToken(result.accessToken);
+      setRefreshToken(result.refreshToken || "");
       setCurrentUserId(result.userId || result.name || "");
       clearPendingOAuth();
       await router.replace("/member");
@@ -357,8 +401,7 @@ async function mergeCartAfterLogin() {
     await mergeGuestCart();
   } catch (error) {
     console.error("비회원 장바구니 병합 실패:", error);
-    errorMessage.value =
-      "로그인은 완료됐지만 장바구니 병합에 실패했습니다. 비회원 상품은 브라우저에 보관되어 있습니다.";
+    showNotice("로그인은 완료됐지만 장바구니 병합에 실패했습니다.");
   }
 }
 </script>
@@ -390,6 +433,7 @@ async function mergeCartAfterLogin() {
             <div class="input-action">
               <input
                 v-model.trim="form.userId"
+                :disabled="state.loading"
                 autocomplete="username"
                 placeholder="영문 소문자로 시작하는 6~20자"
                 @input="resetIdCheck"
@@ -408,36 +452,83 @@ async function mergeCartAfterLogin() {
               >영문 소문자로 시작하고 소문자와 숫자만 사용할 수 있어요.</small
             ></label
           >
-          <label v-if="oauthSignup" class="form-field"
-            ><span>이메일 <b>*</b></span>
+          <label v-if="oauthSignup" class="form-field">
+            <span>이메일 <b>*</b></span>
             <input v-model="form.email" type="email" readonly aria-readonly="true" />
-            <small>Google 계정으로 확인된 이메일입니다. 보안을 위해 변경할 수 없습니다.</small>
+            <small>Google 계정으로 확인된 이메일입니다. 변경할 수 없습니다.</small>
           </label>
-          <label class="form-field"
-            ><span>이메일 <b>*</b></span>
-            <div class="input-action">
-              <input
-                v-model.trim="form.email"
-                type="email"
-                autocomplete="email"
-                placeholder="example@powcast.com"
-                @input="resetEmailVerification"
-              /><button
-                type="button"
-                :disabled="state.loading || !emailValid"
-                @click="checkEmail"
-              >
-                중복 확인
-              </button>
-            </div>
-            <small
-              v-if="state.emailCheckMessage"
-              :class="state.emailCheckStatus"
-              >{{ state.emailCheckMessage }}</small
-            ><small v-else :class="{ invalid: form.email && !emailValid }"
-              >가입에 사용할 이메일 주소를 입력해주세요.</small
-            ></label
-          >
+
+          <section v-else class="email-verification">
+            <section class="form-field">
+              <label for="signup-email">이메일 <b>*</b></label>
+              <div class="input-action">
+                <input
+                  id="signup-email"
+                  v-model.trim="form.email"
+                  type="email"
+                  autocomplete="email"
+                  placeholder="example@powcast.com"
+                  :disabled="state.loading"
+                  @input="resetEmailVerification"
+                />
+                <button
+                  type="button"
+                  :disabled="state.loading || !emailValid || state.emailChecked"
+                  @click="checkEmail"
+                >
+                  {{ state.emailChecked ? "확인 완료" : "중복 확인" }}
+                </button>
+              </div>
+              <small v-if="state.emailCheckMessage" :class="state.emailCheckStatus">
+                {{ state.emailCheckMessage }}
+              </small>
+              <small v-else>가입에 사용할 이메일 주소를 입력해주세요.</small>
+            </section>
+
+            <button
+              v-if="state.emailChecked && !state.emailVerified"
+              class="email-send-button"
+              type="button"
+              :disabled="state.loading"
+              @click="sendEmailCode"
+            >
+              {{ state.emailSent ? "인증번호 재발송" : "인증번호 발송" }}
+            </button>
+
+            <section v-if="state.emailSent && !state.emailVerified" class="form-field">
+              <label for="signup-email-code">이메일 인증번호 <b>*</b></label>
+              <div class="input-action email-code-action">
+                <input
+                  id="signup-email-code"
+                  v-model.trim="form.verificationCode"
+                  type="text"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  maxlength="6"
+                  placeholder="인증번호 6자리"
+                  :disabled="state.loading || remainingSeconds === 0"
+                />
+                <span class="email-timer" :class="{ expired: remainingSeconds === 0 }">
+                  {{ emailTimerText }}
+                </span>
+                <button
+                  type="button"
+                  :disabled="state.loading || remainingSeconds === 0 || !/^\d{6}$/.test(form.verificationCode)"
+                  @click="confirmEmailCode"
+                >
+                  인증 확인
+                </button>
+              </div>
+              <small v-if="remainingSeconds === 0" class="invalid">
+                인증시간이 만료되었습니다. 인증번호를 재발송해주세요.
+              </small>
+              <small v-else>이메일로 발송된 인증번호를 5분 이내에 입력해주세요.</small>
+            </section>
+
+            <p v-if="state.emailVerified" class="email-verified-message" role="status">
+              이메일 인증이 완료되었습니다.
+            </p>
+          </section>
           <div class="form-grid">
             <label class="form-field"
               ><span>비밀번호 <b>*</b></span>
@@ -468,7 +559,7 @@ async function mergeCartAfterLogin() {
               <small
                 v-if="form.passwordHash && !passwordCompositionValid"
                 class="invalid"
-                >영문, 숫자, 특수문자를 각각 1개 이상 포함해주세요.</small
+                >영문, 숫자, 허용 특수문자(!@#$%^&*)를 각각 1개 이상 포함해주세요.</small
               ><small
                 v-else-if="form.passwordHash && !passwordLengthValid"
                 class="invalid"
@@ -649,3 +740,4 @@ async function mergeCartAfterLogin() {
     />
   </main>
 </template>
+<style scoped src="./signup-email-verification.css"></style>
