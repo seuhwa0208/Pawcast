@@ -67,7 +67,7 @@ public class SecurityConfig {
                                 "/api/brands/**", "/api/notices/**",
                                 "/api/reviews/**", "/api/qna/**",
                                 "/api/banners/**", "/api/recommendations/popular",
-                                "/api/search/**").permitAll()
+                                "/api/search/**","/uploads/**", "/images/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/logs/**").permitAll()
                         // 비회원 주문 생성과 결제 승인은 기존 공개 계약을 유지합니다.
                         .requestMatchers(HttpMethod.POST, "/api/orders", "/api/orders/*/payments/confirm").permitAll()

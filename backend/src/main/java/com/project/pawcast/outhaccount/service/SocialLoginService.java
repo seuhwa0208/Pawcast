@@ -98,6 +98,7 @@ public class SocialLoginService {
         Members member = membersRepository.findByEmail(email)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 
+        if(member.getStatus().equals(Members.Status.DELETED)) {throw new BusinessException(ErrorCode.MEMBER_DELETED);}
         if (member.getPasswordHash() == null || !passwordEncoder.matches(request.password(), member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
