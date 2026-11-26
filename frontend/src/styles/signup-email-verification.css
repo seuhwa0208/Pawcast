@@ -1,0 +1,48 @@
+/* 회원가입 이메일 인증 영역 전용 스타일 */
+.email-verification {
+  display: grid;
+  gap: 12px;
+}
+.email-send-button {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.email-send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.email-code-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.email-code-action input {
+  flex: 1;
+  min-width: 0;
+}
+.email-timer {
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.email-timer.expired {
+  color: #9ca3af;
+}
+.email-verified-message {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 14px;
+  font-weight: 600;
+}
