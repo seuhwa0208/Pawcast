@@ -8,7 +8,7 @@ import { addressService } from "@/services/addressService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const router = useRouter();
-const { currentUserId, setAccessToken } = useAuthSession();
+const { currentUserId, clearAuthSession } = useAuthSession();
 const profile = reactive({
   username: "",
   userId: currentUserId.value,
@@ -31,6 +31,7 @@ const addressFormOpen = ref(false);
 const editingAddressId = ref(null);
 const addressError = ref("");
 const withdrawOpen = ref(false);
+const withdrawSuccessOpen = ref(false);
 const withdrawPassword = ref("");
 const withdrawMessage = ref("");
 const withdrawLoading = ref(false);
@@ -241,9 +242,9 @@ async function withdraw() {
   try {
     withdrawLoading.value = true;
     await withdrawMember(withdrawPassword.value);
-    sessionStorage.removeItem("powcast-profile-verified");
-    setAccessToken("");
-    router.push("/");
+    clearAuthSession();
+    withdrawOpen.value = false;
+    withdrawSuccessOpen.value = true;
   } catch (error) {
     withdrawMessage.value = error.message;
   } finally {
@@ -530,5 +531,35 @@ onMounted(async () => {
         </section>
       </div></Teleport
     >
+    <Teleport to="body">
+      <div
+        v-if="withdrawSuccessOpen"
+        class="common-modal-backdrop"
+      >
+        <section
+          class="common-modal withdraw-success-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="withdraw-success-title"
+        >
+          <div class="modal-status-icon signup-success">
+            <svg viewBox="0 0 24 24">
+              <path d="m6 12.5 4 4L18 8" />
+            </svg>
+          </div>
+          <h2 id="withdraw-success-title">탈퇴되었습니다.</h2>
+          <p>그동안 이용해 주셔서 감사합니다.</p>
+          <div class="common-modal-actions single">
+            <button
+              type="button"
+              class="primary"
+              @click="router.replace('/')"
+            >
+              확인
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>

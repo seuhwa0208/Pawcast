@@ -1,16 +1,16 @@
 package com.project.pawcast.security;
 
+import com.project.pawcast.member.entity.Members;
+import com.project.pawcast.member.repository.MembersRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -22,9 +22,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String HEADER = "Authorization";
     private static final String PREFIX = "Bearer ";
     private final JwtTokenProvider tokenProvider;
+    private final MembersRepository membersRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider, MembersRepository membersRepository) {
         this.tokenProvider = tokenProvider;
+        this.membersRepository = membersRepository;
     }
 
     @Override
@@ -48,27 +50,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             // 긴 수명의 refresh 가 사실상 무기한 access 로 쓰인다.
             // 유효한 Access Token인지 확인
             if (claims != null && !tokenProvider.isRefreshToken(claims)) {
-                // 인증 주체 생성
-                LoginMember principal = LoginMember.ofToken(
-                        tokenProvider.memberId(claims),
-                        tokenProvider.email(claims),
-                        tokenProvider.role(claims));
-                
-                // 인증 객체 생성
-                Authentication authentication = new UsernamePasswordAuthenticationToken(
-                                principal,
-                                null,
-                                principal.getAuthorities()
-                        );
-
-                // SecurityContext에 인증 정보 등록
-                SecurityContextHolder.getContext()
-                        .setAuthentication(authentication);
+                Long memberId = tokenProvider.memberId(claims);
+                if (membersRepository.existsByIdAndStatusNot(memberId, Members.Status.DELETED)) {
+                    LoginMember principal = LoginMember.ofToken(
+                            memberId, tokenProvider.email(claims), tokenProvider.role(claims));
+                    Authentication authentication = new UsernamePasswordAuthenticationToken(
+                            principal, null, principal.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
-            // 다음 필터 실행
-            chain.doFilter(request, response);
         }
+        chain.doFilter(request, response);
+    }
 
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader(HEADER);

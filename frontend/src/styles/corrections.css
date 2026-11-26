@@ -9151,3 +9151,38 @@ button.qna-row:hover:not(:disabled) {
   font-size: 18px !important;
   line-height: 1.5 !important;
 }
+
+/* 장바구니 담기 완료 표시: 선명한 그린 체크 배지 */
+.cart-added-modal .cart-added-mark {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 22px;
+  border: 4px solid #e5f7ec;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #39c879 0%, #159b58 100%);
+  color: #fff;
+  font-family: Arial, sans-serif;
+  font-size: 42px;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 1px rgb(0 75 35 / 18%);
+  box-shadow:
+    0 0 0 5px rgb(41 184 105 / 11%),
+    0 8px 18px rgb(24 142 79 / 22%),
+    inset 0 1px 2px rgb(255 255 255 / 30%);
+  animation: cart-added-pop 0.38s cubic-bezier(.2, .8, .2, 1) both;
+}
+
+@keyframes cart-added-pop {
+  0% { opacity: 0; transform: scale(.72); }
+  70% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cart-added-modal .cart-added-mark {
+    animation: none;
+  }
+}

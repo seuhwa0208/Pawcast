@@ -4,15 +4,19 @@ import hmac
 from typing import Annotated
 
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.config import settings
+from app.common.database import get_db_session
 
 
 async def _require_roles(
     authorization: str | None,
     internal_api_key: str | None,
     allowed_roles: set[str],
+    session: AsyncSession,
 ) -> dict:
     """공통 검증으로 JWT 서명·issuer·토큰종류와 역할을 일관되게 확인합니다."""
     # 신뢰된 Spring 서버 간 호출은 브라우저 역할 토큰 대신 공유 키를 사용합니다.
@@ -64,10 +68,29 @@ async def _require_roles(
             detail="요청한 기능을 사용할 권한이 없습니다.",
         )
 
+    try:
+        member_id = int(claims["sub"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 로그인 토큰입니다.",
+        ) from error
+
+    member_exists = await session.scalar(
+        text("SELECT EXISTS (SELECT 1 FROM members WHERE id = :id AND status <> 'DELETED')"),
+        {"id": member_id},
+    )
+    if not member_exists:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="유효하지 않은 로그인 토큰입니다.",
+        )
+
     return claims
 
 
 async def require_admin(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     authorization: Annotated[str | None, Header()] = None,
     internal_api_key: Annotated[
         str | None,
@@ -75,10 +98,11 @@ async def require_admin(
     ] = None,
 ) -> dict:
     """회원 감성 통계와 재학습 등 관리자 전용 기능을 보호합니다."""
-    return await _require_roles(authorization, internal_api_key, {"ADMIN"})
+    return await _require_roles(authorization, internal_api_key, {"ADMIN"}, session)
 
 
 async def require_manager(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
     authorization: Annotated[str | None, Header()] = None,
     internal_api_key: Annotated[
         str | None,
@@ -90,4 +114,5 @@ async def require_manager(
         authorization,
         internal_api_key,
         {"ADMIN", "MANAGER"},
+        session,
     )

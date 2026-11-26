@@ -592,7 +592,7 @@ onMounted(() => {
           {{
             submitting
               ? "결제 준비 중..."
-              : `${finalAmount.toLocaleString()}원 테스트 결제하기`
+              : `${finalAmount.toLocaleString()}원 결제하기`
           }}
         </button>
         <small>실제 승인 여부는 Spring Boot 결제 API 연결 상태에 따라 결정됩니다.</small>
