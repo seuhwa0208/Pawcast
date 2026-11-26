@@ -33,6 +33,11 @@ export default defineConfig({
         target: "http://127.0.0.1:8080",
         changeOrigin: true,
       },
+      // 리뷰 사진도 Spring이 저장한 공개 경로에서 그대로 제공한다.
+      "/uploads/images": {
+        target: "http://127.0.0.1:8080",
+        changeOrigin: true,
+      },
     },
   },
 });

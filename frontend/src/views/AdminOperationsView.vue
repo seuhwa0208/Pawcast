@@ -3,6 +3,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { adminManagementService } from "@/services/adminManagementService";
+import PaginationBar from "@/components/PaginationBar.vue";
 
 const props = defineProps({
   // # 주문·상품·회원·공지·QnA 하위 화면이 담당할 기능을 명시적으로 전달한다.
@@ -220,6 +221,7 @@ onMounted(load);
       <section class="toolbar">
         <input
           v-model="search"
+          type="search"
           placeholder="예) ORD-2026, 로얄캐닌, 홍길동"
         />
         <select v-model="statusFilter">
@@ -368,23 +370,12 @@ onMounted(load);
           </label>
         </article>
       </div>
-      <nav
+      <PaginationBar
         v-if="section === 'qna' && pageCount > 1"
-        class="admin-list-pagination"
-        aria-label="QnA 관리 목록 페이지"
-      >
-        <button type="button" :disabled="currentPage === 1" @click="currentPage = 1">처음</button>
-        <button type="button" :disabled="currentPage === 1" @click="currentPage -= 1">이전</button>
-        <button
-          v-for="number in pageCount"
-          :key="number"
-          type="button"
-          :class="{ active: currentPage === number }"
-          @click="currentPage = number"
-        >{{ number }}</button>
-        <button type="button" :disabled="currentPage === pageCount" @click="currentPage += 1">다음</button>
-        <button type="button" :disabled="currentPage === pageCount" @click="currentPage = pageCount">마지막</button>
-      </nav>
+        v-model:page="currentPage"
+        :total-pages="pageCount"
+        label="QnA 관리 목록 페이지"
+      />
       <p v-else>검색 조건에 맞는 데이터가 없습니다.</p>
       <section v-if="section === 'orders'" class="admin-refund-requests">
         <header>

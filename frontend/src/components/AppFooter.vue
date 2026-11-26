@@ -12,7 +12,7 @@
       <section>
         <h2>고객센터</h2>
         <p>
-          자주 묻는 질문 · Q&amp;A 참고
+          Q&amp;A 를 통해 질문 바랍니다.
         </p>
       </section>
       <section>

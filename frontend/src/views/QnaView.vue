@@ -12,6 +12,8 @@ import { useRoute, useRouter } from "vue-router";
 import { useAuthSession } from "@/stores/auth";
 import { qnaService } from "@/services/qnaService";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
+import PaginationBar from "@/components/PaginationBar.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -68,14 +70,6 @@ const detailNeighbors = computed(() => {
       : null,
   };
 });
-const pageNumbers = computed(() => {
-  const start = Math.floor((page.value - 1) / 5) * 5 + 1;
-  return Array.from(
-    { length: Math.min(5, pageCount.value - start + 1) },
-    (_, index) => start + index,
-  );
-});
-
 function mapQna(item, index) {
   return {
     // # Spring QnaResponse의 식별자는 id가 아니라 qnaId다.
@@ -310,6 +304,7 @@ onBeforeUnmount(() =>
           </div>
         </div>
         <label>
+          <UiSearchIcon />
           <input
             v-model.trim="keywordInput"
             type="search"
@@ -362,40 +357,12 @@ onBeforeUnmount(() =>
           등록된 문의가 없습니다.
         </p>
       </div>
-      <nav
+      <PaginationBar
         v-if="filtered.length"
-        class="qna-pagination"
-        aria-label="Q&A 페이지 이동"
-      >
-        <button :disabled="page === 1" aria-label="첫 페이지" @click="page = 1">
-          «
-        </button>
-        <button :disabled="page === 1" aria-label="이전 페이지" @click="page--">
-          ‹
-        </button>
-        <button
-          v-for="number in pageNumbers"
-          :key="number"
-          :class="{ on: page === number }"
-          @click="page = number"
-        >
-          {{ number }}
-        </button>
-        <button
-          :disabled="page === pageCount"
-          aria-label="다음 페이지"
-          @click="page++"
-        >
-          ›
-        </button>
-        <button
-          :disabled="page === pageCount"
-          aria-label="마지막 페이지"
-          @click="page = pageCount"
-        >
-          »
-        </button>
-      </nav>
+        v-model:page="page"
+        :total-pages="pageCount"
+        label="Q&A 페이지 이동"
+      />
     </section>
     <section v-else-if="mode === 'detail'" class="qna-detail board-detail">
       <header class="qna-detail-head">

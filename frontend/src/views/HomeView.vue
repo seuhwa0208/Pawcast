@@ -1,6 +1,7 @@
 <!-- 홈 검색 조건, 추천 상품, 공지 배너와 인기 상품 자동 전환을 관리하는 메인 화면입니다. -->
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
 import { useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
 import UiTag from "@/components/UiTag.vue";
@@ -417,7 +418,7 @@ onBeforeUnmount(() => {
       <form class="home-filter-form" @submit.prevent="performSearch">
         <div class="home-keyword-row">
           <label class="search-keyword compact-main-keyword">
-            <span class="search-icon" aria-hidden="true" />
+            <UiSearchIcon />
             <input
               v-model.trim="keyword"
               placeholder="예) 연어 사료, 츄르"

@@ -15,6 +15,7 @@ import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
 import CartAddedModal from "@/components/CartAddedModal.vue";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import PaginationBar from "@/components/PaginationBar.vue";
 import ReviewEditModal from "@/components/ReviewEditModal.vue";
 import { reviewService } from "@/services/reviewService";
 
@@ -230,13 +231,6 @@ const regularReviews = computed(() => reviews.value.slice(1));
 const reviewPageCount = computed(() =>
   Math.max(1, Math.ceil(regularReviews.value.length / REVIEW_PAGE_SIZE)),
 );
-const reviewPageNumbers = computed(() => {
-  const start = Math.floor((reviewPage.value - 1) / 5) * 5 + 1;
-  return Array.from(
-    { length: Math.min(5, reviewPageCount.value - start + 1) },
-    (_, index) => start + index,
-  );
-});
 const pagedReviews = computed(() => {
   const start = (reviewPage.value - 1) * REVIEW_PAGE_SIZE;
   return regularReviews.value.slice(start, start + REVIEW_PAGE_SIZE);
@@ -758,22 +752,11 @@ const purchaseGuide = [
           </ol>
 
           <!-- 리뷰 페이지네이션 -->
-          <nav
-            v-if="reviewPageCount > 1"
-            class="qna-pagination review-pagination pagination-bar"
-            aria-label="상품 리뷰 페이지 이동"
-          >
-            <button :disabled="reviewPage === 1" aria-label="첫 페이지" @click="reviewPage = 1">«</button>
-            <button :disabled="reviewPage === 1" aria-label="이전 페이지" @click="reviewPage--">‹</button>
-            <button
-              v-for="number in reviewPageNumbers"
-              :key="number"
-              :class="{ on: reviewPage === number }"
-              @click="reviewPage = number"
-            >{{ number }}</button>
-            <button :disabled="reviewPage === reviewPageCount" aria-label="다음 페이지" @click="reviewPage++">›</button>
-            <button :disabled="reviewPage === reviewPageCount" aria-label="마지막 페이지" @click="reviewPage = reviewPageCount">»</button>
-          </nav>
+          <PaginationBar
+            v-model:page="reviewPage"
+            :total-pages="reviewPageCount"
+            label="상품 리뷰 페이지 이동"
+          />
         </section>
 
         <!-- 등록된 리뷰가 없는 경우 -->

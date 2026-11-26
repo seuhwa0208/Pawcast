@@ -769,7 +769,7 @@ async function verifyPassword() {
           <label
             >취소 사유<textarea
               v-model.trim="cancelReason"
-              rows="5"
+              rows="10"
               maxlength="500"
               required
               placeholder="취소 사유를 입력해주세요."

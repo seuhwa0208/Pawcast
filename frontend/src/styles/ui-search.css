@@ -1,0 +1,98 @@
+/*
+ * 검색창 공통 규격 (돋보기 20px · 색 #805737 · 높이 48px).
+ * 고객 화면은 <UiSearchIcon />, 관리자 화면은 type="search" 입력창의 배경 아이콘을 쓰지만
+ * 같은 SVG 도형과 같은 크기·색·여백 변수를 공유해 모양이 동일합니다.
+ * 돋보기 크기나 색을 바꿀 때는 아래 변수만 고치면 됩니다. main.js에서 가장 마지막에 불러옵니다.
+ */
+:root {
+  --ui-search-color: #805737;
+  --ui-search-size: 20px;
+  --ui-search-height: 48px;
+  --ui-search-gap: 14px;
+  --ui-search-pad: 16px;
+  --ui-search-border: #d59461;
+  --ui-search-placeholder: #9a8475;
+}
+
+/* 돋보기 아이콘 */
+.ui-search-icon {
+  display: block;
+  flex: 0 0 var(--ui-search-size);
+  width: var(--ui-search-size);
+  height: var(--ui-search-size);
+  margin: 0 var(--ui-search-gap) 0 0;
+  color: var(--ui-search-color);
+}
+
+/* 공지처럼 돋보기를 눌러 검색하는 경우: 버튼은 아이콘 크기 그대로 둔다. */
+.ui-search-button {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 고객 화면: 홈·상품관·공지·Q&A 검색창을 같은 높이·테두리·안쪽 여백으로 맞춘다. */
+.search-keyword,
+.side-keyword,
+.notice-toolbar label,
+.qna-toolbar label {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--ui-search-height);
+  min-height: var(--ui-search-height);
+  border: 1px solid var(--ui-search-border);
+  border-radius: 10px;
+  background: #fff;
+}
+.notice-page .notice-toolbar label,
+.qna-page .qna-toolbar label {
+  padding: 0 var(--ui-search-pad);
+}
+.notice-page .notice-toolbar label input,
+.qna-page .qna-toolbar label input {
+  padding: 0;
+}
+.qna-toolbar input[type="search"] {
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/*
+ * 관리자 화면: 회원·주문·상품·공지·Q&A·운영 검색창.
+ * 각 화면 스타일이 나중에 불러와져도 규격이 유지되도록 핵심 속성에 !important를 둔다.
+ * 아래 SVG는 UiSearchIcon.vue와 같은 도형이고 색(%23805737)은 --ui-search-color와 같은 값이다.
+ */
+.admin-app-shell input[type="search"] {
+  appearance: none;
+  box-sizing: border-box !important;
+  height: var(--ui-search-height) !important;
+  min-height: var(--ui-search-height) !important;
+  border: 1px solid #ddc9b8;
+  border-radius: 10px !important;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5' fill='none' stroke='%23805737' stroke-width='2'/%3E%3Cpath d='m15.4 15.4 5 5' fill='none' stroke='%23805737' stroke-linecap='round' stroke-width='2'/%3E%3C/svg%3E") !important;
+  background-position: var(--ui-search-pad) center !important;
+  background-repeat: no-repeat !important;
+  background-size: var(--ui-search-size) var(--ui-search-size) !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  padding-right: var(--ui-search-pad) !important;
+  padding-left: calc(var(--ui-search-pad) + var(--ui-search-size) + var(--ui-search-gap)) !important;
+  color: #493326;
+  font-size: 15px !important;
+}
+.admin-app-shell input[type="search"]::placeholder {
+  color: var(--ui-search-placeholder);
+  opacity: 1;
+}
+/* 검색창 옆 버튼도 같은 높이로 맞춘다. */
+.admin-app-shell .admin-notice-search button,
+.admin-app-shell .admin-qna-search button {
+  height: var(--ui-search-height);
+}

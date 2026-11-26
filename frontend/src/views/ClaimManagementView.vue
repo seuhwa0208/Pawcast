@@ -197,7 +197,7 @@ onMounted(loadClaims);
           <label
             >환불 사유<textarea
               v-model.trim="refundReason"
-              rows="5"
+              rows="11"
               maxlength="500"
               required
               placeholder="환불 사유를 입력해주세요."

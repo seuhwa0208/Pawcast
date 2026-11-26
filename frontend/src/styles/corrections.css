@@ -965,32 +965,6 @@
   background: #fff;
   padding: 0 16px;
 }
-
-
-.search-keyword .search-icon,
-.side-keyword .side-search-icon {
-  position: relative;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  margin: 0 14px 0 0;
-  border: 2px solid #8a613e;
-  border-radius: 50%;
-  padding: 0;
-}
-.search-keyword .search-icon::after,
-.side-keyword .side-search-icon::after {
-  content: "";
-  position: absolute;
-  right: -6px;
-  bottom: -3px;
-  width: 8px;
-  height: 2px;
-  border-radius: 2px;
-  background: #8a613e;
-  transform: rotate(45deg);
-  transform-origin: left center;
-}
 .search-keyword input {
   width: 100%;
   height: 100%;
@@ -2644,30 +2618,6 @@
   outline: 0;
   padding: 0 13px 0 2px;
 }
-.notice-search-icon {
-  position: relative;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  margin: 0 12px 0 17px;
-  border: 1.8px solid #8b684e;
-  border-radius: 50%;
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-}
-.notice-search-icon::after {
-  content: "";
-  position: absolute;
-  right: -5px;
-  bottom: -3px;
-  width: 7px;
-  height: 1.8px;
-  border-radius: 2px;
-  background: #8b684e;
-  transform: rotate(45deg);
-  transform-origin: left center;
-}
 .notice-search {
   height: 44px;
   border: 0;
@@ -3823,17 +3773,17 @@
 .management-list,
 .pet-list {
   display: grid;
-  gap: 12px;
-  margin-top: 22px;
+  gap: 10px;
+  margin-top: 16px;
 }
 .management-list article,
 .pet-list article {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 14px;
+  border-radius: 12px;
   background: #fff7eb;
-  padding: 20px;
+  padding: 14px 18px;
 }
 .management-list article span {
   display: inline-block;
@@ -3870,16 +3820,16 @@
   cursor: pointer;
 }
 
-/* 배송지: API 응답을 한눈에 읽을 수 있도록 수령인·연락처·주소 순으로 크게 배치한다. */
-.management-list .address-label-row { display: flex; align-items: center; gap: 10px; min-height: 30px; }
-.management-list .address-tag { display: inline-flex; align-items: center; justify-content: center; min-height: 29px; border: 1px solid #dfc5af; border-radius: 8px; background: #fff8ef; padding: 4px 11px; color: #805737; font-size: 13px; font-weight: 900; line-height: 1; }
+/* 배송지: 수령인·연락처·주소 순으로 배치하되 카드는 컴팩트하게 유지한다. */
+.management-list .address-label-row { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+.management-list .address-tag { display: inline-flex; align-items: center; justify-content: center; min-height: 24px; border: 1px solid #dfc5af; border-radius: 7px; background: #fff8ef; padding: 3px 9px; color: #805737; font-size: 12px; font-weight: 900; line-height: 1; }
 .management-list .address-tag.primary { border-color: #9b633b; background: #9b633b; color: #fff; }
-.management-list .address-info h3 { font-size: 16px; }
-.management-list .address-info strong { display: block; margin-top: 6px; color: #452d1e; font-size: 18px; }
-.management-list .address-info strong small { margin-left: 10px; color: #896f5d; font-size: 16px; font-weight: 600; }
-.management-list .address-info p { margin-top: 9px; font-size: 16px; line-height: 1.55; }
-.management-list .address-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.management-list .address-actions button { min-width: 98px; border: 1px solid #b2764d; border-radius: 9px; background: #fff; color: #754526; padding: 10px 13px; font: inherit; font-weight: 800; cursor: pointer; }
+.management-list .address-info h3 { margin: 0; font-size: 15px; }
+.management-list .address-info strong { display: block; margin-top: 4px; color: #452d1e; font-size: 15px; }
+.management-list .address-info strong small { margin-left: 8px; color: #896f5d; font-size: 13px; font-weight: 600; }
+.management-list .address-info p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; }
+.management-list .address-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.management-list .address-actions button { min-width: 76px; border: 1px solid #b2764d; border-radius: 8px; background: #fff; color: #754526; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
 .management-list .address-actions button:first-child { background: #9b633b; color: #fff; }
 @media (max-width: 680px) { .management-list .address-actions { justify-content: flex-start; width: 100%; } }
 .pet-list article {
@@ -5808,8 +5758,9 @@
   font-weight: 800;
 }
 .claim-request-modal {
-  width: min(100% - 32px, 620px);
-  padding: 48px 56px 44px;
+  /* 취소·환불 사유를 충분히 작성할 수 있도록 넓고 여유 있게 표시한다. */
+  width: min(100% - 32px, 900px);
+  padding: 60px 72px 52px;
 }
 .claim-request-modal > small {
   color: #9b643d;
@@ -5821,32 +5772,42 @@
   color: #4c3426;
 }
 .claim-request-modal > p {
-  margin: 0 0 20px;
+  margin: 0 0 24px;
   color: #8f8077;
-  font-size: 13px;
+  font-size: 15px;
 }
 .claim-request-modal > label {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   color: #624739;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
+  text-align: left;
 }
 .claim-request-modal textarea {
   width: 100%;
+  min-height: 300px;
   resize: vertical;
   border: 1px solid #ddcbbb;
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 18px 20px;
   font: inherit;
   font-weight: 400;
-  font-size: 15px;
-  line-height: 1.65;
+  font-size: 18px;
+  line-height: 1.5;
 }
 .claim-request-modal textarea:focus {
   outline: 0;
   border-color: #a8734e;
   box-shadow: 0 0 0 3px rgb(168 115 78 / 10%);
+}
+@media (max-width: 600px) {
+  .claim-request-modal {
+    padding: 44px 22px 28px;
+  }
+  .claim-request-modal textarea {
+    min-height: 240px;
+  }
 }
 @media (max-width: 600px) {
   .claim-content {
@@ -6029,28 +5990,6 @@
   outline: 0;
   padding: 0 14px 0 2px;
 }
-.qna-toolbar label .qna-search-icon {
-  position: relative;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-  margin: 0 12px 0 17px;
-  border: 1.8px solid #8b684e;
-  border-radius: 50%;
-  padding: 0;
-}
-.qna-toolbar label .qna-search-icon::after {
-  content: "";
-  position: absolute;
-  right: -5px;
-  bottom: -3px;
-  width: 7px;
-  height: 1.8px;
-  border-radius: 2px;
-  background: #8b684e;
-  transform: rotate(45deg);
-  transform-origin: left center;
-}
 .qna-toolbar > button {
   border: 0;
   border-radius: 9px;
@@ -6185,56 +6124,6 @@ button.qna-row:hover:not(:disabled) {
 .status-badge.waiting {
   background: #fff0c7;
   color: #c17a00;
-}
-.qna-pagination {
-  display: flex;
-  justify-content: center;
-  gap: 4px;
-  width: max-content;
-  margin: 28px auto 0;
-  border-radius: 10px;
-  background: #faf7f3;
-  padding: 4px;
-}
-.qna-pagination button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  padding: 0;
-  color: #806e61;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    border-color 0.16s,
-    background-color 0.16s,
-    color 0.16s,
-    transform 0.16s;
-}
-.qna-pagination button:hover:not(:disabled):not(.on) {
-  border-color: #9a704f;
-  background: #fbf2e8;
-  color: #49301f;
-  transform: translateY(-1px);
-}
-.qna-pagination button.on {
-  border-color: #805737;
-  background: #805737;
-  color: #fff;
-  font-weight: 900;
-  box-shadow: 0 3px 8px rgb(93 57 34 / 18%);
-}
-.qna-pagination button:disabled {
-  border-color: transparent;
-  background: transparent;
-  color: #c9c0b9;
-  opacity: 1;
-  cursor: default;
 }
 .qna-row.private {
   cursor: pointer;
@@ -8316,19 +8205,6 @@ button.qna-row:hover:not(:disabled) {
   height: 48px;
   min-height: 48px;
 }
-.notice-page .notice-toolbar .notice-search-icon {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  margin: 0 14px 0 18px;
-  border-width: 2px;
-  border-color: #805737;
-}
-.notice-page .notice-toolbar .notice-search-icon::after {
-  width: 8px;
-  height: 2px;
-  background: #805737;
-}
 .notice-page .notice-toolbar input {
   min-width: 0;
   padding: 0 16px 0 2px;
@@ -8344,19 +8220,6 @@ button.qna-row:hover:not(:disabled) {
   height: 48px;
   min-height: 48px;
   padding: 0 16px;
-}
-.category-sidebar .side-keyword .side-search-icon {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  margin-right: 14px;
-  border-width: 2px;
-  border-color: #805737;
-}
-.category-sidebar .side-keyword .side-search-icon::after {
-  width: 8px;
-  height: 2px;
-  background: #805737;
 }
 .category-sidebar .side-keyword input {
   font-size: 14px;
@@ -8478,53 +8341,11 @@ button.qna-row:hover:not(:disabled) {
   font-size: 14px;
 }
 .notice-toolbar input::placeholder { color: #9a8475; opacity: 1; }
-.notice-search-icon {
-  border-color: #896145;
-}
-.notice-search-icon::after { background: #896145; }
 
 /* 공지 탭·검색창·검색 버튼은 같은 48px 줄 안에서 맞춘다. */
 .notice-toolbar{grid-template-columns:auto minmax(280px,1fr) 92px;align-items:center;gap:12px}.notice-filters{height:48px;box-sizing:border-box;padding:4px}.notice-filters button{height:40px}.notice-toolbar label,.notice-toolbar .notice-search{height:48px;box-sizing:border-box}.notice-toolbar .notice-search{border:0;border-radius:10px;background:#96603a;color:#fff;font:inherit;font-weight:800;cursor:pointer}.notice-toolbar .notice-search:hover{background:#80502f}
 @media(max-width:720px){.notice-toolbar{grid-template-columns:1fr}.notice-toolbar .notice-search{min-height:48px}.notice-filters{width:max-content}}
-
-/* 모든 일반 검색창의 돋보기는 마지막 공통 규칙으로 크기·색·여백을 고정한다. */
-.search-keyword .search-icon,.side-keyword .side-search-icon,.notice-search-icon{width:18px;height:18px;flex:0 0 18px;border-width:2px;border-color:#896145}.search-keyword .search-icon,.side-keyword .side-search-icon{margin-right:14px}.search-keyword .search-icon::after,.side-keyword .side-search-icon::after{width:8px;height:2px;background:#896145}
 @media(max-width:620px){.home-keyword-row{flex-direction:column}.home-search-submit{min-height:48px;width:100%}}
-
-/* 상품 상세 리뷰: 공지사항과 같은 작은 페이지바를 사용한다. */
-.product-review-panel .review-pagination.pagination-bar {
-  gap: 4px;
-  margin-top: 16px;
-  padding: 4px;
-  border-radius: 10px;
-  background: #faf7f3;
-}
-.product-review-panel .review-pagination.pagination-bar button,
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  display: grid;
-  place-items: center;
-  min-width: 34px;
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  font-size: 13px;
-  line-height: 1;
-}
-.product-review-panel .review-pagination.pagination-bar button.active {
-  background: #805737;
-  box-shadow: 0 3px 8px rgb(93 57 34 / 18%);
-}
-.product-review-panel .review-pagination.pagination-bar{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;width:max-content;min-width:max-content;max-width:none;margin:22px auto 0;padding:5px 14px;gap:7px;border-radius:12px}.product-review-panel .review-pagination.pagination-bar button{flex:0 0 34px}.product-review-panel .review-pagination.pagination-bar button.on{border-color:#805737;background:#805737;color:#fff;box-shadow:0 3px 8px rgb(93 57 34 / 18%)}
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  font-size: 18px;
-}
 
 /* 장바구니 목록: 선택·이미지·정보·수량·금액·삭제를 한 행의 고정 흐름으로 유지한다. */
 .cart-page .cart-list {
@@ -8646,7 +8467,6 @@ button.qna-row:hover:not(:disabled) {
     margin: 0;
   }
 }
-.qna-toolbar input[type="search"] { padding-left: 43px !important; }
 .qna-board-controls {
   display: flex;
   align-items: center;
@@ -8699,11 +8519,6 @@ button.qna-row:hover:not(:disabled) {
   border-top: 0;
   border-bottom: 7px solid #805737;
   transform: translateY(-3px);
-}
-.qna-toolbar input[type="search"] {
-  padding-left: 49px !important;
-  background-size: 22px 22px !important;
-  background-position: 15px center !important;
 }
 
 /* 공지·Q&A의 탭, 선택, 검색, 실행 버튼은 한 줄에서 같은 높이와 간격을 유지한다. */
@@ -8952,15 +8767,6 @@ button.qna-row:hover:not(:disabled) {
   color: #9a8475;
   opacity: 1;
 }
-.search-keyword .search-icon,
-.side-keyword .side-search-icon,
-.qna-toolbar .qna-search-icon {
-  flex: 0 0 17px;
-  width: 17px;
-  height: 17px;
-  margin-right: 14px;
-  border-color: #896145;
-}
 
 /* Q&A 제목은 다른 고객센터 화면과 동일하게 왼쪽 기준으로 유지한다. */
 @media (min-width: 701px) {
@@ -9060,19 +8866,6 @@ button.qna-row:hover:not(:disabled) {
   height: 48px;
   min-height: 48px;
 }
-.notice-page .notice-toolbar .notice-search-icon {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  margin: 0 14px 0 18px;
-  border-width: 2px;
-  border-color: #805737;
-}
-.notice-page .notice-toolbar .notice-search-icon::after {
-  width: 8px;
-  height: 2px;
-  background: #805737;
-}
 .notice-page .notice-toolbar input {
   min-width: 0;
   padding: 0 16px 0 2px;
@@ -9088,19 +8881,6 @@ button.qna-row:hover:not(:disabled) {
   height: 48px;
   min-height: 48px;
   padding: 0 16px;
-}
-.category-sidebar .side-keyword .side-search-icon {
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  margin-right: 14px;
-  border-width: 2px;
-  border-color: #805737;
-}
-.category-sidebar .side-keyword .side-search-icon::after {
-  width: 8px;
-  height: 2px;
-  background: #805737;
 }
 .category-sidebar .side-keyword input {
   font-size: 14px;
@@ -9354,77 +9134,20 @@ button.qna-row:hover:not(:disabled) {
   .cart-page .cart-summary { position: static; }
 }
 
-/* 상품 상세 리뷰 페이지바: 버튼 사이 여백과 좌우 폭을 줄여 한 덩어리로 정돈한다. */
-.product-review-panel .review-pagination.pagination-bar {
-  gap: 4px;
-  margin-top: 20px;
-  padding: 5px 10px;
-  border-radius: 12px;
-}
-.product-review-panel .review-pagination.pagination-bar button,
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  flex: 0 0 32px;
-  min-width: 32px;
-  width: 32px;
-  height: 36px;
-  padding: 0;
-}
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  font-size: 17px;
-}
-
-/* 상품 상세 리뷰는 공지사항과 동일한 '하나의 크림 바' 페이지바를 사용한다. */
-.product-review-panel .review-pagination.pagination-bar {
-  display: flex;
-  width: max-content;
-  min-width: 0;
-  max-width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin: 22px auto 0;
-  border-radius: 12px;
-  background: #faf7f2;
-  padding: 6px 12px;
-}
-.product-review-panel .review-pagination.pagination-bar button,
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  display: grid;
-  flex: 0 0 34px;
-  width: 34px;
-  min-width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  padding: 0;
-  color: #795e49;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 800;
-  line-height: 1;
-}
-.product-review-panel .review-pagination.pagination-bar button.on {
-  background: #96603a;
-  color: #fff;
-  box-shadow: 0 3px 7px rgb(84 49 25 / 18%);
-}
-.product-review-panel .review-pagination.pagination-bar button:first-child,
-.product-review-panel .review-pagination.pagination-bar button:nth-child(2),
-.product-review-panel .review-pagination.pagination-bar button:nth-last-child(2),
-.product-review-panel .review-pagination.pagination-bar button:last-child {
-  flex-basis: 38px;
-  width: 38px;
-  min-width: 38px;
-  font-size: 18px;
+/* 고객·관리자 본문 입력은 동일한 가독성 기준(18px, 1.5줄 간격)을 사용한다. */
+.review-write-modal textarea,
+.qna-write-form input,
+.qna-write-form textarea,
+.qna-write-field input,
+.qna-write-field textarea,
+.admin-qna .qna-answer-panel textarea,
+.admin-qna-answer-modal textarea,
+.admin-operations input,
+.admin-operations textarea,
+.notice-editor input,
+.notice-editor textarea,
+.form-grid input,
+.form-grid textarea {
+  font-size: 18px !important;
+  line-height: 1.5 !important;
 }
