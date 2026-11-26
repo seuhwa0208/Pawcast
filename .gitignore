@@ -16,9 +16,6 @@ AI/app/review/models/
 # Java Heap Dump
 *.hprof
 
-# 이전 AI 프로젝트
-/ai_old/
-
 # Python
 .venv/
 venv/

@@ -1,0 +1,13 @@
+{
+  "fileNamePrefix": "pawcast-sales",
+  "formats": [{ "value": "csv", "label": "CSV" }, { "value": "xlsx", "label": "Excel (.xlsx)" }],
+  "sections": [
+    { "key": "all", "label": "전체 통계", "description": "모든 분석·예측 통계를 내려받습니다." },
+    { "key": "summary", "label": "매출 요약", "sheetName": "매출요약", "columns": { "total_sales": "총 매출", "total_orders": "주문 건수", "average_order_amount": "평균 주문금액", "refund_amount": "환불 완료 금액", "sales_growth_rate": "매출 증감률(%)", "order_growth_rate": "주문 증감률(%)" } },
+    { "key": "categories", "label": "카테고리 통계", "sheetName": "카테고리요약", "columns": { "category_name": "카테고리", "sales": "매출", "orders": "주문 건수", "average_order_amount": "평균 주문금액", "refund_amount": "환불 완료 금액", "growth_rate": "매출 증감률(%)" } },
+    { "key": "daily", "label": "일별 매출", "sheetName": "일별매출", "columns": { "sale_date": "판매일", "sales": "매출", "orders": "주문 건수", "average_order_amount": "평균 주문금액" } },
+    { "key": "products", "label": "상품·재고 통계", "sheetName": "상품통계", "columns": { "product_id": "상품 ID", "name": "상품명", "category_name": "카테고리", "sales": "매출", "quantity": "판매 수량", "orders": "주문 건수", "current_stock": "현재 재고", "review_count": "리뷰 수", "average_rating": "평균 평점", "positive_reviews": "긍정 리뷰 수", "negative_reviews": "부정 리뷰 수", "positive_rate": "긍정 비율(%)" } },
+    { "key": "reviews", "label": "리뷰 감정 통계", "sheetName": "리뷰감정", "columns": { "product_id": "상품 ID", "name": "상품명", "review_count": "리뷰 수", "average_rating": "평균 평점", "positive_reviews": "긍정 리뷰 수", "negative_reviews": "부정 리뷰 수", "positive_rate": "긍정 비율(%)" } },
+    { "key": "forecast", "label": "판매 예측", "sheetName": "판매예측", "columns": { "forecast_date": "예측 기준일", "predicted_sales": "예상 매출", "growth_rate": "예상 증감률(%)", "training_days": "학습 기간(일)", "trained_at": "학습 시각", "insight": "AI 인사이트" } }
+  ]
+}
