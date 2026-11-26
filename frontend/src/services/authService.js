@@ -1,5 +1,4 @@
-
- // 회원가입·로그인·이메일 인증·OAuth 등 인증 관련 Spring API 호출을 한곳에 모읍니다.
+// 회원가입·로그인·이메일 인증·OAuth 등 인증 관련 Spring API 호출을 한곳에 모읍니다.
 import { jsonBody, springRequest } from "@/services/http/springClient";
 
 const post = (path, body) =>
@@ -22,21 +21,29 @@ export const authService = {
             userid: userId,
         }),
 
+    // 백엔드 @PostMapping("/email-availability")가 @RequestBody EmailRequest를 받으므로 JSON 바디로 전송
     checkEmailAvailability: (email) =>
-        postQuery("/auth/email-availability", {
+        post("/auth/email-availability", {
             email,
         }),
 
+    // 백엔드 @PostMapping("/email-verify")가 @RequestBody EmailRequest를 받으므로 JSON 바디로 전송
     sendEmailCode: (email) =>
-        postQuery("/auth/email-verify", {
+        post("/auth/email-verify", {
             email,
         }),
 
+    // email은 JSON 바디(EmailRequest), checkCode는 쿼리 파라미터(@RequestParam)로 전송
     confirmEmailCode: (email, verificationCode) =>
-        postQuery("/auth/email-verify/confirm", {
-            email,
-            checkCode: verificationCode,
-        }),
+        springRequest(
+            `/auth/email-verify/confirm?${new URLSearchParams({
+                checkCode: verificationCode,
+            }).toString()}`,
+            {
+                method: "POST",
+                body: jsonBody({ email }),
+            }
+        ),
 
     signup: (payload) =>
         post("/auth/signup", payload),

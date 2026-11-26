@@ -5,13 +5,17 @@ import com.project.pawcast.auth.service.AuthService;
 import com.project.pawcast.auth.service.EmailVerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
+@Validated
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
@@ -21,6 +25,18 @@ public class AuthController {
     @PostMapping("/availability")
     public Map<String, Boolean> checkUserId(@RequestParam String userid) {
         return Map.of("available", !authService.checkUserId(userid));
+    }
+
+    // 이메일 중복 확인 (GET 쿼리 파라미터 호환): 인증번호 발송 전에 가입 가능 여부를 안내한다.
+    @GetMapping("/email-availability")
+    public Map<String, Boolean> checkEmailByGet(
+            @RequestParam
+            @NotBlank(message = "빈 칸을 입력해 주세요.")
+            @Email(message = "이메일 형식으로 입력해 주세요.")
+            String email
+    ) {
+        // 기존 POST 핸들러와 동일한 검증 및 중복 조회 로직을 재사용합니다.
+        return checkEmail(new EmailRequest(email));
     }
 
     // 이메일 중복 확인: 인증번호 발송 전에 가입 가능 여부를 명확히 안내한다.
@@ -81,4 +97,3 @@ public class AuthController {
         return authService.refresh(token, request);
     }
 }
-

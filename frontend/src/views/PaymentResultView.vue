@@ -6,7 +6,7 @@ import { paymentService } from "@/services/paymentService";
 
 const route = useRoute();
 const router = useRouter();
-const { clear } = useCart();
+const { refresh, remove } = useCart();
 
 const state = ref("loading");
 const message = ref("결제 결과를 확인하고 있습니다.");
@@ -72,20 +72,29 @@ onMounted(async () => {
       },
       savedContext.orderAccessToken,
     );
+  } catch (error) {
+    state.value = "fail";
+    message.value = error.message || "결제 승인에 실패했습니다.";
+    return;
+  }
 
-    if (savedContext.mode !== "buy-now") {
-      await clear();
-    }
+  state.value = "success";
+  message.value = "결제가 완료되었습니다.";
+
+  try {
     sessionStorage.removeItem("powcast-payment-context");
     sessionStorage.removeItem("powcast-buy-now");
     sessionStorage.removeItem("powcast-selected-checkout");
 
-    state.value = "success";
-    message.value = "결제가 완료되었습니다.";
+    if (savedContext.isMember) {
+      await refresh();
+    } else {
+      for (const key of savedContext.guestCartKeys ?? []) {
+        await remove(key);
+      }
+    }
   } catch (error) {
-    // 결제 승인 실패 시 장바구니와 선택 목록을 비우지 않아 상품이 그대로 남도록 둡니다.
-    state.value = "fail";
-    message.value = error.message || "결제 승인에 실패했습니다.";
+    console.warn("결제 후 장바구니 갱신 실패", error);
   }
 });
 </script>

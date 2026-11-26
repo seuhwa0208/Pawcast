@@ -1,10 +1,7 @@
 package com.project.pawcast.pets.dto;
 
 import com.project.pawcast.pets.entity.Pets;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -15,7 +12,7 @@ public record PetsRequest(
         @Size(max = 20, message = "펫 이름은 최대 20자 까지 가능합니다.")
         String name,
 
-        @NotBlank(message = "펫 타입을 입력해 주세요.")
+        @NotNull(message = "펫 타입을 입력해 주세요.")
         Pets.PetType petType,
 
         LocalDate birthday,

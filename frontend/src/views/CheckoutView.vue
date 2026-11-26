@@ -297,8 +297,9 @@ async function requestPayment() {
   }
   try {
     submitting.value = true;
+    const orderdItems = [...checkoutItems.value];
     const order = await paymentService.createOrder({
-      items: checkoutItems.value.map((item) => ({
+      items: orderdItems.map((item) => ({
         productVariantId: item.variantId || item.id,
         quantity: item.quantity,
       })),
@@ -326,6 +327,9 @@ async function requestPayment() {
         orderAccessToken,
         orderEmail: buyerEmail.value,
         isMember: isMember.value,
+        gusetCartKeys: !isMember.value && !isBuyNow.value
+        ? orderedItems.map((itme) => item.key).filter(Boolean)
+        : [],
         mode: isBuyNow.value
           ? "buy-now"
           : isSelectedMode.value
