@@ -104,9 +104,14 @@ public class MemberService {
     // 회원 탈퇴
     @Transactional
     public void deletedMyInfo(Long id) {
-        Members member = findById(id);
+        Members member = membersRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        if (member.getStatus() == Members.Status.DELETED) {
+            return;
+        }
         member.setStatus(Members.Status.DELETED);
         member.setDeletedAt(LocalDateTime.now());
         membersRepository.saveAndFlush(member);
+        refreshTokenRepository.revokeAllByMember(id);
     }
 }

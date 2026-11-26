@@ -17,7 +17,8 @@ import java.util.Optional;
 public interface MembersRepository extends JpaRepository<Members, Long> {
     boolean existsByUserId(String userId);
     boolean existsByEmail(String email);
-    Optional<Members> findByUserId(String userId);
+    boolean existsByEmailAndStatusNot(String email, Members.Status status);
+    boolean existsByIdAndStatusNot(Long id, Members.Status status);
     Optional<Members> findByEmail(String email);
    // List<Members> findAllByStatusNotOrderByCreatedAtAsc(Members.Status status);
 
@@ -25,6 +26,14 @@ public interface MembersRepository extends JpaRepository<Members, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT m FROM Members m WHERE m.id = :id")
     Optional<Members> findByIdForUpdate(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Members m WHERE m.userId = :userId")
+    Optional<Members> findByUserIdForUpdate(@Param("userId") String userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT m FROM Members m WHERE m.email = :email")
+    Optional<Members> findByEmailForUpdate(@Param("email") String email);
 
     @Query("""
     SELECT new com.project.pawcast.member.dto.MemberListResponse(

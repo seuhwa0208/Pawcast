@@ -43,12 +43,13 @@ public class SocialLoginService {
         String name = (String) payload.get("name");
 
         OauthAccount oauthAccount = findOauthAccount(providerUserId);
-        if (oauthAccount != null) {
+        if (hasNonDeletedMember(oauthAccount)) {
             return loginResponse(oauthAccount.getMember(), false);
         }
 
         // 동일 이메일로 가입된 기존 계정이 있으면 계정 연동 유도, 없으면 신규 가입 단계로 안내
-        String nextStep = membersRepository.existsByEmail(email) ? "LINK" : "SIGNUP";
+        String nextStep = membersRepository.existsByEmailAndStatusNot(email, Members.Status.DELETED)
+                ? "LINK" : "SIGNUP";
         return pendingResponse(nextStep, email, name);
     }
 
@@ -61,11 +62,12 @@ public class SocialLoginService {
         String name = request.name().trim();
 
         OauthAccount existing = findOauthAccount(providerUserId);
-        if (existing != null) {
+        if (hasNonDeletedMember(existing)) {
             return loginResponse(existing.getMember(), false);
         }
 
-        if (membersRepository.existsByEmail(email)) {
+        Members previousMember = membersRepository.findByEmailForUpdate(email).orElse(null);
+        if (previousMember != null && previousMember.getStatus() != Members.Status.DELETED) {
             throw new BusinessException(ErrorCode.DUPLICATE_MEMBER);
         }
 
@@ -78,8 +80,14 @@ public class SocialLoginService {
 
         validateRequiredAgreements(request);
 
+        if (previousMember != null) {
+            // 주문 등 기존 회원 기록은 유지하면서 새 계정에 인증된 이메일을 등록할 수 있게 합니다.
+            previousMember.setEmail("withdrawn-" + previousMember.getId() + "@members.pawcast.invalid");
+            membersRepository.saveAndFlush(previousMember);
+        }
+
         Members member = createSocialMember(email, name, request.tel(), request);
-        saveOauthAccount(member, providerUserId);
+        saveOauthAccount(member, providerUserId, existing);
         return loginResponse(member, true);
     }
 
@@ -91,18 +99,19 @@ public class SocialLoginService {
         String email = payload.getEmail();
 
         OauthAccount existing = findOauthAccount(providerUserId);
-        if (existing != null) {
+        if (hasNonDeletedMember(existing)) {
             return loginResponse(existing.getMember(), false);
         }
 
-        Members member = membersRepository.findByEmail(email)
+        Members member = membersRepository.findByEmailForUpdate(email)
+                .filter(found -> found.getStatus() != Members.Status.DELETED)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
 
         if (member.getPasswordHash() == null || !passwordEncoder.matches(request.password(), member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.PASSWORD_MISMATCH);
         }
 
-        saveOauthAccount(member, providerUserId);
+        saveOauthAccount(member, providerUserId, existing);
         return loginResponse(member, false);
     }
 
@@ -118,8 +127,12 @@ public class SocialLoginService {
     // Google 소셜 계정 조회
     private OauthAccount findOauthAccount(String providerUserId) {
         return oauthAccountRepository
-                .findByProviderAndProviderUserId(PROVIDER_GOOGLE, providerUserId)
+                .findForUpdate(PROVIDER_GOOGLE, providerUserId)
                 .orElse(null);
+    }
+
+    private boolean hasNonDeletedMember(OauthAccount account) {
+        return account != null && account.getMember().getStatus() != Members.Status.DELETED;
     }
 
     // 필수 약관 동의 여부 검사
@@ -186,12 +199,16 @@ public class SocialLoginService {
     }
 
     // OauthAccount 매핑 엔티티 저장
-    private void saveOauthAccount(Members member, String providerUserId) {
-        oauthAccountRepository.save(OauthAccount.builder()
-                .member(member)
-                .provider(PROVIDER_GOOGLE)
-                .providerUserId(providerUserId)
-                .build());
+    private void saveOauthAccount(Members member, String providerUserId, OauthAccount existing) {
+        OauthAccount account = existing;
+        if (account == null) {
+            account = OauthAccount.builder()
+                    .provider(PROVIDER_GOOGLE)
+                    .providerUserId(providerUserId)
+                    .build();
+        }
+        account.setMember(member);
+        oauthAccountRepository.saveAndFlush(account);
     }
 
     // 소셜 가입 회원 엔티티 생성 및 저장

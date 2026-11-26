@@ -140,14 +140,12 @@ public class AuthService {
     // 일반 로그인 인증
     @Transactional
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest) {
-        Members member = membersRepository.findByUserId(request.userId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_FAILED));
+        Members member = membersRepository.findByUserIdForUpdate(request.userId())
+                .filter(found -> found.getStatus() != Members.Status.DELETED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_MEMBER_NOT_FOUND));
 
         if (member.getStatus() == Members.Status.INACTIVE) {
             throw new BusinessException(ErrorCode.MEMBER_INACTIVE);
-        }
-        if (member.getStatus() == Members.Status.DELETED) {
-            throw new BusinessException(ErrorCode.MEMBER_DELETED);
         }
         if (!passwordEncoder.matches(request.passwordHash(), member.getPasswordHash())) {
             throw new BusinessException(ErrorCode.LOGIN_FAILED);
@@ -213,6 +211,11 @@ public class AuthService {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
 
+        // 탈퇴와 같은 순서로 회원을 먼저 잠가 토큰을 폐기하는 도중에 재발급되지 않게 합니다.
+        Members member = membersRepository.findByIdForUpdate(tokenProvider.memberId(claims))
+                .filter(found -> found.getStatus() != Members.Status.DELETED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID));
+
         RefreshTokens stored = refreshTokenRepository.findByTokenForUpdate(refreshTokenValue)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TOKEN_INVALID));
 
@@ -220,11 +223,6 @@ public class AuthService {
             log.warn("폐기된 refresh 토큰 재사용 시도: memberId={}", stored.getMember().getId());
             // 늦게 도착한 중복 refresh 요청이 새로 회전된 세션까지 무효화하지 않게 합니다.
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
-        }
-
-        Members member = stored.getMember();
-        if (member.getStatus() == Members.Status.DELETED) {
-            throw new BusinessException(ErrorCode.MEMBER_DELETED);
         }
 
         stored.revoke();
