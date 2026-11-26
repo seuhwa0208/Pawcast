@@ -1,6 +1,7 @@
 <!-- URL 쿼리와 사용자의 필터 선택을 조합해 상품 목록을 계산하는 카테고리 화면입니다. -->
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
 import { useRoute, useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
 import { productService } from "@/services/productService";
@@ -407,7 +408,7 @@ const list = computed(() => {
           </button>
           <h3>검색하기</h3>
           <label class="side-keyword"
-            ><span class="side-search-icon" aria-hidden="true" /><input
+            ><UiSearchIcon /><input
               v-model="keyword"
               placeholder="예) 연어 사료, 츄르"
           /></label>

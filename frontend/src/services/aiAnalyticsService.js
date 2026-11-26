@@ -6,14 +6,14 @@ export const aiAnalyticsService = {
       limit: String(limit),
       days: String(days),
     });
-    const { body } = await aiRequest(
-      `/api/reviews/sentiment-summary?${query}`,
-    );
+    const { body } = await aiRequest(`/api/reviews/sentiment-summary?${query}`);
     return body;
   },
 
   async getInventoryForecast(limit = 5) {
-    const { body } = await aiRequest(`/api/sales/inventory-forecast?limit=${limit}`);
+    const { body } = await aiRequest(
+      `/api/sales/inventory-forecast?limit=${limit}`,
+    );
     return body;
   },
 
@@ -30,10 +30,9 @@ export const aiAnalyticsService = {
       days: String(days),
       limit: String(limit),
     });
-    const { body } = await aiRequest(
-      `/api/reviews/analyze-recent?${query}`,
-      { method: "POST" },
-    );
+    const { body } = await aiRequest(`/api/reviews/analyze-recent?${query}`, {
+      method: "POST",
+    });
     return body;
   },
 };

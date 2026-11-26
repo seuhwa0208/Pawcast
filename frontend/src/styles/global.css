@@ -101,6 +101,17 @@ body {
   text-decoration: none;
   font-weight: 900;
 }
+
+.account .guest-order-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.account .guest-order-link:hover { color: var(--point, #a66b3f); }
 .account .signup {
   border-radius: 9px;
   background: #916840;

@@ -21,7 +21,10 @@ export function canManageAdminArea(value) {
 }
 
 export function getRoleLandingPath(value) {
-  return canManageAdminArea(value) ? "/admin/sales" : "/member";
+  // 매니저는 매출 분석이 아닌 주문·배송 관리부터 시작한다.
+  if (isAdminRole(value)) return "/admin/sales";
+  if (isManagerRole(value)) return "/admin/orders";
+  return "/member";
 }
 
 

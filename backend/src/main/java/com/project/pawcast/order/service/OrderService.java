@@ -245,13 +245,14 @@ public class OrderService {
         return detailGuestOrder(email, orderNumber);
     }
 
-    // 비회원 주문은 주문번호와 결제 시 입력한 이메일이 모두 일치할 때만 조회한다.
+    // 비로그인 상태에서는 주문번호와 결제 시 입력한 이메일이 모두 일치할 때만 조회한다.
+    // 회원 주문도 로그아웃 후 결제 안내 메일의 정보로 조회할 수 있게 같은 조건을 사용한다.
     public OrderResponse detailGuestOrder(
             String email,
             String orderNumber
     ) {
         Order guestOrder = orderRepository
-                .findGuestOrderByEmailAndOrderNumber(
+                .findOrderByEmailAndOrderNumber(
                         email.trim(),
                         orderNumber.trim()
                 )

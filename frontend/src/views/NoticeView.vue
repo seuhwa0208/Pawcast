@@ -1,8 +1,10 @@
 <!-- 공지/이벤트의 검색·고정 글 분리·페이지네이션·상세 열람을 처리하는 게시판입니다. -->
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
 import { useRoute, useRouter } from "vue-router";
 import { noticeService } from "@/services/noticeService";
+import PaginationBar from "@/components/PaginationBar.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -71,15 +73,6 @@ const visibleItems = computed(() =>
   normal.value.slice((page.value - 1) * 10, page.value * 10),
 );
 
-// 현재 페이지가 속한 5개 단위 페이지 묶음만 화면에 노출합니다.
-const pageNumbers = computed(() => {
-  const start = Math.floor((page.value - 1) / 5) * 5 + 1;
-  return Array.from(
-    { length: Math.min(5, pageCount.value - start + 1) },
-    (_, index) => start + index,
-  );
-});
-
 function chooseFilter(value) {
   filter.value = value;
   page.value = 1;
@@ -128,10 +121,12 @@ watch(
         <label>
           <button
             type="button"
-            class="notice-search-icon"
+            class="ui-search-button"
             aria-label="검색"
             @click="applySearch"
-          />
+          >
+            <UiSearchIcon />
+          </button>
           <input
             v-model.trim="keywordInput"
             placeholder="예) 배송 지연, 3주년 세일"
@@ -191,40 +186,7 @@ watch(
         검색 조건에 맞는 게시글이 없습니다.
       </p>
 
-      <nav class="qna-pagination" aria-label="페이지 이동">
-        <button :disabled="page === 1" aria-label="첫 페이지" @click="page = 1">
-          «
-        </button>
-        <button
-          :disabled="page === 1"
-          aria-label="이전 페이지"
-          @click="page--"
-        >
-          ‹
-        </button>
-        <button
-          v-for="n in pageNumbers"
-          :key="n"
-          :class="{ on: page === n }"
-          @click="page = n"
-        >
-          {{ n }}
-        </button>
-        <button
-          :disabled="page === pageCount"
-          aria-label="다음 페이지"
-          @click="page++"
-        >
-          ›
-        </button>
-        <button
-          :disabled="page === pageCount"
-          aria-label="마지막 페이지"
-          @click="page = pageCount"
-        >
-          »
-        </button>
-      </nav>
+      <PaginationBar v-model:page="page" :total-pages="pageCount" label="공지사항 페이지 이동" />
     </section>
 
     <section v-else class="notice-detail board-detail">

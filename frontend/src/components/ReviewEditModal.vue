@@ -60,11 +60,11 @@ const contentChanged = computed(() =>
     reviewContent.value !== originalContent
 );
 
-// 리뷰 수정 사항 확인
+// 별점 또는 리뷰 내용이 바뀐 경우에만 수정하기 버튼을 활성화합니다.
+// (이미지 변경만으로는 활성화되지 않습니다.)
 const hasChanges = computed(() =>
     reviewRating.value !== originalRating ||
-    contentChanged.value ||
-    imageMode.value !== "keep"
+    contentChanged.value
 );
 
 // 현재 수정 요청이 가능한지 확인합니다.
@@ -75,11 +75,7 @@ const canSubmit = computed(() =>
     Number.isInteger(reviewRating.value) &&
     reviewRating.value >= 1 &&
     reviewRating.value <= 5 &&
-    Boolean(reviewContent.value.trim()) &&
-    (
-        imageMode.value !== "replace" ||
-        reviewImages.value.length > 0
-    )
+    Boolean(reviewContent.value.trim())
 );
 
 // 기존 이미지 경로를 화면에서 사용할 수 있도록 처리합니다.

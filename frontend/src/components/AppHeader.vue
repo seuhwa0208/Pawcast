@@ -6,9 +6,11 @@ import { useRoute, useRouter } from "vue-router";
 import { useCart } from "@/stores/cart";
 import { useAuthSession } from "@/stores/auth";
 import { authService } from "@/services/authService";
+import GuestOrderLookupModal from "@/components/GuestOrderLookupModal.vue";
 
 const open = ref(false);
 const isLoggingOut = ref(false);
+const guestOrderLookupOpen = ref(false);
 
 const { count } = useCart();
 
@@ -170,11 +172,14 @@ watch(
                     >
                         회원가입
                     </RouterLink>
+
+                    <button class="guest-order-link" type="button" @click="guestOrderLookupOpen = true">비회원 주문조회</button>
                 </template>
 
                 <RouterLink
                     to="/cart"
                     class="cart-button"
+                    :class="{ 'has-items': count > 0 }"
                     :aria-label="`장바구니, 상품 ${count}개`"
                 >
                     <svg
@@ -208,4 +213,5 @@ watch(
             </div>
         </div>
     </header>
+    <GuestOrderLookupModal :open="guestOrderLookupOpen" @close="guestOrderLookupOpen = false" />
 </template>

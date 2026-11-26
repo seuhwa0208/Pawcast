@@ -75,10 +75,10 @@ public class SecurityConfig {
                         // 회원 역할 변경과 AI 모델 재학습 진입점은 ADMIN 전용입니다.
                         .requestMatchers("/api/admin/members/**", "/api/admin").hasRole("ADMIN")
                         .requestMatchers("/api/admin/ai/**").hasRole("ADMIN")
+                        // 매출·대시보드는 민감한 경영 정보이므로 ADMIN만 조회한다.
+                        .requestMatchers("/api/admin/sales/**", "/api/admin/dashboard/**").hasRole("ADMIN")
                         // 매니저는 요청된 운영 영역만 허용합니다. 새 관리자 경로는 아래 기본 ADMIN 규칙에 걸립니다.
                         .requestMatchers(
-                                "/api/admin/sales/**",
-                                "/api/admin/dashboard/**",
                                 "/api/admin/refunds", "/api/admin/refunds/**",
                                 "/api/admin/products/**",
                                 "/api/admin/variants/**",
