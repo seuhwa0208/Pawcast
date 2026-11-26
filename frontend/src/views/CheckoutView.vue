@@ -65,7 +65,6 @@ const addressFormOpen = ref(false);
 const agreed = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
-const paymentMethod = ref("CARD");
 const deliveryMessageOption = ref("문 앞에 놓아주세요.");
 const customDeliveryMessage = ref("");
 const buyerEmail = ref(member.value?.email || "");
@@ -397,7 +396,7 @@ onMounted(() => {
       <p>
         {{
           isMember
-            ? "상품과 배송지를 확인한 후 결제수단을 선택해주세요."
+            ? "상품과 배송지를 확인한 후 결제를 진행해주세요."
             : "비회원 주문 확인에 필요한 이메일과 배송지 정보를 입력해주세요."
         }}
       </p>
@@ -568,34 +567,6 @@ onMounted(() => {
           </div>
         </section>
 
-        <section class="checkout-card">
-          <header><h2>결제수단</h2></header>
-          <div class="payment-method-grid">
-            <label
-              v-for="method in [
-                ['CARD', '신용·체크카드'],
-                ['TOSSPAY', '토스페이'],
-                ['KAKAOPAY', '카카오페이'],
-                ['TRANSFER', '계좌이체'],
-              ]"
-              :key="method[0]"
-              :class="[
-                { on: paymentMethod === method[0] },
-                `payment-method-${method[0].toLowerCase()}`,
-              ]"
-            >
-              <input
-                v-model="paymentMethod"
-                type="radio"
-                :value="method[0]"
-              />
-              <span>{{ method[1] }}</span>
-            </label>
-          </div>
-          <p class="payment-method-note">
-            결제수단은 토스페이먼츠 결제창에서 최종 선택 및 안전하게 처리됩니다.
-          </p>
-        </section>
       </div>
 
       <aside class="checkout-summary">
