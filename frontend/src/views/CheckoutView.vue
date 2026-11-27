@@ -252,9 +252,8 @@ function createTossCustomerKey() {
   const storageKey = `powcast-toss-customer-key:${rawMemberKey}`;
   const savedKey = localStorage.getItem(storageKey);
   if (savedKey) return savedKey;
-  const safeMemberKey = rawMemberKey
-    .replace(/[^A-Za-z0-9\-._=@]/g, "")
-    .slice(0, 24) || "member";
+  const safeMemberKey =
+    rawMemberKey.replace(/[^A-Za-z0-9\-._=@]/g, "").slice(0, 24) || "member";
 
   const customerKey = `powcast_${safeMemberKey}_${crypto.randomUUID()}`.slice(0, 50);
   localStorage.setItem(storageKey, customerKey);
@@ -265,6 +264,7 @@ function createTossCustomerKey() {
 async function requestPayment() {
   errorMessage.value = "";
   let paymentWindowOpened = false;
+
   if (!checkoutItems.value.length) {
     router.push("/cart");
     return;
@@ -294,11 +294,15 @@ async function requestPayment() {
     errorMessage.value = "주문 내용과 결제 진행에 동의해주세요.";
     return;
   }
+
   try {
     submitting.value = true;
-    const orderdItems = [...checkoutItems.value];
+
+    // 주문 요청 스냅샷을 orderedItems로 통일합니다.
+    const orderedItems = [...checkoutItems.value];
+
     const order = await paymentService.createOrder({
-      items: orderdItems.map((item) => ({
+      items: orderedItems.map((item) => ({
         productVariantId: item.variantId || item.id,
         quantity: item.quantity,
       })),
@@ -312,11 +316,21 @@ async function requestPayment() {
       deliveryAddress2: selectedAddress.value.address2,
       deliveryMessage: selectedAddress.value.deliveryMessage || "",
     });
+
     const orderId = order.id || order.orderId;
     const orderNumber = order.orderNumber || orderId;
     const orderAccessToken =
       order.orderAccessToken || order.accessToken || order.guestOrderToken;
-    if (!orderId) throw new Error("백엔드 주문 생성 응답에 주문 ID가 없습니다.");
+
+    if (!orderId) {
+      throw new Error("백엔드 주문 생성 응답에 주문 ID가 없습니다.");
+    }
+
+    // 비회원 장바구니 결제 시 완료 페이지에서 비울 장바구니 키 목록을 저장합니다.
+    const guestCartKeys =
+      !isMember.value && !isBuyNow.value
+        ? orderedItems.map((item) => item.key).filter(Boolean)
+        : [];
 
     sessionStorage.setItem(
       "powcast-payment-context",
@@ -326,9 +340,7 @@ async function requestPayment() {
         orderAccessToken,
         orderEmail: buyerEmail.value,
         isMember: isMember.value,
-        gusetCartKeys: !isMember.value && !isBuyNow.value
-        ? orderedItems.map((itme) => item.key).filter(Boolean)
-        : [],
+        gusetCartKeys: guestCartKeys,
         mode: isBuyNow.value
           ? "buy-now"
           : isSelectedMode.value
@@ -336,6 +348,7 @@ async function requestPayment() {
             : "cart",
       }),
     );
+
     const TossPayments = await loadTossSdk();
     // test_gck/live_gck 키는 구형 payment()가 아니라 widgets() 흐름에 사용합니다.
     const tossPayments = TossPayments(TOSS_CLIENT_KEY);
@@ -344,14 +357,17 @@ async function requestPayment() {
         ? createTossCustomerKey()
         : TossPayments.ANONYMOUS,
     });
+
     await widgets.setAmount({
       currency: "KRW",
       value: Number(finalAmount.value),
     });
+
     const paymentWindow = await widgets.renderPaymentWindow({
       orderName: orderName.value,
     });
     paymentWindowOpened = true;
+
     paymentWindow.on("paymentRequest", () =>
       widgets.requestPayment({
         orderId: String(orderNumber),
@@ -363,16 +379,18 @@ async function requestPayment() {
         failUrl: `${window.location.origin}/payment/result?status=fail`,
       }),
     );
+
     paymentWindow.on("cancel", () => {
       submitting.value = false;
     });
-    return;
   } catch (error) {
     errorMessage.value =
       error.message || "결제를 시작하지 못했습니다. 백엔드 연결을 확인해주세요.";
   } finally {
     // 결제창이 열린 뒤에는 사용자의 취소 이벤트에서만 버튼 상태를 되돌립니다.
-    if (!paymentWindowOpened) submitting.value = false;
+    if (!paymentWindowOpened) {
+      submitting.value = false;
+    }
   }
 }
 
@@ -566,7 +584,6 @@ onMounted(() => {
             </label>
           </div>
         </section>
-
       </div>
 
       <aside class="checkout-summary">
@@ -625,7 +642,12 @@ onMounted(() => {
               >받는 분<input v-model.trim="addressForm.recipient" required
             /></label>
             <label
-              >연락처<input v-model.trim="addressForm.tel" @input="addressForm.tel = formatPhoneNumber($event.target.value)" type="tel" placeholder="010-1234-5678" required
+              >연락처<input
+                v-model.trim="addressForm.tel"
+                @input="addressForm.tel = formatPhoneNumber($event.target.value)"
+                type="tel"
+                placeholder="010-1234-5678"
+                required
             /></label>
             <label class="address-search-field"
               >우편번호<span
