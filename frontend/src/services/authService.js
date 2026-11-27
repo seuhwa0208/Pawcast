@@ -67,8 +67,8 @@ export const authService = {
             refreshTokenValue,
         }),
 
-    // Browser GIS credentials are ID tokens; Spring verifies the Google signature and audience,
-    // then returns POWCAST access/refresh JWTs without a Google client secret.
+    // GIS 토큰으로 서명과 수신자 검증,
+    // 액세스/리프레시 토큰 JWT 반환
     googleLogin: (idToken) =>
         post("/auth/google", {
             idToken,
