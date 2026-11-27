@@ -214,63 +214,200 @@ docker compose logs -f frontend
 로그 확인을 종료하려면 `Ctrl + C`를 누릅니다. 로그 확인만 종료되며 백그라운드 컨테이너는 계속 실행됩니다.
 
 
+## 5. Docker Hub 이미지로 실행하기
+
+이 방법은 소스코드를 직접 빌드하지 않고 Docker Hub에 게시된 이미지(`sumi0705/frontend:0.1`, `sumi0705/backend:0.1`, `sumi0705/ai:0.1`)를 내려받아 실행하는 방법입니다. 실행 PC에는 Docker Desktop과 Docker Compose가 필요합니다. Git, JDK, Node.js, Python, PostgreSQL을 별도로 설치할 필요는 없습니다.
+
+### 1단계 — Docker Desktop 설치
+
+1. Docker Desktop for Windows에서 설치 파일을 내려받아 설치합니다.
+2. 필요한 경우 WSL 2 기능을 활성화하고 PC를 재시작합니다.
+3. Docker Desktop을 실행하고 엔진이 정상적으로 시작될 때까지 기다립니다.
+
+### 2단계 — 실행 파일 준비
+
+전달받은 `pawcast.zip`의 압축을 풀면 `docker-sumi` 폴더가 만들어집니다. 소스코드는 필요 없지만 아래 파일은 **같은 폴더에** 모두 있어야 합니다.
+
+| 파일/폴더 | 용도 |
+|---|---|
+| `docker-compose.yml` | 4개 컨테이너(db, backend, ai, frontend) 실행 정의 |
+| `.env` | 환경변수(DB 비밀번호, JWT, 결제·로그인 키 등) |
+| `init.sql` | DB 최초 생성 시 테이블 생성 + 데이터 적재 |
+| `pawcast_2026_pack/` | `init.sql`이 읽는 2026 더미 데이터 SQL (`02`~`05` 필수) |
+| `nginx.conf` | 프론트 컨테이너의 `/api`, `/ai`, `/uploads` 프록시 설정 |
+| `shared/` | AI 서버가 시작 시 읽는 `export-schemas/sales.json` (없으면 AI 기동 실패) |
+
+CMD에서 압축을 푼 폴더로 이동합니다.
+
+```bat
+cd /d "%USERPROFILE%\Downloads\docker-sumi"
+dir
+```
+
+`docker-compose.yml`, `.env`, `init.sql`이 표시되는지 확인합니다. `.env`는 이름이 점(`.`)으로 시작하므로 파일 탐색기 설정에 따라 보이지 않을 수 있습니다.
+
+### 3단계 — 환경변수 설정
+
+`.env`에는 Compose 파일이 참조하는 아래 값이 들어 있습니다. 값이 비어 있으면 `docker-compose.yml`의 기본값이 사용됩니다.
+
+| 구분 | 변수 | 설정 내용 | 주의 |
+|---|---|---|---|
+| 이미지 | `DOCKER_USER` | Docker Hub 계정 (`sumi0705`) | 이미지 이름 `<계정>/backend:0.1` 등에 사용 |
+| PostgreSQL | `DB_USERNAME`, `DB_PASSWORD` | DB 사용자/비밀번호 (DB명은 `pawcast` 고정) | backend, ai가 같은 값을 사용. **첫 실행 전에 확정** |
+| PostgreSQL | `DB_HOST_PORT` | 내 PC에서 DB에 접속할 포트 (기본 `5432`) | 5432가 사용 중이면 `5433` 등으로 변경 |
+| Spring Boot / FastAPI | `JWT_SECRET`, `JWT_ISSUER` | JWT 서명 키와 발급자 | 32바이트 이상. backend와 ai가 **같은 값**이어야 함 |
+| Spring Boot / FastAPI | `INTERNAL_API_KEY` | 서버 간 내부 호출 키 | backend, ai 공통 |
+| Spring Boot | `TOSS_SECRET_KEY`, `TOSS_CLIENT_KEY` | 토스페이먼츠 테스트 키 | 비우면 임시값이 들어가 결제는 동작하지 않음 |
+| Spring Boot | `GOOGLE_CLIENT_ID` | 구글 로그인 클라이언트 ID | 비우면 구글 로그인은 동작하지 않음 |
+| Spring Boot | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` | 메일 발송(SMTP) 계정 | Gmail은 앱 비밀번호 사용 |
+| FastAPI | `AI_MAX_LENGTH` | 리뷰 감성 분석 최대 길이 (기본 `256`) | |
+| Frontend | (없음) | `/api`, `/ai` 경로와 `VITE_` 공개 키는 **이미지 빌드 시점에 이미 반영**됨 | 이미지를 pull 해서 쓰는 PC에서는 설정할 것이 없음 |
+
+**중요한 보안 사항**
+
+- 실제 비밀번호, JWT Secret, 결제 Secret Key, 메일 앱 비밀번호가 들어 있는 `.env`를 README나 GitHub에 올리지 마세요. 압축 파일은 팀원에게만 전달하세요.
+- `.env`가 없거나 위치가 다르면 비밀번호·키가 기본값으로 실행되어 로그인·결제·메일이 정상 동작하지 않을 수 있습니다.
+- `VITE_`로 시작하는 값은 프론트엔드 번들에 포함되어 브라우저에 노출됩니다. 비밀키를 넣지 마세요.
+- Google OAuth는 승인된 JavaScript 원본/리디렉션 URI에 접속 주소(`http://localhost`)가 등록되어 있어야 구글 로그인이 동작합니다.
+
+### 4단계 — Docker Compose 실행
+
+Docker Desktop이 실행 중인지 확인한 다음, Compose 파일이 있는 폴더에서 실행합니다.
+
+```bat
+docker compose -p pawcast-4tier pull
+docker compose -p pawcast-4tier up -d
+```
+
+- `docker compose -p pawcast-4tier pull`: Docker Hub에서 `backend`, `ai`, `frontend`, `postgres:16` 이미지를 내려받습니다. 저장소가 private이면 먼저 `docker login`을 하세요.
+- `docker compose -p pawcast-4tier up -d`: DB, Backend, AI, Frontend 컨테이너를 백그라운드로 실행합니다.
+- **최초 실행에는 시간이 걸립니다.** DB가 `init.sql`로 테이블 생성과 2026 더미 데이터 적재를 끝낼 때까지(약 1~3분) 다른 컨테이너가 시작되지 않고, `up -d` 명령도 그동안 멈춘 것처럼 보일 수 있습니다. 정상입니다.
+- 실행 순서는 db → backend → ai → frontend이며, 앞 컨테이너가 `healthy`가 되어야 다음 컨테이너가 시작됩니다.
+- 이 Compose 파일은 `build:` 없이 `image:`만 사용하므로 로컬 빌드는 실행되지 않습니다.
+
+실행 상태를 확인합니다. 4개 컨테이너가 모두 `healthy`(또는 `running`)이면 정상입니다.
+
+```bat
+docker compose -p pawcast-4tier ps
+```
+
+로그를 확인합니다.
+
+```bat
+docker compose -p pawcast-4tier logs -f
+```
+
+특정 서비스만 확인하려면 다음처럼 실행합니다. 서비스 이름은 `db`, `backend`, `ai`, `frontend`입니다.
+
+```bat
+docker compose -p pawcast-4tier logs -f db
+docker compose -p pawcast-4tier logs -f backend
+docker compose -p pawcast-4tier logs -f ai
+docker compose -p pawcast-4tier logs -f frontend
+```
+
+로그 확인을 종료하려면 `Ctrl + C`를 누릅니다. 로그 확인만 종료되며 백그라운드 컨테이너는 계속 실행됩니다.
+
+DB 데이터 적재 진행 상황은 `[init]` 로그로 볼 수 있습니다. `[init] 완료`가 보이면 적재가 끝난 것입니다.
+
+```bat
+docker compose -p pawcast-4tier logs db | findstr "[init]"
+```
+
 ### 5단계 — 접속 및 실행 확인
 
 브라우저에서 다음 주소로 접속합니다.
 
 | 항목 | 주소 |
 |---|---|
-| 쇼핑몰 웹 화면 | `http://localhost/` |
-| Spring Boot API | `http://localhost/api/` |
-| FastAPI 서비스 | `http://localhost/ai/` |
+| 쇼핑몰 웹 화면 | http://localhost/ |
+| Spring Boot API | http://localhost/api/ (직접: http://localhost:8080) |
+| FastAPI 서비스 | http://localhost/ai/ (API 문서: http://localhost:8000/docs) |
 
-API의 루트 경로는 별도 화면을 제공하지 않을 수 있습니다. 따라서 `/api/` 또는 `/ai/` 접속 결과가 404라는 이유만으로 서비스 전체가 실패했다고 판단하지 말고, 프로젝트에 실제 구현된 API 경로와 컨테이너 로그를 확인하세요.
+API의 루트 경로는 별도 화면을 제공하지 않을 수 있습니다. 따라서 `/api/` 접속 결과가 401/404라는 이유만으로 서비스 전체가 실패했다고 판단하지 말고, 쇼핑몰 화면 동작과 컨테이너 로그를 확인하세요. FastAPI 문서 화면은 프록시 경로(`/ai/docs`)가 아니라 `http://localhost:8000/docs`로 접속하세요.
 
+**로그인 테스트 계정** (비밀번호는 모두 `password1!`, 로그인은 이메일이 아닌 **아이디**)
+
+| 아이디 | 역할 |
+|---|---|
+| `admin` | 관리자 |
+| `manager`, `manager2` | 매니저 |
+| `test001` ~ `test004` | 일반 회원 (`test001`, `test002`는 주문·문의·반려동물 데이터 포함) |
+
+**자주 발생하는 문제**
+
+| 증상 | 원인 / 조치 |
+|---|---|
+| `port is already allocated` (5432) | 내 PC의 PostgreSQL이 5432를 사용 중. `.env`의 `DB_HOST_PORT=5433`으로 변경 후 다시 `up -d` |
+| `port is already allocated` (80) | 80번 포트를 다른 프로그램이 사용 중. `docker-compose.yml`의 frontend `"80:80"`을 `"8081:80"` 등으로 바꾸고 `http://localhost:8081/`로 접속 |
+| backend가 계속 `unhealthy` / 재시작 | DB 접속 실패가 대부분. 예전에 만든 DB 볼륨이 남아 있어 `.env`의 `DB_PASSWORD`가 적용되지 않은 경우입니다. 데이터가 필요 없으면 `docker compose -p pawcast-4tier down -v` 후 다시 `up -d` |
+| 화면은 뜨는데 데이터가 비어 있음 | `init.sql`은 DB 볼륨이 비어 있을 때 1회만 실행됩니다. `pawcast_2026_pack/` 폴더가 함께 있는지 확인하고, 다시 적재하려면 `down -v` 후 `up -d` |
+| ai가 시작되지 않음 | `shared/export-schemas/sales.json`이 없는 경우. 압축을 풀 때 `shared` 폴더가 빠지지 않았는지 확인 |
+| 이미지 pull 실패 (`denied`, `not found`) | 저장소가 private이면 `docker login` 필요. `.env`의 `DOCKER_USER`와 태그 `0.1` 확인 |
+
+---
 
 ## 6. 컨테이너 및 데이터 관리
+
+모든 명령은 `docker-compose.yml`이 있는 폴더에서 실행하며, 프로젝트명 `-p pawcast-4tier`를 함께 지정합니다.
 
 ### 컨테이너 중지
 
 ```bat
-docker compose stop
+docker compose -p pawcast-4tier stop
 ```
-
 
 ### 중지된 컨테이너 다시 시작
 
 ```bat
-docker compose start
+docker compose -p pawcast-4tier start
 ```
-
 
 ### 컨테이너 종료 및 제거
 
 ```bat
-docker compose down
+docker compose -p pawcast-4tier down
 ```
 
+컨테이너와 네트워크만 제거하며 **DB·업로드 데이터는 유지**됩니다.
 
 ### 이미지 최신 버전 다시 받기
 
 ```bat
-docker compose pull
-docker compose up -d
+docker compose -p pawcast-4tier pull
+docker compose -p pawcast-4tier up -d
 ```
 
+이미지는 `0.1` 태그를 사용합니다. 새 태그가 배포되면 `docker-compose.yml`의 태그를 함께 수정해야 합니다.
 
 ### DB 데이터 보존
 
-PostgreSQL 데이터는 Compose 파일에서 지정한 named volume에 저장되어야 합니다. 컨테이너를 삭제하거나 다시 만들어도 named volume을 유지하면 DB 데이터가 보존됩니다.
+PostgreSQL 데이터와 업로드 이미지는 아래 named volume에 저장됩니다. 컨테이너를 삭제하거나 다시 만들어도 volume을 유지하면 데이터가 보존됩니다.
+
+| 볼륨 | 내용 |
+|---|---|
+| `pawcast-4tier_pawcast_pgdata` | PostgreSQL 데이터 (DB명 `pawcast`) |
+| `pawcast-4tier_pawcast_uploads` | 상품·리뷰 업로드 이미지 (최초 생성 시 기본 이미지 31개 포함) |
 
 ```bat
 docker volume ls
 ```
 
-**주의:** 아래 명령은 Compose에 연결된 DB 볼륨까지 삭제할 수 있으므로 데이터가 필요하다면 실행하지 마세요.
+> **주의:** 아래 명령은 DB 볼륨과 업로드 볼륨까지 삭제합니다. 데이터가 필요하다면 실행하지 마세요. 삭제 후 `up -d`를 다시 실행하면 `init.sql`이 더미 데이터를 처음부터 다시 적재합니다.
+>
+> ```bat
+> docker compose -p pawcast-4tier down -v
+> ```
+
+### DB 직접 확인
 
 ```bat
-docker compose down -v
+docker exec -it pawcast-db psql -U postgres -d pawcast -c "\dt"
+docker exec -it pawcast-db psql -U postgres -d pawcast -c "SELECT relname, n_live_tup FROM pg_stat_user_tables ORDER BY n_live_tup DESC;"
 ```
+
+사이트에서 회원가입·주문 등을 한 뒤 위 조회를 다시 실행하면 해당 테이블의 건수가 늘어나는 것을 확인할 수 있습니다. `.env`에서 `DB_USERNAME`을 바꾼 경우 `-U` 값도 같은 값으로 바꾸세요.
+
 
 
 ## 7. GitHub 소스코드로 실행하기
