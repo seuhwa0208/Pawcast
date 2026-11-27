@@ -1,6 +1,5 @@
 package com.project.pawcast.security;
 
-
 import com.project.pawcast.common.config.PetmallProperties;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
@@ -21,11 +20,9 @@ import org.springframework.stereotype.Component;
 /**
  * JWT 발급·검증.
  *
- * <p>토큰에는 회원 식별자(sub), 권한(role), 이메일만 담는다. 이름이나
- * 등급처럼 바뀌는 값을 넣으면 토큰이 만료될 때까지 낡은 값이 돌아다닌다.
+ * 토큰에는 회원 식별자(sub), 권한(role), 이메일만 담는다.
  *
- * <p>Access 30분 / Refresh 14일. Refresh 토큰은 DB(refresh_tokens)에
- 펫몰 구축 매뉴얼 · 94 / 320
+ * Access 30분 / Refresh 14일.
  * 저장해 **서버에서 취소할 수 있게** 한다. JWT 는 그 자체로 취소가 안 되므로,
  * 로그아웃·비밀번호 변경·탈퇴 시 저장된 refresh 를 무효화하는 방식으로 막는다.
  */

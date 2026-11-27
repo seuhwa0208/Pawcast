@@ -1,7 +1,5 @@
 package com.project.pawcast.qnaanswer.dto;
 
-import com.project.pawcast.notice.dto.NoticeResponse;
-import com.project.pawcast.notice.entity.Notice;
 import com.project.pawcast.qnaanswer.entity.QnaAnswer;
 
 import java.time.LocalDateTime;

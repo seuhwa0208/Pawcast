@@ -1,7 +1,9 @@
 package com.project.pawcast.product.dto;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.util.List;
+
 public record ProductUpdateRequest(
     @Size(min=1, max=200) String name,
     @Size(max=100) String brand,

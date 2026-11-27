@@ -1,8 +1,6 @@
 package com.project.pawcast.petrecommendation.dto;
 
 import com.project.pawcast.petrecommendation.entity.PetRecommendation;
-import com.project.pawcast.pets.dto.PetsResponse;
-import com.project.pawcast.pets.entity.Pets;
 
 public record PetRecommendationResponse(
         String petName,

@@ -1,7 +1,6 @@
 package com.project.pawcast.product.entity;
 
 import com.project.pawcast.common.entity.BaseTime;
-import com.project.pawcast.product.entity.Category;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.DynamicUpdate;

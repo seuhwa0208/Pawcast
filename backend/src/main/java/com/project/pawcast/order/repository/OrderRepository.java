@@ -2,7 +2,6 @@ package com.project.pawcast.order.repository;
 
 import com.project.pawcast.order.entity.Order;
 import jakarta.persistence.LockModeType;
-import org.aspectj.weaver.ast.Or;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -2,7 +2,6 @@ package com.project.pawcast.product.dto;
 
 import com.project.pawcast.product.repository.ProductListView;
 import com.project.pawcast.review.dto.BestReviewResponse;
-
 import java.math.BigDecimal;
 
 public record ProductResponse(

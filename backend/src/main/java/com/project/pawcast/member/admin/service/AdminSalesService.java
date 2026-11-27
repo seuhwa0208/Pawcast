@@ -4,7 +4,6 @@ import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.admin.dto.SalesRequest;
 import com.project.pawcast.member.admin.dto.SalesResponse;
-import com.project.pawcast.member.admin.entity.SalesPeriod;
 import com.project.pawcast.member.admin.repository.AdminSalesRepository;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;

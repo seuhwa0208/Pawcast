@@ -5,7 +5,6 @@ import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.common.image.service.ImageService;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
-import com.project.pawcast.product.entity.ProductImage;
 import com.project.pawcast.review.filter.ProfanityFilter;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.order.entity.OrderItem;
