@@ -1,6 +1,5 @@
 package com.project.pawcast.qna.controller;
 
-import com.project.pawcast.notice.entity.NoticeSearchType;
 import com.project.pawcast.qna.dto.QnaRequest;
 import com.project.pawcast.qna.dto.QnaResponse;
 import com.project.pawcast.qna.entity.QnaSearchType;

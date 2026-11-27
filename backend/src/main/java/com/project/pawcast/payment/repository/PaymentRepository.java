@@ -1,6 +1,5 @@
 package com.project.pawcast.payment.repository;
 
-import com.project.pawcast.order.entity.Order;
 import com.project.pawcast.payment.entity.Payment;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

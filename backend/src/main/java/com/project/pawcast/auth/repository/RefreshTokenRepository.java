@@ -1,7 +1,6 @@
 package com.project.pawcast.auth.repository;
 
 import com.project.pawcast.auth.entity.RefreshTokens;
-import com.project.pawcast.member.entity.Members;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import jakarta.persistence.LockModeType;

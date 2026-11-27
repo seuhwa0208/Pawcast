@@ -3,7 +3,6 @@ package com.project.pawcast.common.config;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
 import java.nio.file.Path;
 
 /** 상품·리뷰 이미지를 브라우저가 읽을 수 있는 정적 경로로 공개한다. */

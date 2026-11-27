@@ -4,7 +4,6 @@ import com.project.pawcast.member.admin.dto.SalesRequest;
 import com.project.pawcast.member.admin.dto.SalesResponse;
 import com.project.pawcast.member.admin.service.AdminSalesService;
 import com.project.pawcast.security.LoginMember;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;

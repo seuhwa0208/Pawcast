@@ -1,6 +1,5 @@
 package com.project.pawcast.qna.dto;
 
-import com.project.pawcast.product.entity.Product;
 import com.project.pawcast.qna.entity.QnaType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

@@ -1,6 +1,5 @@
 package com.project.pawcast.pets.repository;
 
-import com.project.pawcast.address.entity.Addresses;
 import com.project.pawcast.pets.entity.Pets;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

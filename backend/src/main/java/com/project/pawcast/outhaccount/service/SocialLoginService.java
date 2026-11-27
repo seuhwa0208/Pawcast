@@ -162,7 +162,7 @@ public class SocialLoginService {
                 member.getRole().toString()
         );
 
-        // Google login follows the same persisted refresh-token rotation contract as password login.
+        //  구글 로그인 및 리프레시 토큰 교체
         refreshTokenRepository.revokeAllByMember(member.getId());
         refreshTokenRepository.save(RefreshTokens.builder()
                 .member(member)
