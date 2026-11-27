@@ -2,8 +2,10 @@ package com.project.pawcast.review.service;
 
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
+import com.project.pawcast.common.image.service.ImageService;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
+import com.project.pawcast.product.entity.ProductImage;
 import com.project.pawcast.review.filter.ProfanityFilter;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.order.entity.OrderItem;
@@ -19,9 +21,12 @@ import com.project.pawcast.review.repository.ReviewSentimentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.awt.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -40,26 +45,24 @@ public class ReviewService {
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final ProfanityFilter profanityFilter;
+    private final ImageService imageService;
 
     // 리뷰 등록
     @Transactional
     public ReviewResponse createReview(
             Long memberId,
-            ReviewCreateRequest request
+            ReviewCreateRequest request,
+            List<MultipartFile> images
     ) {
         validateLogin(memberId);
-
         OrderItem orderItem = orderItemRepository
                 .findByIdForUpdate(request.orderItemId())
                 .orElseThrow(
-                        () -> new BusinessException(
-                                ErrorCode.NOT_FOUND_ORDER_ITEM
-                        )
+                        () -> new BusinessException(ErrorCode.NOT_FOUND_ORDER_ITEM)
                 );
 
         // 본인 주문인지 확인
         Members orderMember = orderItem.getOrder().getMember();
-
         if (orderMember == null
                 || !memberId.equals(orderMember.getId())) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
@@ -74,7 +77,7 @@ public class ReviewService {
         if (reviewRepository.existsByOrderItemId(orderItem.getId())) {
             throw new BusinessException(ErrorCode.DUPLICATE_REVIEW);
         }
-        
+
         // 리뷰 욕설 필터링 기능
         profanityFilter.containsProhibitedWord(request.content());
 
@@ -88,8 +91,7 @@ public class ReviewService {
                 .build();
 
         reviewRepository.saveAndFlush(review);
-
-        saveImages(review, request.images());
+        saveImages(review, images);
         reviewImageRepository.flush();
 
         ReviewResponse response = toResponse(review);
@@ -171,12 +173,22 @@ public class ReviewService {
     public ReviewResponse updateReview(
             Long reviewId,
             Long memberId,
-            ReviewUpdateRequest request
+            ReviewUpdateRequest request,
+            List<MultipartFile> images
     ) {
         ProductReview review = findOwnedReview(reviewId, memberId);
 
         int oldRating = review.getRating();
         Long productId = review.getProduct().getId();
+        
+        // 0. 리뷰 필터링 검사
+        profanityFilter.containsProhibitedWord(request.content());
+
+        // 0. 리뷰 필터링 검사
+        profanityFilter.containsProhibitedWord(request.content());
+
+        // 0. 리뷰 필터링 검사
+        profanityFilter.containsProhibitedWord(request.content());
 
         // 1. 기존 본문과 비교
         boolean contentChanged =
@@ -197,7 +209,7 @@ public class ReviewService {
             reviewImageRepository.deleteAllByReviewId(reviewId);
             reviewImageRepository.flush();
 
-            saveImages(review, request.images());
+            saveImages(review, images);
         }
 
         // 변경 내용과 updatedAt 반영
@@ -277,19 +289,24 @@ public class ReviewService {
     // 이미지 저장
     private void saveImages(
             ProductReview review,
-            List<ReviewImageCreateRequest> requests
+            List<MultipartFile> images
     ) {
-        List<ReviewImage> images = requests.stream()
-                .map(request -> {
-                    ReviewImage image = new ReviewImage();
-                    image.setReview(review);
-                    image.setImagePath(request.imagePath());
-                    image.setSortOrder(request.sortOrder());
-                    return image;
-                })
-                .toList();
+        if (images == null || images.isEmpty()) {return;}
 
-        reviewImageRepository.saveAll(images);
+        List<ReviewImage> reviewImages = new ArrayList<>();
+
+        for (int i = 0; i < images.size(); i++) {
+            MultipartFile file = images.get(i);
+
+            String imagePath = imageService.upload(file);
+
+            ReviewImage image = new ReviewImage();
+            image.setReview(review);
+            image.setImagePath(imagePath);
+            image.setSortOrder(i);
+            reviewImages.add(image);
+        }
+        reviewImageRepository.saveAll(reviewImages);
     }
 
     // Entity → 응답 DTO

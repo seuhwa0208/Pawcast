@@ -1,6 +1,7 @@
 <!-- URL 쿼리와 사용자의 필터 선택을 조합해 상품 목록을 계산하는 카테고리 화면입니다. -->
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
 import { useRoute, useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
 import { productService } from "@/services/productService";
@@ -9,6 +10,7 @@ const props = defineProps({ pet: String, device: Boolean });
 const route = useRoute();
 const router = useRouter();
 const products = ref([]);
+const loadError = ref("");
 const foodCategories = ["사료", "간식", "영양제"];
 const deviceCategories = ["급식기", "급수기", "일반 식기", "정수 / 필터"];
 const subcategoryMap = {
@@ -46,7 +48,11 @@ const gridMode = ref("five");
 const keyword = ref(String(route.query.keyword || ""));
 const inStock = ref(route.query.inStock === "1");
 const selectedIngredients = ref(
-  String(route.query.ingredients || route.query.ingredient || "")
+  String(
+    props.device
+      ? route.query.materials || route.query.material || ""
+      : route.query.ingredients || route.query.ingredient || "",
+  )
     .split(",")
     .filter(Boolean),
 );
@@ -100,9 +106,13 @@ const ingredientDefinitions = [
   { label: "글루코사민", keywords: ["글루코사민"] },
   { label: "오메가", keywords: ["오메가"] },
   { label: "활성탄", keywords: ["활성탄"] },
-  { label: "스테인리스", keywords: ["스테인리스"] },
-  { label: "도자기", keywords: ["도자기"] },
+];
+const materialDefinitions = [
+  { label: "스테인리스", keywords: ["스테인리스", "스텐", "스틸"] },
+  { label: "도자기", keywords: ["도자기", "세라믹"] },
   { label: "실리콘", keywords: ["실리콘"] },
+  { label: "플라스틱", keywords: ["플라스틱", "pp", "abs"] },
+  { label: "유리", keywords: ["유리", "글라스"] },
 ];
 const appliedFilters = ref({
   keyword: keyword.value,
@@ -131,7 +141,18 @@ const brandOptions = computed(() =>
 const ingredientOptions = computed(() =>
   ingredientDefinitions.filter((option) =>
     scopedProducts.value.some((item) =>
-      option.keywords.some((keyword) => item.name.includes(keyword)),
+      option.keywords.some((keyword) =>
+        `${item.name} ${item.mainIngredient || ""}`.includes(keyword),
+      ),
+    ),
+  ),
+);
+const materialOptions = computed(() =>
+  materialDefinitions.filter((option) =>
+    scopedProducts.value.some((item) =>
+      option.keywords.some((keyword) =>
+        `${item.name} ${item.material || ""}`.toLowerCase().includes(keyword),
+      ),
     ),
   ),
 );
@@ -139,6 +160,11 @@ const selectedIngredientLabel = computed(() =>
   selectedIngredients.value.length
     ? `${selectedIngredients.value.length}개 원료 선택`
     : "원료 전체",
+);
+const selectedMaterialLabel = computed(() =>
+  selectedIngredients.value.length
+    ? `${selectedIngredients.value.length}개 재질 선택`
+    : "재질 전체",
 );
 const selectedBrandLabel = computed(() =>
   selectedBrands.value.length
@@ -175,12 +201,31 @@ watch(
 
 async function loadProducts() {
   try {
-    products.value = await productService.list(
+    loadError.value = "";
+    const listedProducts = await productService.list(
       { productType: props.device ? "DEVICE" : props.pet },
       props.device ? "ALL" : props.pet,
     );
-  } catch {
+    // 목록 응답에는 기기 재질이 없고 상세 응답의 deviceDetail에만 있으므로,
+    // 식기·급수관에서만 기존 상세 API로 재질을 보완한다.
+    products.value = props.device
+      ? await Promise.all(
+          listedProducts.map(async (item) => {
+            try {
+              const detail = await productService.detail(item.id);
+              return {
+                ...item,
+                material: detail?.deviceDetail?.material || "",
+              };
+            } catch {
+              return item;
+            }
+          }),
+        )
+      : listedProducts;
+  } catch (error) {
     products.value = [];
+    loadError.value = error.message || "상품 목록을 불러오지 못했습니다.";
   }
 }
 
@@ -270,12 +315,13 @@ const list = computed(() => {
   if (filters.ingredients.length) {
     result = result.filter((item) =>
       filters.ingredients.some((label) => {
-        const definition = ingredientDefinitions.find(
+        const definition = (props.device ? materialDefinitions : ingredientDefinitions).find(
           (option) => option.label === label,
         );
-        return definition?.keywords.some((keyword) =>
-          item.name.includes(keyword),
-        );
+        const searchable = props.device
+          ? `${item.name} ${item.material || ""}`
+          : `${item.name} ${item.mainIngredient || ""}`;
+        return definition?.keywords.some((keyword) => searchable.toLowerCase().includes(keyword));
       }),
     );
   }
@@ -362,9 +408,9 @@ const list = computed(() => {
           </button>
           <h3>검색하기</h3>
           <label class="side-keyword"
-            ><span class="side-search-icon" aria-hidden="true" /><input
+            ><UiSearchIcon /><input
               v-model="keyword"
-              placeholder="검색어를 입력하세요."
+              placeholder="예) 연어 사료, 츄르"
           /></label>
           <button
             class="side-detail"
@@ -409,7 +455,31 @@ const list = computed(() => {
                 </div>
               </div>
             </fieldset>
-            <fieldset class="side-multi-filter">
+            <fieldset v-if="device" class="side-multi-filter device-material-filter">
+              <legend>재질</legend>
+              <div class="side-multi-select">
+                <button
+                  type="button"
+                  class="side-multi-trigger"
+                  :class="{ open: ingredientFilterOpen }"
+                  :aria-expanded="ingredientFilterOpen"
+                  @click="toggleFilterMenu('ingredient')"
+                >
+                  <span>{{ selectedMaterialLabel }}</span
+                  ><i aria-hidden="true" />
+                </button>
+                <div v-if="ingredientFilterOpen" class="side-multi-menu">
+                  <label v-for="item in materialOptions" :key="item.label"
+                    ><input
+                      type="checkbox"
+                      :checked="selectedIngredients.includes(item.label)"
+                      @change="toggleSelection(selectedIngredients, item.label)"
+                    /><i aria-hidden="true" /><span>{{ item.label }}</span></label
+                  >
+                </div>
+              </div>
+            </fieldset>
+            <fieldset v-else class="side-multi-filter">
               <legend>원료</legend>
               <div class="side-multi-select">
                 <button
@@ -592,9 +662,18 @@ const list = computed(() => {
         </div>
         <div v-else class="catalog-empty">
           <span aria-hidden="true">···</span>
-          <h2>상품 준비 중입니다</h2>
+          <h2>
+            {{
+              loadError
+                ? "상품 목록을 불러오지 못했습니다"
+                : "상품 준비 중입니다"
+            }}
+          </h2>
           <p>
-            선택하신 분류의 상품을 준비하고 있어요.<br />조금만 기다려 주세요.
+            {{ loadError || "선택하신 분류의 상품을 준비하고 있어요." }}<br />
+            {{
+              loadError ? "잠시 후 다시 시도해주세요." : "조금만 기다려 주세요."
+            }}
           </p>
         </div>
       </section>

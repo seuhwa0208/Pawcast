@@ -1,6 +1,13 @@
 <!-- URL의 상품 식별자로 상세 데이터를 찾고 갤러리·옵션·구매 동작을 제어합니다. -->
 <script setup>
-import { computed, onMounted, ref, watch, watchEffect } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  watchEffect,
+} from "vue";
 import { useRouter } from "vue-router";
 import { productService } from "@/services/productService";
 import { useCart } from "@/stores/cart";
@@ -8,23 +15,97 @@ import { useWishlist } from "@/stores/wishlist";
 import { useAuthSession } from "@/stores/auth";
 import CartAddedModal from "@/components/CartAddedModal.vue";
 import LoginRequiredModal from "@/components/LoginRequiredModal.vue";
+import PaginationBar from "@/components/PaginationBar.vue";
+import ReviewEditModal from "@/components/ReviewEditModal.vue";
+import { reviewService } from "@/services/reviewService";
 
 const props = defineProps({ pet: String, id: String });
 const router = useRouter();
 const product = ref(null);
 const detailLoading = ref(true);
 const detailError = ref("");
+const reviews = ref([]);
+useAuthSession();
+const reviewsLoading = ref(false);
+const reviewPage = ref(1);
+const REVIEW_PAGE_SIZE = 5;
+
+// 리뷰 수정 모달 관련 상태
+const reviewEditOpen = ref(false);
+const editingReview = ref(null);
+const reviewEditLoading = ref(false);
+const reviewEditError = ref("");
+const reviewEditSuccess = ref("");
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+
+function resolveImageUrl(rawPath) {
+  if (!rawPath) return "/images/product-placeholder.svg";
+  const path = String(rawPath).trim();
+  if (!path) return "/images/product-placeholder.svg";
+  if (
+    /^https?:\/\//i.test(path) ||
+    path.startsWith("data:") ||
+    path.startsWith("blob:")
+  ) {
+    return path;
+  }
+  const normalizedBase = API_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+function handleImageError(event) {
+  const img = event?.target;
+  if (!img || img.dataset.fallbackApplied === "true") return;
+  img.dataset.fallbackApplied = "true";
+  img.src = "/images/product-placeholder.svg";
+}
 
 function normalizeDetail(detail) {
-  const variants = detail.productType === "DEVICE" ? detail.deviceVariants : detail.foodVariants;
-  const available = (variants || []).filter((item) => item.status !== "DISCONTINUED");
+  const variants =
+    detail.productType === "DEVICE"
+      ? detail.deviceVariants
+      : detail.foodVariants;
+  const available = (variants || []).filter(
+    (item) => item.status !== "DISCONTINUED",
+  );
   const first = available[0] || {};
+
+  // main 우선 정렬 후 중복 제거한 실제 이미지 목록 구성
+  const sortedImages = [...(detail.images || [])].sort(
+    (a, b) => Number(Boolean(b?.main)) - Number(Boolean(a?.main)),
+  );
+  const resolvedImages = sortedImages
+    .map((item) =>
+      resolveImageUrl(item?.imagePath || item?.url || item?.imageUrl),
+    )
+    .filter(Boolean);
+  const uniqueImages = [...new Set(resolvedImages)];
+
+  const fallbackImage = resolveImageUrl(
+    detail.imageUrl || detail.thumbnailUrl || "/images/product-placeholder.svg",
+  );
+  const mainImage = uniqueImages[0] || fallbackImage;
+
   return {
     ...detail,
     category: detail.categoryName || "기타",
-    image: detail.images?.find((item) => item.main)?.imagePath || detail.images?.[0]?.imagePath || "/images/product-placeholder.svg",
-    options: available.map((item) => item.optionLabel || item.optionKey).filter(Boolean),
-    optionPrices: Object.fromEntries(available.map((item) => [item.optionLabel || item.optionKey, Number(item.price || 0)])),
+    image: mainImage,
+    images: uniqueImages.length ? uniqueImages : [mainImage],
+    options: available
+      .map((item) => item.optionLabel || item.optionKey)
+      .filter(Boolean),
+    optionPrices: Object.fromEntries(
+      available.map((item) => [
+        item.optionLabel || item.optionKey,
+        Number(item.price || 0),
+      ]),
+    ),
+    // # 선택한 옵션의 실제 variant ID를 주문·장바구니 API에 전달한다.
+    optionVariantIds: Object.fromEntries(
+      available.map((item) => [item.optionLabel || item.optionKey, item.id]),
+    ),
     option: first.optionLabel || first.optionKey || "기본 옵션",
     price: Number(first.price || 0),
     stock: available.some((item) => Number(item.stock || 0) > 0) ? 1 : 0,
@@ -37,16 +118,63 @@ async function loadProduct() {
   detailLoading.value = true;
   detailError.value = "";
   try {
-    product.value = normalizeDetail(await productService.detail(props.id));
+    reviewsLoading.value = true;
+    const detail = await productService.detail(props.id);
+    product.value = normalizeDetail(detail);
+    try {
+      // 공개 리뷰는 Spring이 정한 별점·작성일 기준 정렬 결과를 그대로 사용한다.
+      const reviewResult = await reviewService.getProductReviews(props.id);
+      reviews.value = Array.isArray(reviewResult)
+        ? reviewResult
+        : reviewResult?.reviews || [];
+      reviewPage.value = 1;
+    } catch (reviewError) {
+      // # 리뷰 API 오류가 상품 상세 페이지 전체를 막지 않도록 리뷰 영역만 빈 상태로 둔다.
+      reviews.value = [];
+      console.warn("상품 리뷰를 불러오지 못했습니다.", reviewError);
+    }
   } catch (error) {
     product.value = null;
     detailError.value = error.message || "상품 정보를 불러오지 못했습니다.";
   } finally {
     detailLoading.value = false;
+    reviewsLoading.value = false;
   }
 }
-onMounted(loadProduct);
-watch(() => props.id, loadProduct);
+
+// # 상품 옵션 드롭다운은 다른 영역을 누르면 닫혀야 키보드·마우스 모두에서 상태가 남지 않는다.
+const optionSelector = ref(null);
+const closeOptionOnOutside = (event) => {
+  if (
+    optionOpen.value &&
+    optionSelector.value &&
+    !optionSelector.value.contains(event.target)
+  ) {
+    optionOpen.value = false;
+  }
+};
+
+onMounted(() => {
+  loadProduct();
+  document.addEventListener("pointerdown", closeOptionOnOutside);
+});
+
+onBeforeUnmount(() =>
+  document.removeEventListener("pointerdown", closeOptionOnOutside),
+);
+
+watch(
+  () => props.id,
+  () => {
+    closeReviewEdit();
+    reviewEditError.value = "";
+    reviewEditSuccess.value = "";
+    galleryIndex.value = 0;
+    selectedOption.value = "";
+    loadProduct();
+  },
+);
+
 const sectionName = computed(() =>
   props.pet === "CAT"
     ? "고양이관"
@@ -57,6 +185,7 @@ const sectionName = computed(() =>
 const petLabel = computed(() =>
   props.pet === "CAT" ? "고양이" : props.pet === "ALL" ? "식기·급수" : "강아지",
 );
+
 // 품절 상세 URL로 직접 들어온 경우 해당 상품관 목록으로 즉시 되돌립니다.
 watchEffect(() => {
   if (product.value && product.value.stock <= 0)
@@ -68,57 +197,197 @@ watchEffect(() => {
           : "/dog",
     );
 });
+
 const tab = ref("detail");
 const galleryIndex = ref(0);
 const optionOpen = ref(false);
 const cartAdded = ref(false);
 const loginRequired = ref(false);
 const selectedOption = ref("");
-const galleryImages = computed(() =>
-  !product.value
-    ? []
-    :
-  Array.from({ length: 4 }, (_, index) => ({
-    src: product.value.image,
+
+const galleryImages = computed(() => {
+  if (!product.value) return [];
+  const list = product.value.images?.length
+    ? product.value.images
+    : [product.value.image];
+  return list.map((src, index) => ({
+    src,
     alt: `${product.value.name} 상품 이미지 ${index + 1}`,
-  })),
-);
-const productOptions = computed(
-  () => product.value?.options?.length ? product.value.options : product.value ? [product.value.option] : [],
+  }));
+});
+
+const productOptions = computed(() =>
+  product.value?.options?.length
+    ? product.value.options
+    : product.value
+      ? [product.value.option]
+      : [],
 );
 const currentOption = computed(
   () => selectedOption.value || productOptions.value[0] || "기본 옵션",
 );
+const bestReview = computed(() => reviews.value[0] || null);
+const regularReviews = computed(() => reviews.value.slice(1));
+const reviewPageCount = computed(() =>
+  Math.max(1, Math.ceil(regularReviews.value.length / REVIEW_PAGE_SIZE)),
+);
+const pagedReviews = computed(() => {
+  const start = (reviewPage.value - 1) * REVIEW_PAGE_SIZE;
+  return regularReviews.value.slice(start, start + REVIEW_PAGE_SIZE);
+});
+
+function maskReviewWriter(userId) {
+  const value = String(userId || "").trim();
+  if (!value) return "고객님";
+  const visibleLength =
+    value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
+  return `${value.slice(0, visibleLength)}${"*".repeat(Math.min(4, Math.max(2, value.length - visibleLength)))} 고객님`;
+}
+
 // 옵션별 가격표가 없는 API 상품도 기본 판매가로 안전하게 표시합니다.
 const currentPrice = computed(
-  () => product.value?.optionPrices?.[currentOption.value] || product.value?.price || 0,
+  () =>
+    product.value?.optionPrices?.[currentOption.value] ||
+    product.value?.price ||
+    0,
+);
+const currentVariantId = computed(
+  () => product.value?.optionVariantIds?.[currentOption.value] || null,
 );
 const getOptionPrice = (option) =>
   product.value?.optionPrices?.[option] || product.value?.price || 0;
 const getOptionExtra = (option) =>
   Math.max(0, getOptionPrice(option) - getOptionPrice(productOptions.value[0]));
+
 const { add } = useCart();
 const { isFavorite, toggle } = useWishlist();
-const { accessToken } = useAuthSession();
-const addToCart = async () => {
+const { accessToken, currentUserId } = useAuthSession();
+
+// 로그인 회원 본인의 리뷰인지 확인합니다.
+function isMyReview(review) {
+  return Boolean(
+    accessToken.value &&
+      currentUserId.value &&
+      review?.writerId === currentUserId.value,
+  );
+}
+
+// 리뷰 수정 모달 열기
+async function openReviewEdit(review) {
   if (!accessToken.value) {
     loginRequired.value = true;
     return;
   }
+
+  if (!isMyReview(review)) {
+    return;
+  }
+
+  if (reviewEditLoading.value) {
+    return;
+  }
+
+  reviewEditError.value = "";
+  reviewEditSuccess.value = "";
+  reviewEditLoading.value = true;
+
+  const requestedProductId = props.id;
+
+  try {
+    // 수정 전 서버에서 최신 리뷰 정보를 조회합니다.
+    const latestReview = await reviewService.getReview(review.id);
+
+    // 조회 도중 다른 상품으로 이동한 경우 모달을 열지 않습니다.
+    if (requestedProductId !== props.id) {
+      return;
+    }
+
+    // 최신 리뷰 정보에서도 작성자 본인인지 확인합니다.
+    if (!isMyReview(latestReview)) {
+      reviewEditError.value = "본인이 작성한 리뷰만 수정할 수 있습니다.";
+      return;
+    }
+
+    editingReview.value = latestReview;
+    reviewEditOpen.value = true;
+  } catch (error) {
+    reviewEditError.value =
+      error.message || "리뷰 정보를 불러오지 못했습니다.";
+  } finally {
+    reviewEditLoading.value = false;
+  }
+}
+
+// 리뷰 수정 모달 닫기
+function closeReviewEdit() {
+  reviewEditOpen.value = false;
+  editingReview.value = null;
+}
+
+// 리뷰 수정 완료 후 리뷰 목록 및 상품 평점 갱신
+async function handleReviewUpdated(updatedReview) {
+  reviewEditError.value = "";
+  reviewEditSuccess.value = "리뷰가 정상적으로 수정되었습니다.";
+
+  const requestedProductId = props.id;
+
+  // 수정된 리뷰를 화면에 우선 반영합니다.
+  reviews.value = reviews.value.map((review) =>
+    review.id === updatedReview.id ? { ...review, ...updatedReview } : review,
+  );
+
+  reviewsLoading.value = true;
+
+  try {
+    // 서버에서 최신 리뷰 목록 및 평균 별점을 조회합니다.
+    const reviewResult =
+      await reviewService.getProductReviews(requestedProductId);
+
+    if (requestedProductId !== props.id) {
+      return;
+    }
+
+    reviews.value = Array.isArray(reviewResult)
+      ? reviewResult
+      : reviewResult?.reviews || [];
+
+    // 상품 상세 및 리뷰 영역의 평균 별점을 함께 갱신합니다.
+    if (product.value) {
+      product.value = {
+        ...product.value,
+        rating: Number(reviewResult?.averageRating ?? product.value.rating),
+        reviewCount: Number(reviewResult?.reviewCount ?? reviews.value.length),
+      };
+    }
+
+    // 현재 리뷰 페이지가 전체 페이지 수를 초과하지 않도록 처리합니다.
+    reviewPage.value = Math.min(reviewPage.value, reviewPageCount.value);
+  } catch (error) {
+    reviewEditError.value =
+      "리뷰는 수정되었지만 최신 목록을 불러오지 못했습니다. 새로고침 후 확인해주세요.";
+    console.warn("리뷰 수정 후 목록 갱신 실패", error);
+  } finally {
+    reviewsLoading.value = false;
+  }
+}
+
+const addToCart = async () => {
   try {
     await add(
-    {
-      ...product.value,
-      option: currentOption.value,
-      price: currentPrice.value,
-    },
-    props.pet,
+      {
+        ...product.value,
+        option: currentOption.value,
+        price: currentPrice.value,
+        variantId: currentVariantId.value,
+      },
+      props.pet,
     );
     cartAdded.value = true;
   } catch (error) {
     if (error.message === "LOGIN_REQUIRED") loginRequired.value = true;
   }
 };
+
 const buyNow = () => {
   sessionStorage.setItem(
     "powcast-buy-now",
@@ -129,12 +398,14 @@ const buyNow = () => {
       name: product.value.name,
       image: product.value.image,
       price: currentPrice.value,
+      variantId: currentVariantId.value,
       option: currentOption.value,
       quantity: 1,
     }),
   );
   router.push({ path: "/checkout", query: { mode: "buy-now" } });
 };
+
 // 회원은 같은 위시리스트 Store를 토글하고, 비회원은 로그인 안내를 표시합니다.
 const toggleWishlist = () => {
   if (!accessToken.value) {
@@ -143,6 +414,7 @@ const toggleWishlist = () => {
   }
   toggle(product.value.id);
 };
+
 const goToLogin = () => {
   loginRequired.value = false;
   router.push({
@@ -150,15 +422,18 @@ const goToLogin = () => {
     query: { redirect: router.currentRoute.value.fullPath },
   });
 };
+
 // 나머지 연산으로 양 끝에서 반대편 이미지로 자연스럽게 순환합니다.
 const previousImage = () => {
   galleryIndex.value =
     (galleryIndex.value - 1 + galleryImages.value.length) %
     galleryImages.value.length;
 };
+
 const nextImage = () => {
   galleryIndex.value = (galleryIndex.value + 1) % galleryImages.value.length;
 };
+
 const chooseOption = (option) => {
   selectedOption.value = option;
   optionOpen.value = false;
@@ -172,7 +447,12 @@ const productDetailContent = computed(() => {
       title: `${product.value.name}, 매일 편리하게 사용하는 반려생활 용품`,
       description:
         "반려동물이 편안하게 사용할 수 있도록 안정성과 관리 편의성을 고려한 상품입니다.",
-      highlights: ["간편한 세척", "안정적인 사용", "생활 방수", "반려동물 맞춤"],
+      highlights: [
+        "간편한 세척",
+        "안정적인 사용",
+        "생활 방수",
+        "반려동물 맞춤",
+      ],
       usage:
         "평평하고 안정적인 장소에 설치한 뒤 사용 전 구성품을 깨끗이 세척해주세요.",
       storage: "직사광선과 습기가 많은 장소를 피해 보관해주세요.",
@@ -196,7 +476,8 @@ const productDetailContent = computed(() => {
     highlights: ["엄선한 원료", "균형 영양", "기호성 고려", "신선한 제조"],
     usage:
       "기존에 먹던 식품과 조금씩 섞어 적응 기간을 두고, 체중과 활동량에 따라 급여량을 조절해주세요.",
-    storage: "개봉 후 밀봉하여 직사광선을 피해 서늘하고 건조한 곳에 보관해주세요.",
+    storage:
+      "개봉 후 밀봉하여 직사광선을 피해 서늘하고 건조한 곳에 보관해주세요.",
   };
 });
 
@@ -214,7 +495,6 @@ const purchaseGuide = [
     text: "결제완료 상태에서는 배송지와 배송 요청사항을 변경할 수 있으며 배송준비 이후에는 고객 문의로 접수해주세요.",
   },
 ];
-
 </script>
 
 <template>
@@ -226,6 +506,7 @@ const purchaseGuide = [
           <img
             :src="galleryImages[galleryIndex].src"
             :alt="galleryImages[galleryIndex].alt"
+            @error="handleImageError"
           /><button
             type="button"
             class="gallery-arrow previous"
@@ -253,7 +534,11 @@ const purchaseGuide = [
             :aria-label="`${index + 1}번 상품 이미지 보기`"
             @click="galleryIndex = index"
           >
-            <img :src="image.src" :alt="image.alt" />
+            <img
+              :src="image.src"
+              :alt="image.alt"
+              @error="handleImageError"
+            />
           </button>
         </div>
       </div>
@@ -262,7 +547,7 @@ const purchaseGuide = [
         <h2>{{ product.name }}</h2>
         <p>신선한 원료를 천천히 조리해 만든 건강한 상품</p>
         <b
-          >★ {{ product.rating }}　리뷰
+          >★ {{ product.rating }} 리뷰
           {{ product.reviewCount.toLocaleString() }}개</b
         >
         <dl>
@@ -272,8 +557,8 @@ const purchaseGuide = [
           <dd>3,000원</dd>
         </dl>
         <div class="option-selector">
-          <strong>{{ pet === "ALL" ? "옵션 선택" : "중량 선택" }}</strong>
-          <div class="option-control">
+          <strong>옵션 선택 (필수) <em>*</em></strong>
+          <div ref="optionSelector" class="option-control">
             <button
               type="button"
               class="option-trigger"
@@ -281,26 +566,43 @@ const purchaseGuide = [
               :aria-expanded="optionOpen"
               @click="optionOpen = !optionOpen"
             >
-              <span>{{ currentOption }}</span>
-              <small v-if="getOptionExtra(currentOption)">
-                (+{{ getOptionExtra(currentOption).toLocaleString() }}원)
+              <span class="option-trigger-name">{{ currentOption }}</span>
+              <small class="option-trigger-price">
+                {{ getOptionPrice(currentOption).toLocaleString() }}원
+                <template v-if="getOptionExtra(currentOption)">
+                  <b>(+{{ getOptionExtra(currentOption).toLocaleString() }}원)</b>
+                </template>
               </small>
               <i aria-hidden="true" />
             </button>
-            <div v-if="optionOpen" class="option-menu">
-              <button
+            <div
+              v-if="optionOpen"
+              class="option-menu"
+              role="radiogroup"
+              aria-label="상품 옵션"
+            >
+              <label
                 v-for="option in productOptions"
                 :key="option"
-                type="button"
                 :class="{ selected: currentOption === option }"
                 @click="chooseOption(option)"
               >
-                <span>{{ option }}</span>
-                <small v-if="getOptionExtra(option)">
-                  (+{{ getOptionExtra(option).toLocaleString() }}원)
+                <input
+                  type="radio"
+                  name="product-option"
+                  :checked="currentOption === option"
+                  :value="option"
+                  @change="selectedOption = option"
+                />
+                <i class="option-choice" aria-hidden="true" />
+                <span class="option-menu-name">{{ option }}</span>
+                <small class="option-menu-price">
+                  {{ getOptionPrice(option).toLocaleString() }}원
+                  <template v-if="getOptionExtra(option)">
+                    (+{{ getOptionExtra(option).toLocaleString() }}원)
+                  </template>
                 </small>
-                <span v-if="currentOption === option">✓</span>
-              </button>
+              </label>
             </div>
           </div>
         </div>
@@ -388,13 +690,176 @@ const purchaseGuide = [
           </div>
           <strong>★ {{ product.rating }}</strong>
         </header>
-        <p class="empty-data-notice">등록된 상품 리뷰가 없습니다.</p>
+
+        <!-- 리뷰 수정 성공 메시지 -->
+        <p v-if="reviewEditSuccess" class="review-update-success" role="status">
+          {{ reviewEditSuccess }}
+        </p>
+
+        <!-- 리뷰 수정 오류 메시지 -->
+        <p v-if="reviewEditError" class="review-update-error" role="alert">
+          {{ reviewEditError }}
+        </p>
+
+        <!-- 리뷰 조회 중 안내 -->
+        <p v-if="reviewsLoading" class="empty-data-notice" role="status">
+          상품 리뷰를 불러오는 중입니다.
+        </p>
+
+        <!-- Spring 공개 리뷰 정렬의 첫 항목을 베스트 리뷰로 노출하고, 나머지는 페이지로 나눠 표시한다. -->
+        <section v-if="reviews.length" class="review-list">
+          <!-- BEST 리뷰 -->
+          <article v-if="bestReview && reviewPage === 1" class="best-review">
+            <small>BEST REVIEW</small>
+            <div class="review-meta">
+              <b>★ {{ bestReview.rating }}</b>
+              <span>{{ maskReviewWriter(bestReview.writerId) }}</span>
+              <span v-if="isMyReview(bestReview)" class="my-review-label">내 리뷰</span>
+              <time>{{ String(bestReview.createdAt || "").slice(0, 10) }}</time>
+              <button
+                v-if="isMyReview(bestReview)"
+                type="button"
+                class="review-edit-button"
+                :disabled="reviewEditLoading || reviewsLoading"
+                @click="openReviewEdit(bestReview)"
+              >
+                수정
+              </button>
+            </div>
+            <p>{{ bestReview.content }}</p>
+          </article>
+
+          <!-- 일반 리뷰 -->
+          <ol v-if="regularReviews.length" class="review-items">
+            <li v-for="review in pagedReviews" :key="review.id">
+              <div class="review-meta">
+                <b>★ {{ review.rating }}</b>
+                <span>{{ maskReviewWriter(review.writerId) }}</span>
+                <span v-if="isMyReview(review)" class="my-review-label">내 리뷰</span>
+                <time>{{ String(review.createdAt || "").slice(0, 10) }}</time>
+                <button
+                  v-if="isMyReview(review)"
+                  type="button"
+                  class="review-edit-button"
+                  :disabled="reviewEditLoading || reviewsLoading"
+                  @click="openReviewEdit(review)"
+                >
+                  수정
+                </button>
+              </div>
+              <p>{{ review.content }}</p>
+            </li>
+          </ol>
+
+          <!-- 리뷰 페이지네이션 -->
+          <PaginationBar
+            v-model:page="reviewPage"
+            :total-pages="reviewPageCount"
+            label="상품 리뷰 페이지 이동"
+          />
+        </section>
+
+        <!-- 등록된 리뷰가 없는 경우 -->
+        <p v-else-if="!reviewsLoading" class="empty-data-notice">
+          등록된 상품 리뷰가 없습니다.
+        </p>
       </article>
     </section>
     <CartAddedModal v-model="cartAdded" @cart="router.push('/cart')" />
     <LoginRequiredModal v-model="loginRequired" @login="goToLogin" />
+
+    <!-- 회원 본인 리뷰 수정 모달 -->
+    <ReviewEditModal
+      v-if="reviewEditOpen && editingReview"
+      :key="editingReview.id"
+      :review="editingReview"
+      :product-name="product.name"
+      @close="closeReviewEdit"
+      @updated="handleReviewUpdated"
+    />
   </div>
   <main v-else class="container detail-page detail-page-state">
     {{ detailLoading ? "상품 정보를 불러오는 중입니다." : detailError }}
   </main>
 </template>
+
+<style scoped>
+/* 회원 본인 리뷰 표시 */
+.my-review-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  background: #f3e6d7;
+  padding: 4px 8px;
+  color: #95643d;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* 리뷰 수정 버튼 */
+.review-edit-button {
+  min-width: 58px;
+  min-height: 30px;
+  border: 1px solid #ddc9b7;
+  border-radius: 7px;
+  background: #fff;
+  padding: 5px 12px;
+  color: #805737;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.review-edit-button:hover:not(:disabled) {
+  border-color: #95643d;
+  background: #95643d;
+  color: #fff;
+}
+
+.review-edit-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 리뷰 수정 성공 메시지 */
+.review-update-success {
+  margin: 16px 0;
+  border: 1px solid #cfe3ce;
+  border-radius: 9px;
+  background: #f2f8f0;
+  padding: 12px 16px;
+  color: #4f8051;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* 리뷰 수정 오류 메시지 */
+.review-update-error {
+  margin: 16px 0;
+  border: 1px solid #ebc9c2;
+  border-radius: 9px;
+  background: #fff5f3;
+  padding: 12px 16px;
+  color: #c65b49;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .review-meta {
+    flex-wrap: wrap;
+  }
+
+  .review-edit-button {
+    min-height: 34px;
+  }
+}
+</style>

@@ -1,0 +1,1 @@
+"""PAWCAST AI prediction application."""

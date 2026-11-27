@@ -1,0 +1,643 @@
+/* 관리자·매니저 통합 대시보드: AdminLayout의 본문(main.admin-overview) 기준 */
+
+.admin-overview {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  max-width: none;
+  padding: 34px;
+  background: #f7f5f1;
+}
+
+.admin-overview header small {
+  color: #a66838;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.admin-overview h1 {
+  margin: 8px 0;
+}
+
+.admin-overview header p {
+  color: #917866;
+}
+
+.admin-overview .status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  color: #806653;
+  font-size: 13px;
+}
+
+.admin-overview .status button {
+  border: 1px solid #d9b898;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 10px;
+  color: #7c4e30;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-overview .issue {
+  color: #a14d32;
+}
+
+/* 대시보드 각 영역은 서로 독립된 레이아웃을 사용합니다. */
+.admin-overview > section {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin-top: 16px;
+}
+
+.admin-overview .overview-metric-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-overview .overview-metric-grid > a {
+  min-width: 0;
+  border: 1px solid #e8d8ca;
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
+}
+
+.admin-overview .overview-metric-grid > a:hover {
+  border-color: #a66b3f;
+  transform: translateY(-2px);
+}
+
+.admin-overview .overview-metric-grid > a small {
+  display: block;
+  color: #8a5b3d;
+  font-weight: 800;
+}
+
+.admin-overview .overview-metric-grid > a strong {
+  display: block;
+  margin: 9px 0;
+  overflow-wrap: anywhere;
+  font-size: 25px;
+}
+
+.admin-overview .overview-metric-grid > a p {
+  min-height: 40px;
+  color: #917866;
+}
+
+.admin-overview .overview-metric-grid > a span {
+  color: #a66838;
+  font-weight: 800;
+}
+
+/* 운영 지표 및 ECharts 요약 */
+
+.admin-overview .overview-metric-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin-top: 24px;
+}
+
+.admin-overview .overview-metric-grid a {
+  min-height: 98px;
+  padding: 18px;
+}
+
+.admin-overview .overview-metric-grid .attention {
+  border-color: #efd0c0;
+  background: #fffaf6;
+}
+
+.admin-overview .overview-menu-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-overview .overview-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  max-width: 100%;
+}
+
+.admin-overview .overview-chart-panel {
+  min-height: 350px;
+  padding: 20px;
+}
+
+.admin-overview .overview-chart-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.admin-overview .overview-chart-panel h2 {
+  margin: 0;
+  color: #3f281d;
+  font-size: 19px;
+}
+
+.admin-overview .overview-chart-panel header p {
+  min-height: auto;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.admin-overview .overview-echart {
+  width: 100%;
+  height: 278px;
+  margin-top: 10px;
+}
+
+.admin-overview .overview-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  max-width: 100%;
+}
+
+.admin-overview .overview-ai-panel {
+  min-height: 260px;
+  padding: 20px;
+}
+
+.admin-overview .overview-ai-panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.admin-overview .overview-ai-panel h2 {
+  margin: 0;
+  color: #3f281d;
+  font-size: 19px;
+}
+
+.admin-overview .overview-ai-panel header p {
+  min-height: auto;
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.admin-overview .sentiment-rate {
+  display: flex;
+  overflow: hidden;
+  height: 13px;
+  margin: 24px 0 10px;
+  border-radius: 999px;
+  background: #eee7df;
+}
+
+.admin-overview .sentiment-rate .positive {
+  background: #90a46f;
+}
+
+.admin-overview .sentiment-rate .negative {
+  background: #c97969;
+}
+
+.admin-overview .sentiment-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: #735a49;
+  font-size: 13px;
+}
+
+.admin-overview .sentiment-legend span {
+  color: inherit;
+  font-weight: 800;
+}
+
+.admin-overview .sentiment-legend small {
+  margin-left: auto;
+  color: #917866;
+}
+
+.admin-overview .ai-list {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-overview .ai-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid #f0e7df;
+}
+
+.admin-overview .ai-list strong {
+  margin: 0;
+  font-size: 14px;
+}
+
+.admin-overview .ai-list span {
+  text-align: right;
+  color: #a66838;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.admin-overview .inventory-list small {
+  display: block;
+  margin-top: 3px;
+  color: #917866;
+}
+
+.admin-overview .empty-analysis {
+  min-height: auto;
+  margin: 36px 0;
+  color: #917866;
+  line-height: 1.6;
+}
+
+.admin-overview .overview-operations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  max-width: 100%;
+}
+
+.admin-overview .overview-operation-panel {
+  min-width: 0;
+  min-height: 280px;
+  border: 1px solid #e8d8ca;
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.2s,
+    transform 0.2s;
+}
+
+.admin-overview .overview-operation-panel:hover {
+  border-color: #a66b3f;
+  transform: translateY(-2px);
+}
+
+.admin-overview .overview-operation-panel header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-overview .overview-operation-panel h2,
+.admin-overview .overview-forecast-panel h2 {
+  margin: 0;
+  color: #3f281d;
+  font-size: 18px;
+}
+
+.admin-overview .overview-operation-panel header p {
+  min-height: 0;
+  margin: 5px 0 0;
+  font-size: 12px;
+}
+
+.admin-overview .overview-operation-panel header > span {
+  color: #a66838;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-overview .status-summary-list,
+.admin-overview .inventory-summary-list {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-overview .status-summary-list li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.admin-overview .status-summary-list li > i {
+  display: block;
+  overflow: hidden;
+  height: 8px;
+  border-radius: 99px;
+  background: #f1e8df;
+}
+
+.admin-overview .status-summary-list li em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #b67545;
+}
+
+.admin-overview .status-chip {
+  display: inline-flex;
+  border-radius: 99px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.admin-overview .status-chip.paid {
+  background: #eee6d9;
+}
+
+.admin-overview .status-chip.preparing {
+  background: #f9e4c8;
+}
+
+.admin-overview .status-chip.shipping {
+  background: #dfeef3;
+}
+
+.admin-overview .status-chip.delivered {
+  background: #e3efd8;
+}
+
+.admin-overview .status-chip.cancelled {
+  background: #fae0dd;
+}
+
+.admin-overview .compact-table {
+  width: 100%;
+  margin-top: 15px;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.admin-overview .compact-table th,
+.admin-overview .compact-table td {
+  border-bottom: 1px solid #f0e7de;
+  padding: 9px 5px;
+  text-align: left;
+}
+
+.admin-overview .compact-table th {
+  color: #9c7d67;
+  font-size: 10px;
+}
+
+.admin-overview .compact-table td:nth-child(n+2) {
+  text-align: right;
+}
+
+.admin-overview .inventory-summary-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #f0e7de;
+  padding-bottom: 9px;
+  font-size: 12px;
+}
+
+.admin-overview .inventory-summary-list li:last-child {
+  border-bottom: 0;
+}
+
+.admin-overview .inventory-summary-list small {
+  display: block;
+  margin-top: 3px;
+  color: #a88c78;
+}
+
+.admin-overview .inventory-summary-list li > span {
+  color: #a66838;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.admin-overview .product-performance-panel {
+  grid-column: span 2;
+}
+
+.admin-overview .product-performance-table td:first-child b {
+  display: inline-block;
+  border-radius: 99px;
+  padding: 4px 8px;
+  font-size: 9px;
+}
+
+.admin-overview .product-performance-table b.best {
+  background: #e5efda;
+  color: #5c7b42;
+}
+
+.admin-overview .product-performance-table b.worst {
+  background: #fae1dc;
+  color: #b44f43;
+}
+
+.admin-overview .overview-forecast-panel {
+  display: block;
+  margin-top: 16px;
+  max-width: 100%;
+  border: 1px solid #ebd8bb;
+  border-radius: 16px;
+  background: #fffaf0;
+  padding: 22px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-overview .overview-forecast-panel small {
+  color: #a66838;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.admin-overview .overview-forecast-panel strong {
+  display: block;
+  margin: 12px 0;
+  font-size: 29px;
+}
+
+.admin-overview .overview-forecast-panel p {
+  min-height: 0;
+  color: #887060;
+}
+
+.admin-overview .overview-forecast-panel span {
+  color: #a66838;
+  font-weight: 800;
+}
+
+.admin-overview .overview-empty {
+  min-height: auto;
+  margin: 35px 0;
+  color: #a48d7c;
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 1050px) {
+  .admin-overview .overview-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .admin-overview .overview-chart-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-overview .overview-ai-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-overview .overview-operations-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-overview .product-performance-panel {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 900px) {
+  .admin-overview .overview-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-overview {
+    padding: 22px 16px;
+  }
+
+  .admin-overview .overview-metric-grid,
+  .admin-overview .overview-menu-grid,
+  .admin-overview .overview-ai-grid,
+  .admin-overview .overview-operations-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 카드 내부 텍스트가 그리드의 너비를 밀어내지 않도록 제한합니다. */
+.admin-overview .overview-chart-grid > *,
+.admin-overview .overview-ai-grid > *,
+.admin-overview .overview-operations-grid > * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.admin-overview .overview-chart-panel,
+.admin-overview .overview-ai-panel {
+  display: block;
+  border: 1px solid #e8d8ca;
+  border-radius: 16px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.admin-overview .overview-chart-panel header,
+.admin-overview .overview-ai-panel header,
+.admin-overview .overview-operation-panel header {
+  min-width: 0;
+}
+
+.admin-overview .overview-chart-panel header > *,
+.admin-overview .overview-ai-panel header > *,
+.admin-overview .overview-operation-panel header > * {
+  min-width: 0;
+}
+
+.admin-overview .overview-echart {
+  min-width: 0;
+}
+
+/* 대시보드 전체 폭과 카드 정렬: AdminLayout의 콘텐츠 영역을 기준으로 합니다. */
+.admin-overview {
+  max-width: none;
+}
+
+.admin-overview .overview-metric-grid {
+  width: 100%;
+  max-width: none;
+  align-items: stretch;
+}
+
+.admin-overview .overview-metric-grid > a {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  row-gap: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 220px;
+  padding: 20px;
+}
+
+.admin-overview .overview-metric-grid > a small {
+  display: block;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.admin-overview .overview-metric-grid > a strong {
+  display: block;
+  margin: 0;
+  font-size: clamp(19px, 1.45vw, 25px);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.admin-overview .overview-metric-grid > a p {
+  min-height: 0;
+  margin: 0;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.admin-overview .overview-metric-grid > a span {
+  display: block;
+  align-self: end;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+}
+
+/* 그리드 항목이 내부 콘텐츠 너비 때문에 넘치지 않도록 합니다. */
+.admin-overview .overview-chart-grid,
+.admin-overview .overview-ai-grid,
+.admin-overview .overview-operations-grid,
+.admin-overview .overview-forecast-panel {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+/* 브라우저 전체가 아니라 실제 본문 너비에 맞춰 카드 개수를 조절합니다. */
+@media (max-width: 900px) {
+  .admin-overview .overview-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-overview .overview-metric-grid {
+    grid-template-columns: 1fr;
+  }
+}

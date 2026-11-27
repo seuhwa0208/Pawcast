@@ -6,6 +6,7 @@ import { useCart } from "@/stores/cart";
 import { useAuthSession } from "@/stores/auth";
 import { addressService } from "@/services/addressService";
 import { paymentService } from "@/services/paymentService";
+import { getMyProfile } from "@/services/memberService";
 
 const TOSS_CLIENT_KEY =
   import.meta.env.VITE_TOSS_CLIENT_KEY ||
@@ -23,12 +24,23 @@ const isMember = computed(() => Boolean(accessToken.value));
 const buyNowItem = ref(
   JSON.parse(sessionStorage.getItem("powcast-buy-now") || "null"),
 );
+const selectedCheckoutItems = ref(
+  JSON.parse(sessionStorage.getItem("powcast-selected-checkout") || "[]"),
+);
 const isBuyNow = computed(
   () => route.query.mode === "buy-now" && Boolean(buyNowItem.value),
 );
-const checkoutItems = computed(() =>
-  isBuyNow.value ? [buyNowItem.value] : items.value,
+const isSelectedMode = computed(
+  () =>
+    route.query.mode === "selected" &&
+    Array.isArray(selectedCheckoutItems.value) &&
+    selectedCheckoutItems.value.length > 0,
 );
+const checkoutItems = computed(() => {
+  if (isBuyNow.value) return [buyNowItem.value];
+  if (isSelectedMode.value) return selectedCheckoutItems.value;
+  return items.value;
+});
 const checkoutTotal = computed(() =>
   checkoutItems.value.reduce(
     (sum, item) => sum + Number(item.price) * Number(item.quantity),
@@ -53,7 +65,8 @@ const addressFormOpen = ref(false);
 const agreed = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
-const paymentMethod = ref("CARD");
+const deliveryMessageOption = ref("문 앞에 놓아주세요.");
+const customDeliveryMessage = ref("");
 const buyerEmail = ref(member.value?.email || "");
 const ordererName = ref(member.value?.username || "");
 const ordererPhone = ref(member.value?.tel || "");
@@ -109,6 +122,34 @@ async function loadAddresses() {
   }
 }
 
+async function loadMemberProfile() {
+  if (!isMember.value) return;
+  try {
+    const res = await getMyProfile();
+    const profile = res?.member || res?.profile || res?.data || res;
+    if (!profile) return;
+
+    member.value = profile;
+
+    const name = profile.username || profile.name || profile.nickname || "";
+    const tel = profile.tel || profile.phone || profile.phoneNumber || "";
+    const email = profile.email || "";
+
+    if (!ordererName.value && name) {
+      ordererName.value = name;
+    }
+    if (!ordererPhone.value && tel) {
+      ordererPhone.value = formatPhoneNumber(tel);
+    }
+    if (!buyerEmail.value && email) {
+      buyerEmail.value = email;
+    }
+  } catch (error) {
+    // 주문서 작성 자체를 막지 않도록 조용히 넘기거나 필요 시 콘솔만 남깁니다.
+    console.warn("회원 정보를 불러오지 못했습니다:", error);
+  }
+}
+
 function initializeGuestOrder() {
   Object.assign(addressForm, {
     label: "비회원 배송지",
@@ -119,7 +160,16 @@ function initializeGuestOrder() {
     address2: "",
     deliveryMessage: "문 앞에 놓아주세요.",
   });
+  deliveryMessageOption.value = "문 앞에 놓아주세요.";
+  customDeliveryMessage.value = "";
 }
+
+watch([deliveryMessageOption, customDeliveryMessage], () => {
+  addressForm.deliveryMessage =
+    deliveryMessageOption.value === "CUSTOM"
+      ? customDeliveryMessage.value.trim()
+      : deliveryMessageOption.value;
+});
 
 function formatPhoneNumber(value) {
   const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
@@ -195,9 +245,26 @@ function loadTossSdk() {
   });
 }
 
+// Toss customerKey는 영문·숫자 및 -._=@ 만 허용하고 2~50자여야 한다.
+// 회원 아이디가 한글이거나 비어 있어도 결제창을 열 수 있도록 안전한 키를 만든다.
+function createTossCustomerKey() {
+  const rawMemberKey = String(userId.value || "member");
+  const storageKey = `powcast-toss-customer-key:${rawMemberKey}`;
+  const savedKey = localStorage.getItem(storageKey);
+  if (savedKey) return savedKey;
+  const safeMemberKey =
+    rawMemberKey.replace(/[^A-Za-z0-9\-._=@]/g, "").slice(0, 24) || "member";
+
+  const customerKey = `powcast_${safeMemberKey}_${crypto.randomUUID()}`.slice(0, 50);
+  localStorage.setItem(storageKey, customerKey);
+  return customerKey;
+}
+
 // 서버가 확정한 주문번호와 금액을 받은 뒤에만 PG 결제창을 실행합니다.
 async function requestPayment() {
   errorMessage.value = "";
+  let paymentWindowOpened = false;
+
   if (!checkoutItems.value.length) {
     router.push("/cart");
     return;
@@ -227,10 +294,15 @@ async function requestPayment() {
     errorMessage.value = "주문 내용과 결제 진행에 동의해주세요.";
     return;
   }
+
   try {
     submitting.value = true;
+
+    // 주문 요청 스냅샷을 orderedItems로 통일합니다.
+    const orderedItems = [...checkoutItems.value];
+
     const order = await paymentService.createOrder({
-      items: checkoutItems.value.map((item) => ({
+      items: orderedItems.map((item) => ({
         productVariantId: item.variantId || item.id,
         quantity: item.quantity,
       })),
@@ -244,11 +316,21 @@ async function requestPayment() {
       deliveryAddress2: selectedAddress.value.address2,
       deliveryMessage: selectedAddress.value.deliveryMessage || "",
     });
+
     const orderId = order.id || order.orderId;
     const orderNumber = order.orderNumber || orderId;
     const orderAccessToken =
       order.orderAccessToken || order.accessToken || order.guestOrderToken;
-    if (!orderId) throw new Error("백엔드 주문 생성 응답에 주문 ID가 없습니다.");
+
+    if (!orderId) {
+      throw new Error("백엔드 주문 생성 응답에 주문 ID가 없습니다.");
+    }
+
+    // 비회원 장바구니 결제 시 완료 페이지에서 비울 장바구니 키 목록을 저장합니다.
+    const guestCartKeys =
+      !isMember.value && !isBuyNow.value
+        ? orderedItems.map((item) => item.key).filter(Boolean)
+        : [];
 
     sessionStorage.setItem(
       "powcast-payment-context",
@@ -258,38 +340,69 @@ async function requestPayment() {
         orderAccessToken,
         orderEmail: buyerEmail.value,
         isMember: isMember.value,
-        mode: isBuyNow.value ? "buy-now" : "cart",
+        gusetCartKeys: guestCartKeys,
+        mode: isBuyNow.value
+          ? "buy-now"
+          : isSelectedMode.value
+            ? "selected"
+            : "cart",
       }),
     );
+
     const TossPayments = await loadTossSdk();
-    const customerKey = `powcast-${userId.value}-${String(Date.now())}`;
-    const payment = TossPayments(TOSS_CLIENT_KEY).payment({ customerKey });
-    const card = ["TOSSPAY", "KAKAOPAY"].includes(paymentMethod.value)
-      ? { flowMode: "DIRECT", easyPay: paymentMethod.value }
-      : { flowMode: "DEFAULT" };
-    await payment.requestPayment({
-      method: paymentMethod.value === "TRANSFER" ? "TRANSFER" : "CARD",
-      amount: { currency: "KRW", value: finalAmount.value },
-      orderId: String(orderNumber),
+    // test_gck/live_gck 키는 구형 payment()가 아니라 widgets() 흐름에 사용합니다.
+    const tossPayments = TossPayments(TOSS_CLIENT_KEY);
+    const widgets = tossPayments.widgets({
+      customerKey: isMember.value
+        ? createTossCustomerKey()
+        : TossPayments.ANONYMOUS,
+    });
+
+    await widgets.setAmount({
+      currency: "KRW",
+      value: Number(finalAmount.value),
+    });
+
+    const paymentWindow = await widgets.renderPaymentWindow({
       orderName: orderName.value,
-      customerName: selectedAddress.value.recipient,
-      customerEmail: buyerEmail.value,
-      successUrl: `${window.location.origin}/payment/result?status=success`,
-      failUrl: `${window.location.origin}/payment/result?status=fail`,
-      ...(paymentMethod.value === "TRANSFER" ? {} : { card }),
+    });
+    paymentWindowOpened = true;
+
+    paymentWindow.on("paymentRequest", () =>
+      widgets.requestPayment({
+        orderId: String(orderNumber),
+        orderName: orderName.value,
+        customerName: selectedAddress.value.recipient,
+        customerEmail: buyerEmail.value,
+        customerMobilePhone: String(ordererPhone.value).replace(/\D/g, ""),
+        successUrl: `${window.location.origin}/payment/result?status=success`,
+        failUrl: `${window.location.origin}/payment/result?status=fail`,
+      }),
+    );
+
+    paymentWindow.on("cancel", () => {
+      submitting.value = false;
     });
   } catch (error) {
     errorMessage.value =
       error.message || "결제를 시작하지 못했습니다. 백엔드 연결을 확인해주세요.";
   } finally {
-    submitting.value = false;
+    // 결제창이 열린 뒤에는 사용자의 취소 이벤트에서만 버튼 상태를 되돌립니다.
+    if (!paymentWindowOpened) {
+      submitting.value = false;
+    }
   }
 }
 
 onMounted(() => {
-  if (!checkoutItems.value.length) router.replace("/cart");
-  else if (isMember.value) loadAddresses();
-  else initializeGuestOrder();
+  if (!checkoutItems.value.length) {
+    router.replace("/cart");
+  } else if (isMember.value) {
+    loadMemberProfile();
+    loadAddresses();
+  } else {
+    initializeGuestOrder();
+  }
 });
 </script>
 
@@ -301,7 +414,7 @@ onMounted(() => {
       <p>
         {{
           isMember
-            ? "상품과 배송지를 확인한 후 결제수단을 선택해주세요."
+            ? "상품과 배송지를 확인한 후 결제를 진행해주세요."
             : "비회원 주문 확인에 필요한 이메일과 배송지 정보를 입력해주세요."
         }}
       </p>
@@ -431,7 +544,7 @@ onMounted(() => {
                 required
               />
             </label>
-            <label class="address-search-field">
+            <label class="address-search-field wide">
               우편번호
               <span>
                 <input v-model="addressForm.zipcode" readonly required />
@@ -450,7 +563,7 @@ onMounted(() => {
             </label>
             <label class="wide">
               배송 요청사항
-              <select v-model="addressForm.deliveryMessage">
+              <select v-model="deliveryMessageOption" class="delivery-message-select">
                 <option value="문 앞에 놓아주세요.">문 앞에 놓아주세요.</option>
                 <option value="경비실에 맡겨주세요.">
                   경비실에 맡겨주세요.
@@ -459,35 +572,17 @@ onMounted(() => {
                   배송 전에 연락해주세요.
                 </option>
                 <option value="">요청사항 없음</option>
+                <option value="CUSTOM">직접 입력</option>
               </select>
-            </label>
-          </div>
-        </section>
-
-        <section class="checkout-card">
-          <header><h2>결제수단</h2></header>
-          <div class="payment-method-grid">
-            <label
-              v-for="method in [
-                ['CARD', '신용·체크카드'],
-                ['TOSSPAY', '토스페이'],
-                ['KAKAOPAY', '카카오페이'],
-                ['TRANSFER', '계좌이체'],
-              ]"
-              :key="method[0]"
-              :class="{ on: paymentMethod === method[0] }"
-            >
               <input
-                v-model="paymentMethod"
-                type="radio"
-                :value="method[0]"
+                v-if="deliveryMessageOption === 'CUSTOM'"
+                v-model.trim="customDeliveryMessage"
+                class="delivery-message-custom"
+                maxlength="255"
+                placeholder="배송 요청사항을 직접 입력해주세요."
               />
-              <span>{{ method[1] }}</span>
             </label>
           </div>
-          <p class="payment-method-note">
-            선택한 결제수단은 토스페이먼츠 결제창에서 안전하게 처리됩니다.
-          </p>
         </section>
       </div>
 
@@ -501,6 +596,7 @@ onMounted(() => {
           <dt>총 결제 금액</dt>
           <dd>{{ finalAmount.toLocaleString() }}원</dd>
         </dl>
+        <p class="checkout-shipping-notice">* 20,000원 이상 구매 시 배송비 무료</p>
         <label class="checkout-agreement">
           <input v-model="agreed" type="checkbox" />
           <span
@@ -513,7 +609,7 @@ onMounted(() => {
           {{
             submitting
               ? "결제 준비 중..."
-              : `${finalAmount.toLocaleString()}원 테스트 결제하기`
+              : `${finalAmount.toLocaleString()}원 결제하기`
           }}
         </button>
         <small>실제 승인 여부는 Spring Boot 결제 API 연결 상태에 따라 결정됩니다.</small>
@@ -546,7 +642,12 @@ onMounted(() => {
               >받는 분<input v-model.trim="addressForm.recipient" required
             /></label>
             <label
-              >연락처<input v-model.trim="addressForm.tel" @input="addressForm.tel = formatPhoneNumber($event.target.value)" type="tel" placeholder="010-1234-5678" required
+              >연락처<input
+                v-model.trim="addressForm.tel"
+                @input="addressForm.tel = formatPhoneNumber($event.target.value)"
+                type="tel"
+                placeholder="010-1234-5678"
+                required
             /></label>
             <label class="address-search-field"
               >우편번호<span

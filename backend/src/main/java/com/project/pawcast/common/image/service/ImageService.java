@@ -1,5 +1,7 @@
 package com.project.pawcast.common.image.service;
 
+import com.project.pawcast.common.exception.BusinessException;
+import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.common.image.storage.ImageStorage;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,7 +22,27 @@ public class ImageService {
     public ImageService(ImageStorage imageStorage) {this.imageStorage = imageStorage;}
 
     // 이미지 업로드
-    public String upload(MultipartFile file) throws IOException {
+    public String upload(MultipartFile file){
+
+        validateUpload(file);
+        try {
+            return imageStorage.save(file);
+        }catch (IOException e){
+            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
+    /** 상품 이미지는 공개 상품 전용 디렉터리에 저장합니다. */
+    public String uploadProduct(MultipartFile file){
+        validateUpload(file);
+        try {
+            return imageStorage.saveProduct(file);
+        }catch (IOException e){
+            throw new BusinessException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+    }
+
+    private void validateUpload(MultipartFile file) {
 
         // 파일 존재 여부 확인
         if (file == null || file.isEmpty()) {throw new IllegalArgumentException("이미지 파일이 비어 있습니다.");}
@@ -32,8 +54,7 @@ public class ImageService {
         if (originalFilename == null || !originalFilename.contains(".")) {throw new IllegalArgumentException("올바르지 않은 파일입니다.");}
         String extension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다.");}
-        // 실제 파일 저장
-        return imageStorage.save(file);
+
     }
 
     // 이미지 삭제

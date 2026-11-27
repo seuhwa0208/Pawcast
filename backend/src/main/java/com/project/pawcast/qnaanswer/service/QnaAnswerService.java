@@ -5,6 +5,7 @@ import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
 import com.project.pawcast.qna.entity.Qna;
+import com.project.pawcast.qna.entity.QnaStatus;
 import com.project.pawcast.qna.repository.QnaRepository;
 import com.project.pawcast.qnaanswer.dto.QnaAnswerRequest;
 import com.project.pawcast.qnaanswer.dto.QnaAnswerResponse;
@@ -44,6 +45,7 @@ public class QnaAnswerService {
                 .member(member)
                 .content(request.content())
                 .build();
+        qna.setStatus(QnaStatus.ANSWERED);
         return QnaAnswerResponse.from(qnaAnswerRepository.save(answer));
     }
 
@@ -70,5 +72,6 @@ public class QnaAnswerService {
         Qna qna = qnaRepository.findByIdAndDeletedAtIsNull(qnaId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_QNA));
         QnaAnswer answer = qnaAnswerRepository.findByQna(qna).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_QNA_ANSWER));
         qnaAnswerRepository.delete(answer);
+        qna.setStatus(QnaStatus.WAITING);
     }
 }

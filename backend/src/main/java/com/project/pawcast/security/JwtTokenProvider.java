@@ -11,6 +11,7 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -41,8 +42,19 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(PetmallProperties properties) {
         this.config = properties.jwt();
+
+        // JWT 환경변수와 Spring 설정값 길이 확인
+        String envSecret = System.getenv("JWT_SECRET");
+
+        log.info("JWT 환경변수 길이: {}",
+                envSecret == null ? -1 : envSecret.getBytes(StandardCharsets.UTF_8).length);
+
+        log.info("JWT 설정값 길이: {}",
+                config.secret() == null ? -1 : config.secret().getBytes(StandardCharsets.UTF_8).length);
+
         byte[] secret = config.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < 32) {
+
             // HS256 은 256비트 이상을 요구한다. 짧은 키로 기동되면 운영 중
             // 첫 로그인에서야 터지므로, 기동 시점에 막는다.
             throw new IllegalStateException(
@@ -71,7 +83,11 @@ public class JwtTokenProvider {
                 .claim(CLAIM_TYPE, type)
                 .issuedAt(now)
                 .expiration(expiry)
-                .signWith(key)
+                // JWT NumericDate는 초 단위 정밀도이므로 같은 초에 회전한 토큰이 같아질 수 있습니다.
+                // JTI를 넣어 동일 회원·역할·발급 시각이어도 토큰 문자열이 항상 달라지게 합니다.
+                .id(UUID.randomUUID().toString())
+                // Python FastAPI 검증기와 서명 알고리즘을 고정해 라이브러리 자동 선택 차이를 없앱니다.
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 

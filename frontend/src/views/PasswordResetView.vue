@@ -1,10 +1,13 @@
 <!-- 비밀번호 초기화 요청을 백엔드 인증 API에 접수하는 화면입니다. -->
 <script setup>
 import { reactive, ref } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { authService } from "@/services/authService";
+import { useAuthSession } from "@/stores/auth";
 
 const route = useRoute();
+const router = useRouter();
+const { setAccessToken, setUserRole } = useAuthSession();
 const form = reactive({
   email: String(route.query.email || ""),
   userId: String(route.query.userId || ""),
@@ -12,6 +15,14 @@ const form = reactive({
 const loading = ref(false);
 const requested = ref(false);
 const message = ref("");
+
+// 임시 비밀번호가 발급되면 기존 인증 세션을 끝내고 새 비밀번호로 다시 로그인하게 합니다.
+function returnToLoginAfterReset() {
+  sessionStorage.removeItem("powcast-profile-verified");
+  setUserRole("");
+  setAccessToken("");
+  router.replace("/login");
+}
 
 async function submitRequest() {
   message.value = "";
@@ -37,19 +48,24 @@ async function submitRequest() {
       <header class="signup-heading">
         <span>ACCOUNT HELP</span>
         <h1>비밀번호 초기화 요청</h1>
-        <p>
-          가입 이메일을 확인한 뒤 임시 비밀번호를 바로 발송합니다.
-        </p>
+        <p>가입 이메일을 확인한 뒤 임시 비밀번호를 바로 발송합니다.</p>
       </header>
       <div v-if="requested" class="password-request-complete">
         <div class="modal-status-icon signup-success">
           <svg viewBox="0 0 24 24"><path d="m6 12.5 4 4L18 8" /></svg>
         </div>
         <h2>초기화 요청이 접수되었습니다</h2>
-        <p>등록된 이메일로 임시 비밀번호를 발송했습니다.<br />로그인한 뒤 비밀번호를 변경해주세요.</p>
-        <RouterLink class="login-submit" to="/login"
-          >로그인으로 돌아가기</RouterLink
+        <p>
+          등록된 이메일로 임시 비밀번호를 발송했습니다.<br />로그인한 뒤
+          비밀번호를 변경해주세요.
+        </p>
+        <button
+          class="login-submit"
+          type="button"
+          @click="returnToLoginAfterReset"
         >
+          로그인으로 돌아가기
+        </button>
       </div>
       <form v-else class="login-form" @submit.prevent="submitRequest">
         <div class="reset-process">
@@ -82,7 +98,7 @@ async function submitRequest() {
           {{ message }}
         </p>
         <button class="login-submit" type="submit" :disabled="loading">
-          {{ loading ? "요청 접수 중..." : "관리자에게 초기화 요청하기" }}
+          {{ loading ? "이메일 발송 중..." : "초기화 이메일 보내기" }}
         </button>
         <RouterLink class="back-login" to="/login"
           >로그인으로 돌아가기</RouterLink

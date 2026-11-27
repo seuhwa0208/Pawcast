@@ -15,6 +15,13 @@ export const withdrawMember = (currentPassword) =>
 
 export const getMyProfile = () => springRequest("/members/me");
 
+// 회원정보 변경 전 현재 비밀번호를 확인하는 Spring API입니다.
+export const verifyMyPassword = (password) =>
+  springRequest("/members/me/verify-password", {
+    method: "POST",
+    body: jsonBody({ password }),
+  });
+
 export const updateMyProfile = (payload) =>
   springRequest("/members/me", {
     method: "PATCH",

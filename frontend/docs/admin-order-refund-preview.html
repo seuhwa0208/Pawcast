@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PAWCAST 주문·환불 관리 미리보기</title>
+  <style>
+    :root { --brown:#ac6a3d; --ink:#3d281b; --line:#eadfd5; --surface:#fffdfb; --ground:#f7f5f1; --soft:#fff8f3; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--ground); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+    main { max-width:1180px; margin:auto; padding:42px 28px 60px; } small { color:#97765e; font-weight:800; letter-spacing:.08em; } h1 { margin:6px 0; font-size:36px; } p { color:#917866; }
+    .cards { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin:25px 0 18px; } .card,.panel { border:1px solid var(--line); background:var(--surface); border-radius:16px; }
+    .card { min-height:98px; padding:16px; } .card strong { display:block; margin-top:9px; font-size:26px; } .card.refund { background:var(--soft); border-color:#edcbb9; } .card.refund strong { color:#bb5d36; }
+    .panel { padding:22px; margin-top:18px; } .panel-header { display:flex; justify-content:space-between; align-items:center; } h2 { margin:6px 0; font-size:23px; } .badge { border-radius:99px; background:#fff0df; color:#a66432; padding:6px 10px; font-size:13px; font-weight:800; }
+    table { width:100%; border-collapse:collapse; margin-top:17px; } th,td { padding:13px; border-bottom:1px solid #f1e8e1; text-align:left; } th { background:#fff9f4; color:#94755f; font-size:13px; } .status { display:inline-block; padding:5px 8px; border-radius:99px; background:#eee7dd; color:#755945; font-size:12px; font-weight:800; } .status.pending { background:#f8ead4; color:#9d6428; }
+    .reason { max-width:440px; color:#5b4030; } button { border:1px solid #ac6a3d; background:#ac6a3d; color:#fff; border-radius:8px; padding:8px 13px; font:inherit; font-weight:800; } .note { margin-top:18px; color:#967966; font-size:13px; }
+    @media (max-width:850px) { .cards { grid-template-columns:repeat(3,1fr); } .scroll { overflow:auto; } table { min-width:760px; } } @media (max-width:520px) { main { padding:28px 16px; } .cards { grid-template-columns:repeat(2,1fr); } }
+  </style>
+</head>
+<body>
+  <main>
+    <small>STATIC PREVIEW · 실제 API 호출 없음</small>
+    <h1>주문·배송 관리</h1>
+    <p>환불 신청 데이터가 없는 환경에서도 화면 구성과 승인 위치를 확인하기 위한 별도 미리보기입니다.</p>
+    <section class="cards" aria-label="주문 상태 요약">
+      <article class="card"><small>결제 완료</small><strong>19건</strong></article><article class="card"><small>상품 준비</small><strong>29건</strong></article><article class="card"><small>배송 중</small><strong>40건</strong></article><article class="card"><small>배송 완료</small><strong>9,913건</strong></article><article class="card"><small>취소</small><strong>500건</strong></article><article class="card refund"><small>환불 승인 대기</small><strong>2건</strong></article>
+    </section>
+    <section class="panel"><div class="panel-header"><div><small>REFUND REQUESTS</small><h2>환불 신청 · 승인 대기</h2><p>실제 서비스에서는 Spring Boot의 <code>GET /refunds</code> 결과만 표시합니다.</p></div><span class="badge">2건 대기</span></div>
+      <div class="scroll"><table><thead><tr><th>신청 번호</th><th>환불 사유</th><th>환불 금액</th><th>신청일</th><th>처리</th></tr></thead><tbody><tr><td>101</td><td class="reason">상품이 주문 내용과 달라 환불을 요청합니다.</td><td>58,200원</td><td>2026. 11. 23. 14:24</td><td><button>승인</button></td></tr><tr><td>102</td><td class="reason">배송 지연으로 주문을 취소하고 싶습니다.</td><td>31,800원</td><td>2026. 11. 23. 11:06</td><td><button>승인</button></td></tr></tbody></table></div>
+    </section>
+    <p class="note">이 파일의 숫자와 사유는 화면 예시일 뿐입니다. 실제 Vue 화면은 API에서 받은 환불 데이터가 있을 때만 행을 표시합니다.</p>
+  </main>
+</body>
+</html>

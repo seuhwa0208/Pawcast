@@ -3,7 +3,6 @@ package com.project.pawcast.member.admin.service;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.entity.Members;
-import com.project.pawcast.member.admin.client.SalesForecastClient;
 import com.project.pawcast.member.repository.MembersRepository;
 import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +28,6 @@ public class AdminDashboardService {
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final NamedParameterJdbcTemplate jdbc;
-    private final SalesForecastClient salesForecastClient;
 
     public Map<String, Object> getSalesDashboard(
             Long adminId, String unit, Integer year, LocalDate from, LocalDate to) {
@@ -40,7 +38,9 @@ public class AdminDashboardService {
         int selectedYear = year == null ? LocalDate.now().getYear() : year;
         LocalDate start = from == null ? LocalDate.of(selectedYear, 1, 1) : from;
         LocalDate end = to == null ? LocalDate.of(selectedYear, 12, 31) : to;
-        if (end.isBefore(start)) throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        if (end.isBefore(start)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("start", start)
@@ -59,6 +59,7 @@ public class AdminDashboardService {
 
         String truncUnit = switch (unit == null ? "month" : unit.toLowerCase()) {
             case "day" -> "day";
+            case "quarter" -> "quarter";
             case "year" -> "year";
             default -> "month";
         };
@@ -74,17 +75,23 @@ public class AdminDashboardService {
                 """.formatted(truncUnit, labelFormat(truncUnit), SALES_STATUSES, truncUnit, truncUnit);
         List<Map<String, Object>> trendRows = jdbc.queryForList(trendSql, params);
 
+        // 관리자 첫 화면은 하위 식품 분류가 아닌 쇼핑몰 3개 관(DOG/CAT/DEVICE)만 비교한다.
+        // 세부 사료·간식·식기 분류는 상품 관리와 다운로드 파일에서 별도로 제공한다.
         String categorySql = """
-                SELECT COALESCE(c.name, '기타') AS name,
+                SELECT CASE p.product_type
+                           WHEN 'DOG' THEN '강아지관'
+                           WHEN 'CAT' THEN '고양이관'
+                           WHEN 'DEVICE' THEN '식기·급수관'
+                           ELSE '기타'
+                       END AS name,
                        COALESCE(SUM(oi.total_price), 0) AS sales
                 FROM order_items oi
                 JOIN orders o ON o.id = oi.order_id
                 JOIN product_variants pv ON pv.id = oi.product_variant_id
                 JOIN products p ON p.id = pv.product_id
-                LEFT JOIN categories c ON c.id = p.category_id
                 WHERE o.created_at::date BETWEEN :start AND :end
                   AND o.status IN (%s)
-                GROUP BY COALESCE(c.name, '기타')
+                GROUP BY p.product_type
                 ORDER BY sales DESC
                 """.formatted(SALES_STATUSES);
         List<Map<String, Object>> categoryRows = jdbc.queryForList(categorySql, params);
@@ -115,12 +122,11 @@ public class AdminDashboardService {
         trend.put("sales", trendRows.stream().map(row -> row.get("sales")).toList());
         trend.put("orders", trendRows.stream().map(row -> row.get("orders")).toList());
 
+        // AI 예측은 Vue가 FastAPI에서 직접 조회한다. 이 Spring 응답은 일반 DB 집계만 담당한다.
         Map<String, Object> forecast = new LinkedHashMap<>();
-        forecast.put("predictedSales", totalSales.multiply(BigDecimal.valueOf(1.05)).setScale(0, RoundingMode.HALF_UP));
-        forecast.put("growthRate", 5.0);
-        forecast.put("insight", ((Number) totals.get("total_orders")).longValue() == 0
-                ? "선택 기간의 결제 데이터가 없습니다."
-                : "최근 매출 흐름을 기준으로 한 단순 예상치입니다.");
+        forecast.put("predictedSales", null);
+        forecast.put("growthRate", null);
+        forecast.put("insight", "AI 예측은 FastAPI에서 직접 제공합니다.");
         forecast.put("topProducts", topProducts);
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -131,24 +137,23 @@ public class AdminDashboardService {
         return response;
     }
 
-    public Map<String, Object> reforecastSales(Long adminId, LocalDate forecastDate) {
+    /** 주문 데이터가 실제로 존재하는 연도만 조회 조건에 제공한다. */
+    public List<Integer> getAvailableSalesYears(Long adminId) {
         Members admin = membersRepository.findById(adminId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         authorizationValidator.validateManager(admin);
-        SalesForecastClient.ForecastResponse result = salesForecastClient.retrain(forecastDate);
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("predictedSales", result.predicted_sales());
-        response.put("growthRate", result.growth_rate());
-        response.put("forecastDate", result.forecast_date());
-        response.put("trainedAt", result.trained_at());
-        response.put("trainingDays", result.training_days());
-        response.put("insight", result.insight());
-        return response;
+        return jdbc.queryForList("""
+                SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS sales_year
+                FROM orders
+                WHERE created_at IS NOT NULL
+                ORDER BY sales_year DESC
+                """, new MapSqlParameterSource(), Integer.class);
     }
 
     private String labelFormat(String unit) {
         return switch (unit) {
             case "day" -> "YYYY-MM-DD";
+            case "quarter" -> "YYYY \"Q\"Q";
             case "year" -> "YYYY";
             default -> "YYYY-MM";
         };

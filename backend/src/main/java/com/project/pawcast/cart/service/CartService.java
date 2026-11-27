@@ -1,10 +1,15 @@
 package com.project.pawcast.cart.service;
 
-import com.project.pawcast.cart.dto.*;
+import com.project.pawcast.cart.dto.CartAddRequest;
+import com.project.pawcast.cart.dto.CartItemResponse;
+import com.project.pawcast.cart.dto.CartMergeRequest;
+import com.project.pawcast.cart.dto.CartQuantityUpdateRequest;
+import com.project.pawcast.cart.dto.CartResponse;
 import com.project.pawcast.cart.entity.Cart;
 import com.project.pawcast.cart.entity.CartItem;
 import com.project.pawcast.cart.entity.CartStatus;
 import com.project.pawcast.cart.repository.CartItemRepository;
+import com.project.pawcast.cart.repository.CartMergeRequestRepository;
 import com.project.pawcast.cart.repository.CartRepository;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
@@ -33,48 +38,57 @@ public class CartService {
     private final MembersRepository membersRepository;
     private final ProductVariantRepository variantRepository;
     private final ProductImageRepository imageRepository;
+    private final CartMergeRequestRepository mergeRequestRepository;
 
     public CartResponse getCart(Long memberId) {
         requireMember(memberId, false);
-        return cartRepository.findFirstByMemberIdAndStatusOrderByIdDesc(memberId, CartStatus.ACTIVE)
-                .map(this::response)
-                .orElseGet(() -> CartResponse.of(null, List.of()));
+        return activeCartResponse(memberId);
     }
 
     @Transactional
     public CartResponse addItem(Long memberId, CartAddRequest request) {
-        requireQuantity(request == null ? null : request.quantity());
-        if (request.variantId() == null || request.variantId() < 1) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
-        // 회원 행을 먼저 잠가 동일 회원의 생성·추가·수정·삭제·결제 정리를 직렬화합니다.
+        validateAddRequest(request);
         Members member = requireMember(memberId, true);
-        ProductVariant variant = variantRepository.findById(request.variantId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT));
-        requireAvailable(variant, request.quantity());
+        Cart cart = getOrCreateActiveCart(member);
 
-        Cart cart = cartRepository.findFirstByMemberIdAndStatusOrderByIdDesc(memberId, CartStatus.ACTIVE)
-                .orElseGet(() -> cartRepository.saveAndFlush(new Cart(member)));
-        CartItem existing = itemRepository.findByCartIdAndVariantId(cart.getId(), variant.getId()).orElse(null);
-        if (existing == null) {
-            itemRepository.saveAndFlush(new CartItem(cart, variant, request.quantity()));
-        } else {
-            long quantity = (long) existing.getQuantity() + request.quantity();
-            requireAvailable(variant, quantity);
-            existing.changeQuantity((int) quantity);
-            itemRepository.flush();
-        }
+        addOrIncreaseItem(cart, request);
         return response(cart);
     }
 
     @Transactional
-    public CartResponse updateQuantity(Long memberId, Long itemId, CartQuantityUpdateRequest request) {
+    public CartResponse mergeGuestCart(Long memberId, CartMergeRequest request) {
+        if (request == null || request.mergeId() == null
+                || request.items() == null || request.items().isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+
+        Members member = requireMember(memberId, true);
+
+        if (!mergeRequestRepository.insertIfAbsent(memberId, request.mergeId())) {
+            return activeCartResponse(memberId);
+        }
+
+        Cart cart = getOrCreateActiveCart(member);
+        for (CartAddRequest item : request.items()) {
+            validateAddRequest(item);
+            addOrIncreaseItem(cart, item);
+        }
+
+        return response(cart);
+    }
+
+    @Transactional
+    public CartResponse updateQuantity(
+            Long memberId, Long itemId, CartQuantityUpdateRequest request
+    ) {
         requireQuantity(request == null ? null : request.quantity());
         requireMember(memberId, true);
+
         CartItem item = ownedItem(memberId, itemId);
         requireAvailable(item.getVariant(), request.quantity());
         item.changeQuantity(request.quantity());
         itemRepository.flush();
+
         return response(item.getCart());
     }
 
@@ -90,17 +104,69 @@ public class CartService {
         if (memberId == null || purchasedItems == null || purchasedItems.isEmpty()) {
             return 0;
         }
+
         membersRepository.findByIdForUpdate(memberId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
         List<Long> variantIds = purchasedItems.stream()
-                .map(item -> item.getProductVariant().getId()).distinct().sorted().toList();
+                .map(item -> item.getProductVariant().getId())
+                .distinct()
+                .sorted()
+                .toList();
+
         return itemRepository.deletePurchasedItems(memberId, CartStatus.ACTIVE, variantIds);
+    }
+
+    private CartResponse activeCartResponse(Long memberId) {
+        return cartRepository
+                .findFirstByMemberIdAndStatusOrderByIdDesc(memberId, CartStatus.ACTIVE)
+                .map(this::response)
+                .orElseGet(() -> CartResponse.of(null, List.of()));
+    }
+
+    private Cart getOrCreateActiveCart(Members member) {
+        return cartRepository
+                .findFirstByMemberIdAndStatusOrderByIdDesc(
+                        member.getId(), CartStatus.ACTIVE
+                )
+                .orElseGet(() -> cartRepository.saveAndFlush(new Cart(member)));
+    }
+
+    private void validateAddRequest(CartAddRequest request) {
+        requireQuantity(request == null ? null : request.quantity());
+        if (request.variantId() == null || request.variantId() < 1) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private void addOrIncreaseItem(Cart cart, CartAddRequest request) {
+        ProductVariant variant = variantRepository.findById(request.variantId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT));
+
+        CartItem existing = itemRepository
+                .findByCartIdAndVariantId(cart.getId(), variant.getId())
+                .orElse(null);
+
+        long quantity = request.quantity();
+        if (existing != null) {
+            quantity += existing.getQuantity();
+        }
+
+        requireAvailable(variant, quantity);
+
+        if (existing == null) {
+            itemRepository.saveAndFlush(new CartItem(cart, variant, (int) quantity));
+        } else {
+            existing.changeQuantity((int) quantity);
+            itemRepository.flush();
+        }
     }
 
     private CartItem ownedItem(Long memberId, Long itemId) {
         if (itemId == null || itemId < 1) {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
+
         return itemRepository.findOwnedItem(itemId, memberId, CartStatus.ACTIVE)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_CART_ITEM));
     }
@@ -109,11 +175,16 @@ public class CartService {
         if (memberId == null) {
             throw new BusinessException(ErrorCode.TOKEN_INVALID);
         }
-        Members member = (lock ? membersRepository.findByIdForUpdate(memberId) : membersRepository.findById(memberId))
+
+        Members member = (lock
+                ? membersRepository.findByIdForUpdate(memberId)
+                : membersRepository.findById(memberId))
                 .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+
         if (member.getStatus() != Members.Status.ACTIVE) {
             throw new BusinessException(ErrorCode.FORBIDDEN);
         }
+
         return member;
     }
 
@@ -137,13 +208,22 @@ public class CartService {
         if (items.isEmpty()) {
             return CartResponse.of(cart.getId(), List.of());
         }
-        List<Long> productIds = items.stream().map(item -> item.getVariant().getProduct().getId())
-                .distinct().toList();
+
+        List<Long> productIds = items.stream()
+                .map(item -> item.getVariant().getProduct().getId())
+                .distinct()
+                .toList();
+
         Map<Long, String> images = new HashMap<>();
         imageRepository.findAllByProductIdInOrderByMainDescSortOrderAscIdAsc(productIds)
-                .forEach(image -> images.putIfAbsent(image.getProduct().getId(), image.getImagePath()));
+                .forEach(image ->
+                        images.putIfAbsent(image.getProduct().getId(), image.getImagePath())
+                );
+
         return CartResponse.of(cart.getId(), items.stream()
-                .map(item -> CartItemResponse.from(item, images.get(item.getVariant().getProduct().getId())))
+                .map(item -> CartItemResponse.from(
+                        item, images.get(item.getVariant().getProduct().getId())
+                ))
                 .toList());
     }
 }

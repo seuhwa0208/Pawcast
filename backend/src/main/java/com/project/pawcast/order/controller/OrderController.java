@@ -12,7 +12,10 @@ import com.project.pawcast.order.service.OrderService;
 import com.project.pawcast.security.AuthorizationValidator;
 import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.checkerframework.checker.units.qual.A;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +24,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Validated
 @RequestMapping("/api/orders")
 public class OrderController {
     private final OrderService orderService;
@@ -30,7 +34,7 @@ public class OrderController {
     // 주문하기
     @PostMapping
     public OrderResponse createOrder(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody OrderRequest request){
-       return orderService.createOrder(member.getId(), request);
+       return orderService.createOrder(member == null ? null : member.getId(), request);
     }
     
     //회원의 주문 내역 조회
@@ -43,6 +47,15 @@ public class OrderController {
     @GetMapping("/{orderId}")
     public OrderResponse detailOrder(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, String email, String orderNumber){
         return orderService.detailOrder(member.getId(),orderId,email,orderNumber);
+    }
+
+    // 비회원 주문 조회: 주문 시 입력한 이메일과 서버가 발급한 주문번호를 함께 확인한다.
+    @GetMapping("/guest")
+    public OrderResponse detailGuestOrder(
+            @RequestParam @NotBlank @Email String email,
+            @RequestParam @NotBlank String orderNumber
+    ) {
+        return orderService.detailGuestOrder(email, orderNumber);
     }
 
     // 주문 정보 수정 - 배송지 수정
@@ -68,7 +81,7 @@ public class OrderController {
     }
     // 상태 변경 - 주문
     @PostMapping("/admin/{orderId}/status")
-    public void changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @Valid @RequestBody OrderStatusRequest request){
-        orderService.changeOrderStatus(member.getId(),orderId,request);
+    public OrderResponse changeOrderStatus(@AuthenticationPrincipal LoginMember member, @PathVariable Long orderId, @Valid @RequestBody OrderStatusRequest request){
+        return orderService.changeOrderStatus(member.getId(),orderId,request);
     }
 }

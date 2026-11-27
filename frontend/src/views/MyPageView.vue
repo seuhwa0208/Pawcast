@@ -3,12 +3,12 @@
 import { onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthSession } from "@/stores/auth";
-import { getMyProfile, updateMyProfile, withdrawMember } from "@/services/memberService";
+import { changeMemberPassword, getMyProfile, updateMyProfile, withdrawMember } from "@/services/memberService";
 import { addressService } from "@/services/addressService";
 import MemberSidebar from "@/components/MemberSidebar.vue";
 
 const router = useRouter();
-const { currentUserId, setAccessToken } = useAuthSession();
+const { currentUserId, clearAuthSession } = useAuthSession();
 const profile = reactive({
   username: "",
   userId: currentUserId.value,
@@ -17,9 +17,21 @@ const profile = reactive({
   marketing: false,
 });
 const profileSavedOpen = ref(false);
+const profileMessage = ref("");
+const passwordMessage = ref("");
+const passwordSuccess = ref(false);
+const passwordChanging = ref(false);
+const passwordInputsReady = ref(false);
+const passwordForm = reactive({
+  password: "",
+  newPassword: "",
+  newPasswordCheck: "",
+});
 const addressFormOpen = ref(false);
+const editingAddressId = ref(null);
 const addressError = ref("");
 const withdrawOpen = ref(false);
+const withdrawSuccessOpen = ref(false);
 const withdrawPassword = ref("");
 const withdrawMessage = ref("");
 const withdrawLoading = ref(false);
@@ -33,26 +45,100 @@ const addressForm = reactive({
   tel: "",
 });
 
+function normalizeAddress(item) {
+  return {
+    id: item.id,
+    name: item.name || item.label || "배송지",
+    recipient: item.recipient || "",
+    zipCode: item.zipCode || item.zipcode || "",
+    address: item.address || item.address1 || "",
+    detailAddress: item.detailAddress || item.address2 || "",
+    tel: formatTel(item.tel || ""),
+    primary: item.primary ?? item.isDefault ?? false,
+  };
+}
+function resetAddressForm() {
+  Object.assign(addressForm, {
+    name: "", recipient: "", zipCode: "", address: "", detailAddress: "", tel: "",
+  });
+  editingAddressId.value = null;
+}
+function resetPasswordForm() {
+  Object.assign(passwordForm, {
+    password: "",
+    newPassword: "",
+    newPasswordCheck: "",
+  });
+}
+function openAddAddress() {
+  addressError.value = "";
+  resetAddressForm();
+  addressFormOpen.value = true;
+}
+function openEditAddress(item) {
+  addressError.value = "";
+  editingAddressId.value = item.id;
+  Object.assign(addressForm, normalizeAddress(item));
+  addressFormOpen.value = true;
+}
+
 function formatTel(value) {
   const numbers = String(value).replace(/\D/g, "").slice(0, 11);
   if (numbers.length <= 3) return numbers;
   if (numbers.length <= 7) return `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
 }
+function enablePasswordInputs() {
+  passwordInputsReady.value = true;
+}
 async function saveProfile() {
-  if (
-    !profile.username.trim() ||
-    !/^\S+@\S+\.\S+$/.test(profile.email) ||
-    !/^010-\d{4}-\d{4}$/.test(profile.tel)
-  )
+  profileMessage.value = "";
+  if (!profile.username.trim()) {
+    profileMessage.value = "이름을 입력해주세요.";
     return;
-  await updateMyProfile({
-    username: profile.username,
-    email: profile.email,
-    tel: profile.tel.replace(/\D/g, ""),
-    isAgreedMarketing: profile.marketing,
-  });
-  profileSavedOpen.value = true;
+  }
+  if (!/^\S+@\S+\.\S+$/.test(profile.email)) {
+    profileMessage.value = "올바른 이메일 형식을 입력해주세요.";
+    return;
+  }
+  if (!/^010-\d{4}-\d{4}$/.test(profile.tel)) {
+    profileMessage.value = "휴대전화를 010-1234-5678 형식으로 입력해주세요.";
+    return;
+  }
+  try {
+    await updateMyProfile({
+      name: profile.username,
+      tel: profile.tel.replace(/\D/g, ""),
+      isAgreedMarketing: profile.marketing,
+    });
+    profileSavedOpen.value = true;
+  } catch (error) {
+    profileMessage.value = error.message || "회원정보를 저장하지 못했습니다.";
+  }
+}
+async function savePassword() {
+  passwordMessage.value = "";
+  passwordSuccess.value = false;
+  if (!passwordForm.password || !passwordForm.newPassword || !passwordForm.newPasswordCheck) {
+    passwordMessage.value = "현재 비밀번호와 새 비밀번호를 모두 입력해주세요.";
+    return;
+  }
+  if (passwordForm.newPassword !== passwordForm.newPasswordCheck) {
+    passwordMessage.value = "새 비밀번호와 확인 값이 일치하지 않습니다.";
+    return;
+  }
+  try {
+    passwordChanging.value = true;
+    await changeMemberPassword({ ...passwordForm });
+    // 로그인 페이지로 이동하지 않고 현재 화면에 유지하며 입력값만 초기화합니다.
+    resetPasswordForm();
+    passwordSuccess.value = true;
+    passwordMessage.value = "비밀번호가 변경되었습니다.";
+  } catch (error) {
+    passwordMessage.value = error.message || "비밀번호를 변경하지 못했습니다.";
+  } finally {
+    passwordChanging.value = false;
+  }
 }
 function loadPostcodeScript() {
   if (window.daum?.Postcode || window.kakao?.Postcode) return Promise.resolve();
@@ -92,7 +178,7 @@ async function openPostcode() {
       "주소 검색 서비스를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.";
   }
 }
-async function addAddress() {
+async function saveAddress() {
   addressError.value = "";
   if (
     !addressForm.name ||
@@ -109,25 +195,34 @@ async function addAddress() {
     addressError.value = "연락처를 010-1234-5678 형식으로 입력해주세요.";
     return;
   }
-  const created = await addressService.addAddress({
+  const payload = {
     label: addressForm.name,
     recipient: addressForm.recipient,
     zipcode: addressForm.zipCode,
     address1: addressForm.address,
     address2: addressForm.detailAddress,
     tel: addressForm.tel,
-    isDefault: addresses.value.length === 0,
-  });
-  addresses.value.push(created);
-  Object.assign(addressForm, {
-    name: "",
-    recipient: "",
-    zipCode: "",
-    address: "",
-    detailAddress: "",
-    tel: "",
-  });
-  addressFormOpen.value = false;
+    isDefault: editingAddressId.value
+      ? addresses.value.find((item) => item.id === editingAddressId.value)?.primary ?? false
+      : addresses.value.length === 0,
+  };
+  try {
+    const saved = editingAddressId.value
+      ? await addressService.updateAddress(editingAddressId.value, payload)
+      : await addressService.addAddress(payload);
+    const normalized = normalizeAddress(saved);
+    if (editingAddressId.value) {
+      addresses.value = addresses.value.map((item) =>
+        item.id === editingAddressId.value ? normalized : item,
+      );
+    } else {
+      addresses.value.push(normalized);
+    }
+    resetAddressForm();
+    addressFormOpen.value = false;
+  } catch (error) {
+    addressError.value = error.message || "배송지를 저장하지 못했습니다.";
+  }
 }
 async function makePrimary(id) {
   await addressService.setDefault(id);
@@ -147,9 +242,9 @@ async function withdraw() {
   try {
     withdrawLoading.value = true;
     await withdrawMember(withdrawPassword.value);
-    sessionStorage.removeItem("powcast-profile-verified");
-    setAccessToken("");
-    router.push("/");
+    clearAuthSession();
+    withdrawOpen.value = false;
+    withdrawSuccessOpen.value = true;
   } catch (error) {
     withdrawMessage.value = error.message;
   } finally {
@@ -168,10 +263,17 @@ onMounted(async () => {
       marketing: member.isAgreedMarketing ?? false,
     });
     const result = await addressService.getAddresses();
-    addresses.value = result.content || result.items || result.addresses || [];
+    const serverAddresses = Array.isArray(result)
+      ? result
+      : result?.content || result?.items || result?.addresses || [];
+    addresses.value = serverAddresses.map(normalizeAddress);
   } catch (error) {
     addressError.value = error.message || "회원정보를 불러오지 못했습니다.";
   }
+  // 브라우저의 저장 비밀번호 자동 주입을 비워, 변경 의사를 가진 사용자가 직접 입력하게 한다.
+  window.setTimeout(() => {
+    resetPasswordForm();
+  }, 0);
 });
 </script>
 
@@ -195,7 +297,7 @@ onMounted(async () => {
             <h2>기본 회원정보</h2>
             <p>회원님의 소중한 정보는 안전하게 보호됩니다.</p>
           </header>
-          <form class="profile-form" @submit.prevent="saveProfile">
+          <form class="profile-form" autocomplete="off" @submit.prevent="saveProfile">
             <label
               ><span>이름</span><input v-model.trim="profile.username"
             /></label>
@@ -215,29 +317,56 @@ onMounted(async () => {
               ><input
                 :value="profile.tel"
                 inputmode="numeric"
+                maxlength="13"
+                autocomplete="tel"
                 @input="profile.tel = formatTel($event.target.value)"
             /></label>
             <section class="password-management">
               <div>
                 <b>비밀번호 관리</b>
                 <p>
-                  비밀번호 변경이 필요한 경우 관리자에게 초기화를 요청해주세요.
-                  처리 완료 후 임시 비밀번호가 가입 이메일로 발송됩니다.
+                  현재 비밀번호를 확인한 뒤 새 비밀번호로 직접 변경할 수 있습니다.
                 </p>
               </div>
-              <div>
-                <button
-                  type="button"
-                  @click="
-                    router.push({
-                      path: '/password-reset',
-                      query: { email: profile.email, userId: profile.userId },
-                    })
-                  "
-                >
-                  관리자에게 초기화 요청
+              <div class="password-change-fields">
+                <input
+                  v-model="passwordForm.password"
+                  type="password"
+                  name="member-password-current"
+                  autocomplete="new-password"
+                  :readonly="!passwordInputsReady"
+                  placeholder="현재 비밀번호"
+                  @focus="enablePasswordInputs"
+                />
+                <input
+                  v-model="passwordForm.newPassword"
+                  type="password"
+                  name="member-password-new"
+                  autocomplete="new-password"
+                  :readonly="!passwordInputsReady"
+                  placeholder="새 비밀번호 (8~20자)"
+                  @focus="enablePasswordInputs"
+                />
+                <input
+                  v-model="passwordForm.newPasswordCheck"
+                  type="password"
+                  name="member-password-confirm"
+                  autocomplete="new-password"
+                  :readonly="!passwordInputsReady"
+                  placeholder="새 비밀번호 확인"
+                  @focus="enablePasswordInputs"
+                />
+                <button type="button" :disabled="passwordChanging" @click="savePassword">
+                  {{ passwordChanging ? "변경 중..." : "비밀번호 변경" }}
                 </button>
               </div>
+              <p
+                v-if="passwordMessage"
+                class="password-message"
+                :class="{ success: passwordSuccess }"
+              >
+                {{ passwordMessage }}
+              </p>
             </section>
             <div class="marketing-row">
               <div>
@@ -254,6 +383,7 @@ onMounted(async () => {
                 <i />
               </button>
             </div>
+            <p v-if="profileMessage" class="profile-message">{{ profileMessage }}</p>
             <button class="save-profile" type="submit">변경사항 저장</button>
           </form>
         </section>
@@ -261,14 +391,14 @@ onMounted(async () => {
         <section id="mypage-address" class="settings-card management-card">
           <header>
             <h2>배송지 관리</h2>
-            <button type="button" @click="addressFormOpen = !addressFormOpen">
+            <button type="button" @click="addressFormOpen ? (addressFormOpen = false) : openAddAddress()">
               추가
             </button>
           </header>
           <form
             v-if="addressFormOpen"
             class="inline-add-form address-add-form"
-            @submit.prevent="addAddress"
+            @submit.prevent="saveAddress"
           >
             <input
               v-model.trim="addressForm.name"
@@ -302,22 +432,24 @@ onMounted(async () => {
               @input="addressForm.tel = formatTel($event.target.value)"
             />
             <p v-if="addressError" class="address-error">{{ addressError }}</p>
-            <button type="submit">저장</button>
+            <button type="submit">{{ editingAddressId ? "수정 저장" : "저장" }}</button>
           </form>
           <div v-if="addresses.length" class="management-list">
             <article v-for="item in addresses" :key="item.id">
-              <div>
-                <span v-if="item.primary">기본</span>
-                <h3>{{ item.name }} · {{ item.recipient }}</h3>
-                <p>
-                  [{{ item.zipCode }}] {{ item.address }}
-                  {{ item.detailAddress }}
-                </p>
-                <small>{{ item.tel }}</small>
+              <div class="address-info">
+                <div class="address-label-row">
+                  <span class="address-tag" :class="{ primary: item.primary }">
+                    {{ item.primary ? "기본" : item.name }}
+                  </span>
+                  <h3 v-if="item.primary">{{ item.name }}</h3>
+                </div>
+                <strong>{{ item.recipient }} <small>{{ item.tel }}</small></strong>
+                <p>[{{ item.zipCode }}] {{ item.address }} {{ item.detailAddress }}</p>
               </div>
-              <button v-if="!item.primary" @click="makePrimary(item.id)">
-                기본으로 지정
-              </button>
+              <div class="address-actions">
+                <button type="button" @click="openEditAddress(item)">수정</button>
+                <button v-if="!item.primary" type="button" @click="makePrimary(item.id)">기본으로 지정</button>
+              </div>
             </article>
           </div>
           <p v-else class="empty-setting">등록된 배송지가 없습니다.</p>
@@ -399,5 +531,35 @@ onMounted(async () => {
         </section>
       </div></Teleport
     >
+    <Teleport to="body">
+      <div
+        v-if="withdrawSuccessOpen"
+        class="common-modal-backdrop"
+      >
+        <section
+          class="common-modal withdraw-success-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="withdraw-success-title"
+        >
+          <div class="modal-status-icon signup-success">
+            <svg viewBox="0 0 24 24">
+              <path d="m6 12.5 4 4L18 8" />
+            </svg>
+          </div>
+          <h2 id="withdraw-success-title">탈퇴되었습니다.</h2>
+          <p>그동안 이용해 주셔서 감사합니다.</p>
+          <div class="common-modal-actions single">
+            <button
+              type="button"
+              class="primary"
+              @click="router.replace('/')"
+            >
+              확인
+            </button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>

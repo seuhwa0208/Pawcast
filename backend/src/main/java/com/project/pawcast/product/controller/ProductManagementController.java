@@ -1,12 +1,16 @@
 package com.project.pawcast.product.controller;
 import com.project.pawcast.common.exception.*;
 import com.project.pawcast.product.dto.*;
+import com.project.pawcast.product.entity.ProductVariantStatus;
 import com.project.pawcast.product.service.ProductService;
 import com.project.pawcast.security.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 @RestController
@@ -28,16 +32,19 @@ public class ProductManagementController {
         return productService.managementDetail(id(member),productId);
     }
 
-    @PostMapping("/products") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
-    public ProductDetailResponse create(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody ProductCreateRequest request) {
-        return productService.create(id(member),request);
+    @PostMapping(value = "/products", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+    public ProductDetailResponse create(@AuthenticationPrincipal LoginMember member,
+                                        @Valid @RequestPart("request") ProductCreateRequest request,
+                                        @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return productService.create(id(member),request,images);
     }
 
-    @PatchMapping("/products/{productId}")
+    @PatchMapping( value = "/products/{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProductDetailResponse update(@AuthenticationPrincipal LoginMember member,
                                         @PathVariable Long productId,
-                                        @Valid @RequestBody ProductUpdateRequest request) {
-        return productService.update(id(member),productId,request);
+                                        @Valid @RequestPart("request") ProductUpdateRequest request,
+                                        @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return productService.update(id(member),productId,request, images);
     }
 
     @PostMapping("/products/{productId}/variants")
@@ -66,5 +73,20 @@ public class ProductManagementController {
                                              @PathVariable Long variantId,
                                              @RequestParam int quantityChange) {
         return productService.adjustStock(id(member), variantId, quantityChange);
+    }
+
+    @PatchMapping("/variants/{variantId}/status")
+    public void changeVariantStatus(@AuthenticationPrincipal LoginMember member,
+                                    @PathVariable Long variantId,
+                                    @RequestParam ProductVariantStatus status) {
+        productService.changeVariantStatus(id(member), variantId, status);
+    }
+
+    /** 관리자 상품 목록의 상품 단위 상태 변경 결과를 갱신된 집계 상태로 반환한다. */
+    @PatchMapping("/products/{productId}/status")
+    public ProductResponse changeProductStatus(@AuthenticationPrincipal LoginMember member,
+                                               @PathVariable Long productId,
+                                               @RequestParam ProductVariantStatus status) {
+        return productService.changeProductStatus(id(member), productId, status);
     }
 }

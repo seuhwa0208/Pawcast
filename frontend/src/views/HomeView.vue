@@ -1,6 +1,7 @@
 <!-- 홈 검색 조건, 추천 상품, 공지 배너와 인기 상품 자동 전환을 관리하는 메인 화면입니다. -->
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import UiSearchIcon from "@/components/UiSearchIcon.vue";
 import { useRouter } from "vue-router";
 import ProductCard from "@/components/ProductCard.vue";
 import UiTag from "@/components/UiTag.vue";
@@ -44,8 +45,8 @@ const priceSelectionLabel = computed(() =>
 );
 const ratingSelectionLabel = computed(() =>
   selectedRatings.value.length
-    ? `${selectedRatings.value.length}개 평점 선택`
-    : "평점 전체",
+    ? `★ ${selectedRatings.value.length}개 평점 선택`
+    : "★ 평점 전체",
 );
 const ingredientSelectionLabel = computed(() =>
   selectedIngredients.value.length
@@ -75,12 +76,40 @@ const bannerIndex = ref(0);
 const currentBanner = computed(() => bannerItems.value[bannerIndex.value]);
 let bannerTimer;
 let popularTimer;
+const guestRecommendationProducts = computed(() =>
+  [...topDogProducts.value, ...topCatProducts.value].slice(0, 5),
+);
 
 // 같은 함수로 여러 다중 선택 배열을 토글해 필터별 중복 코드를 줄입니다.
 function toggleSelection(list, value) {
   const index = list.indexOf(value);
   if (index === -1) list.push(value);
   else list.splice(index, 1);
+}
+function maskBestReviewWriter(userId) {
+  const value = String(userId || "").trim();
+  if (!value) return "고객님";
+  const visibleLength =
+    value.length <= 3 ? 1 : Math.min(3, Math.ceil(value.length / 2));
+  const visible = value.slice(0, visibleLength);
+  const masked = "*".repeat(
+    Math.min(4, Math.max(2, value.length - visibleLength)),
+  );
+  return `${visible}${masked} 고객님`;
+}
+function formatReviewDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()))
+    return String(value).slice(0, 10).replaceAll("-", ".");
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(date)
+    .replaceAll(". ", ".")
+    .replace(/\.$/, "");
 }
 function toggleHomeFilterMenu(type) {
   openFilterMenu.value = openFilterMenu.value === type ? "" : type;
@@ -145,7 +174,8 @@ function performSearch() {
 function moveBanner(step) {
   if (!bannerItems.value.length) return;
   bannerIndex.value =
-    (bannerIndex.value + step + bannerItems.value.length) % bannerItems.value.length;
+    (bannerIndex.value + step + bannerItems.value.length) %
+    bannerItems.value.length;
   restartBannerTimer();
 }
 // 재시작 전에 기존 타이머를 지워 중복 interval이 쌓이는 것을 방지합니다.
@@ -167,6 +197,10 @@ function restartPopularTimer() {
       popularPet.value = popularPet.value === "DOG" ? "CAT" : "DOG";
   }, 10000);
 }
+// 이름이 같은 반려동물이 있어도 ID로 구분해 각 반려동물의 추천 결과를 불러옵니다.
+function selectRecommendationPet(petId) {
+  selectedRecommendationPetId.value = petId;
+}
 onMounted(() => {
   loadHomeData();
   restartBannerTimer();
@@ -178,23 +212,21 @@ async function loadHomeData() {
   const saleFilters = { sortType: "SALES_DESC", inStockOnly: true };
   const reviewFilters = { sortType: "RATING_DESC", inStockOnly: true };
   try {
-    const [dog, cat, dogReviews, catReviews, notices] = await Promise.all([
+    const [dog, cat, reviewProducts, notices] = await Promise.all([
       productService.list({ ...saleFilters, productType: "DOG" }, "DOG"),
       productService.list({ ...saleFilters, productType: "CAT" }, "CAT"),
-      productService.bestReviews({ ...reviewFilters, productType: "DOG" }, "DOG"),
-      productService.bestReviews({ ...reviewFilters, productType: "CAT" }, "CAT"),
+      productService.bestReviews({ ...reviewFilters, limit: 5 }),
       noticeService.list(),
     ]);
     topDogProducts.value = dog.slice(0, 5);
     topCatProducts.value = cat.slice(0, 5);
-    bestReviewProducts.value = [...dogReviews, ...catReviews]
-      .sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount)
-      .slice(0, 5);
+    bestReviewProducts.value = reviewProducts.slice(0, 5);
     bannerItems.value = notices.filter((item) => item.pinned);
     bannerIndex.value = 0;
     restartBannerTimer();
-    homeBrandOptions.value = [...new Set([...dog, ...cat].map((item) => item.brand).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, "ko"));
+    homeBrandOptions.value = [
+      ...new Set([...dog, ...cat].map((item) => item.brand).filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b, "ko"));
     if (props.memberMode) await loadRecommendationPets(dog, cat);
   } catch {
     // 공통 API 오류 처리기가 화면 수준의 오류를 안내합니다.
@@ -204,17 +236,26 @@ async function loadHomeData() {
 async function loadRecommendationPets(dogProducts, catProducts) {
   try {
     const pets = await petService.getPets();
-    recommendationPets.value = (Array.isArray(pets) ? pets : []).filter((pet) => pet.id && pet.birthday);
-    selectedRecommendationPetId.value = recommendationPets.value[0]?.id || "";
+    recommendationPets.value = (Array.isArray(pets) ? pets : []).filter(
+      (pet) => pet.id && pet.birthday,
+    );
+    const firstPet = recommendationPets.value[0];
+    selectedRecommendationPetId.value = firstPet?.id || "";
     if (!selectedRecommendationPetId.value)
-      recommendationMessage.value = "생일을 포함한 반려동물 정보를 등록하면 AI 맞춤 추천을 받을 수 있습니다.";
+      recommendationMessage.value =
+        "생일을 포함한 반려동물 정보를 등록하면 AI 맞춤 추천을 받을 수 있습니다.";
   } catch {
     recommendationMessage.value = "반려동물 정보를 불러오지 못했습니다.";
   }
 }
 
-async function loadRecommendations(dogProducts = topDogProducts.value, catProducts = topCatProducts.value) {
-  const pet = recommendationPets.value.find((item) => String(item.id) === String(selectedRecommendationPetId.value));
+async function loadRecommendations(
+  dogProducts = topDogProducts.value,
+  catProducts = topCatProducts.value,
+) {
+  const pet = recommendationPets.value.find(
+    (item) => String(item.id) === String(selectedRecommendationPetId.value),
+  );
   if (!pet) return;
   recommendationLoading.value = true;
   recommendationMessage.value = "";
@@ -245,7 +286,12 @@ async function loadRecommendations(dogProducts = topDogProducts.value, catProduc
         birthday: pet.birthday,
         breedName: pet.breedName || null,
         weightKg: pet.weightKg || null,
-        allergies: pet.allergies ? pet.allergies.split(",").map((item) => item.trim()).filter(Boolean) : [],
+        allergies: pet.allergies
+          ? pet.allergies
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+          : [],
       },
       products: candidates,
       limit: 5,
@@ -264,17 +310,31 @@ async function loadRecommendations(dogProducts = topDogProducts.value, catProduc
       pet: pet.petType,
       recommendationReasons: item.recommendationReasons || [],
     }));
-    if (!recommendedProducts.value.length) recommendationMessage.value = "조건에 맞는 추천 상품이 없습니다.";
+    if (!recommendedProducts.value.length)
+      recommendationMessage.value = "조건에 맞는 추천 상품이 없습니다.";
   } catch (error) {
-    recommendationMessage.value = error.message || "AI 추천을 불러오지 못했습니다.";
+    recommendationMessage.value =
+      error.message || "AI 추천을 불러오지 못했습니다.";
   } finally {
     recommendationLoading.value = false;
   }
 }
 
-watch(selectedRecommendationPetId, () => {
-  if (selectedRecommendationPetId.value) loadRecommendations();
-});
+watch(
+  [selectedRecommendationPetId, recommendationPets],
+  () => {
+    const selectedPet = recommendationPets.value.find(
+      (item) => String(item.id) === String(selectedRecommendationPetId.value),
+    );
+    if (selectedPet) loadRecommendations();
+    else {
+      recommendedProducts.value = [];
+      if (recommendationPets.value.length)
+        selectedRecommendationPetId.value = recommendationPets.value[0].id;
+    }
+  },
+  { immediate: true },
+);
 // 화면을 떠난 뒤에도 자동 전환이 실행되는 메모리 누수를 막습니다.
 onBeforeUnmount(() => {
   window.clearInterval(bannerTimer);
@@ -354,175 +414,191 @@ onBeforeUnmount(() => {
     </section>
 
     <section class="search-box home-search">
-      <h2>내가 찾는 상품 검색하기!</h2>
-      <form @submit.prevent="performSearch">
-        <div class="search-row">
-          <label class="search-keyword"
-            ><span class="search-icon" aria-hidden="true" /><input
+      <h2>상품 검색</h2>
+      <form class="home-filter-form" @submit.prevent="performSearch">
+        <div class="home-keyword-row">
+          <label class="search-keyword compact-main-keyword">
+            <UiSearchIcon />
+            <input
               v-model.trim="keyword"
-              placeholder="검색하세요. 예) 연어 사료, 고양이 간식, 츄르"
-          /></label>
-          <button
-            type="button"
-            class="detail-button"
-            :class="{ open: detailOpen }"
-            :aria-expanded="detailOpen"
-            aria-controls="home-detail-filters"
-            @click="detailOpen = !detailOpen"
-          >
-            <span class="filter-icon" aria-hidden="true"><i /><i /><i /></span
-            ><span>상세 조건</span
-            ><i class="filter-chevron" aria-hidden="true" />
-          </button>
-          <button type="submit" class="search-submit">검색하기</button>
+              placeholder="예) 연어 사료, 츄르"
+              aria-label="상품명 검색"
+            />
+          </label>
+          <button type="submit" class="home-search-submit">검색</button>
         </div>
-        <Transition name="filter-drop"
-          ><div
-            v-if="detailOpen"
-            id="home-detail-filters"
-            class="home-filter-panel"
-          >
-            <fieldset class="pet-filter">
-              <legend>상품관</legend>
-              <div>
-                <button
-                  type="button"
-                  :class="{ on: pet === 'DOG' && !deviceSelected }"
-                  @click="selectPet('DOG')"
+        <div id="home-detail-filters" class="home-filter-panel">
+          <fieldset class="pet-filter">
+            <legend>상품관</legend>
+            <div>
+              <button
+                type="button"
+                :class="{ on: pet === 'DOG' && !deviceSelected }"
+                @click="selectPet('DOG')"
+              >
+                강아지</button
+              ><button
+                type="button"
+                :class="{ on: pet === 'CAT' && !deviceSelected }"
+                @click="selectPet('CAT')"
+              >
+                고양이</button
+              ><button
+                type="button"
+                :class="{ on: deviceSelected }"
+                :aria-pressed="deviceSelected"
+                @click="toggleDevice"
+              >
+                식기·급수
+              </button>
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>가격</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'price' }"
+                @click="toggleHomeFilterMenu('price')"
+              >
+                <span>{{ priceSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'price'" class="side-multi-menu">
+                <label v-for="item in priceRanges" :key="item.key"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedPriceRanges.includes(item.key)"
+                    @change="toggleSelection(selectedPriceRanges, item.key)"
+                  /><i /><span>{{ item.label }}</span></label
                 >
-                  🐶 강아지</button
-                ><button
-                  type="button"
-                  :class="{ on: pet === 'CAT' && !deviceSelected }"
-                  @click="selectPet('CAT')"
-                >
-                  🐱 고양이</button
-                ><button
-                  type="button"
-                  :class="{ on: deviceSelected }"
-                  :aria-pressed="deviceSelected"
-                  @click="toggleDevice"
-                >
-                  식기·급수
-                </button>
               </div>
-              <small>식기·급수는 필요할 때만 선택할 수 있어요.</small>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>가격</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'price' }"
-                  @click="toggleHomeFilterMenu('price')"
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>브랜드</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'brand' }"
+                @click="toggleHomeFilterMenu('brand')"
+              >
+                <span>{{ brandSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'brand'" class="side-multi-menu">
+                <label v-for="item in homeBrandOptions" :key="item"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedBrands.includes(item)"
+                    @change="toggleSelection(selectedBrands, item)"
+                  /><i /><span>{{ item }}</span></label
                 >
-                  <span>{{ priceSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'price'" class="side-multi-menu">
-                  <label v-for="item in priceRanges" :key="item.key"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedPriceRanges.includes(item.key)"
-                      @change="toggleSelection(selectedPriceRanges, item.key)"
-                    /><i /><span>{{ item.label }}</span></label
-                  >
-                </div>
               </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>브랜드</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'brand' }"
-                  @click="toggleHomeFilterMenu('brand')"
+            </div>
+          </fieldset>
+          <fieldset class="side-multi-filter">
+            <legend>평점</legend>
+            <div class="side-multi-select">
+              <button
+                type="button"
+                class="side-multi-trigger"
+                :class="{ open: openFilterMenu === 'rating' }"
+                @click="toggleHomeFilterMenu('rating')"
+              >
+                <span>{{ ratingSelectionLabel }}</span
+                ><i />
+              </button>
+              <div v-if="openFilterMenu === 'rating'" class="side-multi-menu">
+                <label v-for="item in ratingRanges" :key="item.value"
+                  ><input
+                    type="checkbox"
+                    :checked="selectedRatings.includes(item.value)"
+                    @change="toggleSelection(selectedRatings, item.value)"
+                  /><i /><span>★ {{ item.label }}</span></label
                 >
-                  <span>{{ brandSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'brand'" class="side-multi-menu">
-                  <label v-for="item in homeBrandOptions" :key="item"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedBrands.includes(item)"
-                      @change="toggleSelection(selectedBrands, item)"
-                    /><i /><span>{{ item }}</span></label
-                  >
-                </div>
               </div>
-            </fieldset>
-            <fieldset class="stock-filter">
-              <legend>재고 상태</legend>
-              <div>
-                <button
-                  type="button"
-                  :class="{ on: stock === 'ALL' }"
-                  @click="stock = 'ALL'"
-                >
-                  전체</button
-                ><button
-                  type="button"
-                  :class="{ on: stock === 'AVAILABLE' }"
-                  @click="stock = 'AVAILABLE'"
-                >
-                  재고 있음
-                </button>
-              </div>
-            </fieldset>
-            <fieldset class="side-multi-filter">
-              <legend>평점</legend>
-              <div class="side-multi-select">
-                <button
-                  type="button"
-                  class="side-multi-trigger"
-                  :class="{ open: openFilterMenu === 'rating' }"
-                  @click="toggleHomeFilterMenu('rating')"
-                >
-                  <span>{{ ratingSelectionLabel }}</span
-                  ><i />
-                </button>
-                <div v-if="openFilterMenu === 'rating'" class="side-multi-menu">
-                  <label v-for="item in ratingRanges" :key="item.value"
-                    ><input
-                      type="checkbox"
-                      :checked="selectedRatings.includes(item.value)"
-                      @change="toggleSelection(selectedRatings, item.value)"
-                    /><i /><span>★ {{ item.label }}</span></label
-                  >
-                </div>
-              </div>
-            </fieldset>
-            <button type="button" class="filter-reset" @click="resetSearch">
-              ↻ 초기화
-            </button>
-          </div></Transition
-        >
+            </div>
+          </fieldset>
+          <fieldset class="stock-filter">
+            <legend>재고 상태</legend>
+            <div>
+              <button
+                type="button"
+                :class="{ on: stock === 'ALL' }"
+                @click="stock = 'ALL'"
+              >
+                전체
+              </button>
+              <button
+                type="button"
+                :class="{ on: stock === 'AVAILABLE' }"
+                @click="stock = 'AVAILABLE'"
+              >
+                재고 있음
+              </button>
+            </div>
+          </fieldset>
+          <button type="button" class="filter-reset" @click="resetSearch">
+            ↻ 초기화
+          </button>
+        </div>
       </form>
     </section>
 
-
-    <section v-if="memberMode" class="product-section recommendation member-recommendation">
+    <section
+      v-if="memberMode"
+      class="product-section recommendation member-recommendation"
+    >
       <div class="recommendation-heading">
         <div>
           <h2>AI 맞춤 추천</h2>
           <p>등록한 반려동물 정보와 실제 판매 상품을 바탕으로 추천합니다.</p>
         </div>
-        <label v-if="recommendationPets.length" class="recommendation-pet-select">
-          <span class="sr-only">추천 반려동물 선택</span>
-          <select v-model="selectedRecommendationPetId">
-            <option v-for="petItem in recommendationPets" :key="petItem.id" :value="petItem.id">
-              {{ petItem.name }} · {{ petItem.petType === 'CAT' ? '고양이' : '강아지' }}
-            </option>
-          </select>
-        </label>
+        <div
+          class="recommendation-pet-banner"
+          role="tablist"
+          aria-label="추천 반려동물 선택"
+        >
+          <button
+            v-for="petItem in recommendationPets"
+            :key="petItem.id"
+            type="button"
+            role="tab"
+            :aria-selected="
+              String(selectedRecommendationPetId) === String(petItem.id)
+            "
+            :class="{
+              on: String(selectedRecommendationPetId) === String(petItem.id),
+            }"
+            @click="selectRecommendationPet(petItem.id)"
+          >
+            {{ petItem.name }}
+            {{ petItem.petType === "CAT" ? "(고양이)" : "(강아지)" }}
+          </button>
+        </div>
       </div>
-      <p v-if="recommendationLoading" class="dashboard-order-state">AI 추천을 불러오는 중입니다.</p>
-      <p v-else-if="recommendationMessage" class="dashboard-order-state">{{ recommendationMessage }}</p>
+      <p v-if="recommendationLoading" class="dashboard-order-state">
+        AI 추천을 불러오는 중입니다.
+      </p>
+      <div v-else-if="recommendationMessage" class="ai-recommendation-empty">
+        <div>
+          <strong>반려동물 정보를 등록해 주세요</strong>
+          <p>{{ recommendationMessage }}</p>
+        </div>
+        <button type="button" @click="router.push('/mypage/pets')">
+          반려동물 등록
+        </button>
+      </div>
       <div v-else class="product-grid">
-        <ProductCard v-for="product in recommendedProducts" :key="product.id" :product="product" :pet="product.pet" />
+        <ProductCard
+          v-for="product in recommendedProducts"
+          :key="product.id"
+          :product="product"
+          :pet="product.pet"
+        />
       </div>
     </section>
 
@@ -588,7 +664,60 @@ onBeforeUnmount(() => {
           class="review-product"
         >
           <ProductCard :product="p" :pet="p.pet" />
+          <div v-if="p.bestReview" class="review-highlight">
+            <b>BEST REVIEW</b>
+            <p>{{ p.bestReview.content }}</p>
+            <small
+              >★ {{ p.bestReview.rating }} ·
+              {{ maskBestReviewWriter(p.bestReview.writerId) }}
+              <time v-if="p.bestReview.createdAt"
+                >· {{ formatReviewDate(p.bestReview.createdAt) }}</time
+              ></small
+            >
+          </div>
         </article>
+      </div>
+    </section>
+    <section
+      v-if="!memberMode"
+      class="product-section recommendation guest-recommendation"
+      aria-labelledby="guest-ai-title"
+    >
+      <div class="recommendation-heading">
+        <div>
+          <h2 id="guest-ai-title">나와 비슷한 집사의 선택!</h2>
+          <p>로그인 후 우리 아이의 정보에 맞는 AI 추천을 만나보세요.</p>
+        </div>
+      </div>
+      <div class="guest-recommendation-preview" aria-hidden="true">
+        <div class="product-grid">
+          <ProductCard
+            v-for="product in guestRecommendationProducts"
+            :key="product.id"
+            :product="product"
+            :pet="product.pet"
+          />
+        </div>
+        <div class="guest-ai-lock">
+          <span aria-hidden="true">🔒</span><small>MEMBERS ONLY</small>
+          <strong>추천 기능은 회원에게만 제공하고 있는 기능입니다.</strong>
+          <p>로그인하시면 AI 맞춤 추천을 받아보실 수 있어요.</p>
+          <div>
+            <button
+              type="button"
+              class="guest-login"
+              @click="router.push('/login')"
+            >
+              로그인</button
+            ><button
+              type="button"
+              class="guest-signup"
+              @click="router.push('/signup')"
+            >
+              회원가입
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   </div>

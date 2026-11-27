@@ -9,7 +9,7 @@ public record BestReviewResponse(
         Long id,
         int rating,
         String content,
-        String writerName,
+        String writerId,
         LocalDateTime createdAt
 
 ) {
@@ -19,7 +19,7 @@ public record BestReviewResponse(
                 review.getId(),
                 review.getRating(),
                 review.getContent(),
-                review.getMember().getName(),
+                review.getMember().getUserId(),
                 review.getCreatedAt()
         );
     }

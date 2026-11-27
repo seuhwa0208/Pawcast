@@ -18,15 +18,41 @@ const errorMessage = ref("");
 const formOpen = ref(false);
 const editingId = ref(null);
 const toast = ref("");
-const form = reactive({ name: "", type: "DOG", birth: "", breed: "", weight: "", allergy: "" });
-const BREEDS_BY_TYPE = {
-  DOG: ["말티즈", "푸들", "말티푸", "포메라니안", "비숑 프리제", "시츄", "치와와", "요크셔테리어", "웰시코기", "골든리트리버", "래브라도리트리버", "진돗개", "시바견", "프렌치불도그", "믹스견"],
-  CAT: ["코리안 숏헤어", "브리티시 숏헤어", "러시안 블루", "샴", "페르시안", "스코티시 폴드", "아메리칸 숏헤어", "노르웨이 숲", "메인쿤", "랙돌", "아비시니안", "벵갈", "먼치킨", "스핑크스", "믹스묘"],
+const formError = ref("");
+const MAX_PET_COUNT = 3;
+const form = reactive({
+  name: "",
+  type: "DOG",
+  birth: "",
+  breed: "",
+  weight: "",
+  allergies: [],
+});
+const ALLERGY_OPTIONS_BY_TYPE = {
+  DOG: ["닭고기", "소고기", "오리", "연어", "양고기", "돼지고기", "유제품", "곡물"],
+  CAT: ["닭고기", "참치", "연어", "소고기", "오리", "유제품", "곡물"],
 };
-const breedOptions = computed(() => BREEDS_BY_TYPE[form.type] || []);
+const canAddPet = computed(() => pets.value.length < MAX_PET_COUNT);
+const allergyOptions = computed(() => ALLERGY_OPTIONS_BY_TYPE[form.type] || []);
+const breedPlaceholder = computed(() =>
+  form.type === "CAT" ? "예) 코리안숏헤어, 페르시안" : "예) 포메라니안, 믹스견",
+);
 
-function handleTypeChange() {
-  form.breed = "";
+function parseAllergies(value) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+function toggleAllergy(value) {
+  if (form.allergies.includes(value)) {
+    removeAllergy(value);
+    return;
+  }
+  form.allergies.push(value);
+}
+function removeAllergy(value) {
+  form.allergies = form.allergies.filter((item) => item !== value);
 }
 
 // API 응답 필드명을 화면 전용 모델로 통일합니다.
@@ -45,7 +71,9 @@ async function loadPets() {
   try {
     loading.value = true;
     const result = await petService.getPets();
-    const serverPets = result.content || result.items || result.pets || [];
+    const serverPets = Array.isArray(result)
+      ? result
+      : result.content || result.items || result.pets || [];
     pets.value = serverPets.map(normalizePet);
   } catch (error) {
     pets.value = [];
@@ -55,13 +83,26 @@ async function loadPets() {
   }
 }
 function openAddForm() {
+  if (!canAddPet.value) {
+    showToast("반려동물은 최대 3마리까지 등록할 수 있습니다.");
+    return;
+  }
   editingId.value = null;
-  Object.assign(form, { name: "", type: "DOG", birth: "", breed: "", weight: "", allergy: "" });
+  formError.value = "";
+  Object.assign(form, { name: "", type: "DOG", birth: "", breed: "", weight: "", allergies: [] });
   formOpen.value = true;
 }
 function openEditForm(pet) {
   editingId.value = pet.id;
-  Object.assign(form, pet);
+  formError.value = "";
+  Object.assign(form, {
+    name: pet.name,
+    type: pet.type,
+    birth: pet.birth,
+    breed: pet.breed,
+    weight: pet.weight,
+    allergies: parseAllergies(pet.allergy),
+  });
   formOpen.value = true;
 }
 function toApiPayload() {
@@ -71,12 +112,20 @@ function toApiPayload() {
     birthday: form.birth || null,
     breedName: form.breed,
     weightKg: Number(form.weight) || null,
-    allergies: form.allergy || null,
+    allergies: form.allergies.join(", ") || null,
   };
 }
 async function submitPet() {
-  if (!form.name.trim() || !form.breed.trim()) return;
+  if (!form.name.trim() || !form.breed.trim()) {
+    formError.value = "이름과 품종을 모두 입력해주세요.";
+    return;
+  }
+  if (!editingId.value && !canAddPet.value) {
+    formError.value = "반려동물은 최대 3마리까지 등록할 수 있습니다.";
+    return;
+  }
   try {
+    formError.value = "";
     if (editingId.value) {
       const updated = await petService.updatePet(editingId.value, toApiPayload());
       const index = pets.value.findIndex((pet) => pet.id === editingId.value);
@@ -87,7 +136,7 @@ async function submitPet() {
     formOpen.value = false;
     showToast(editingId.value ? "반려동물 정보가 수정되었습니다." : "반려동물이 등록되었습니다.");
   } catch (error) {
-    errorMessage.value = error.message || "반려동물 정보를 저장하지 못했습니다.";
+    formError.value = error.message || "반려동물 정보를 저장하지 못했습니다.";
   }
 }
 async function removePet(pet) {
@@ -132,8 +181,8 @@ onMounted(loadPets);
               <h2>등록된 반려동물</h2>
               <p>이름, 품종, 체중과 알레르기 정보를 관리할 수 있습니다.</p>
             </div>
-            <button type="button" @click="openAddForm">
-              + 반려동물 추가
+            <button type="button" :disabled="!canAddPet" @click="openAddForm">
+              {{ canAddPet ? "+ 반려동물 추가" : "최대 3마리 등록 완료" }}
             </button>
           </header>
           <p v-if="loading" class="pet-management-state">
@@ -141,19 +190,16 @@ onMounted(loadPets);
           </p>
           <div v-else-if="pets.length" class="pet-management-list">
             <article v-for="pet in pets" :key="pet.id">
-              <div class="pet-avatar">
-                {{ pet.type === "CAT" ? "🐱" : "🐶" }}
-              </div>
-              <div>
-                <small>{{ pet.type === "CAT" ? "고양이" : "강아지" }}</small>
+              <div class="pet-identity">
                 <h3>{{ pet.name }}</h3>
-                <p>
-                  {{ pet.breed }}
-                  <template v-if="pet.weight">· {{ pet.weight }}kg</template>
-                </p>
-                <span v-if="pet.birth">생일 {{ pet.birth }}</span>
-                <span v-if="pet.allergy">알레르기: {{ pet.allergy }}</span>
+                <span>{{ pet.type === "CAT" ? "고양이" : "강아지" }}</span>
               </div>
+              <dl class="pet-meta">
+                <div><dt>품종</dt><dd>{{ pet.breed || "미등록" }}</dd></div>
+                <div><dt>생일</dt><dd>{{ pet.birth || "미등록" }}</dd></div>
+                <div><dt>알레르기</dt><dd>{{ pet.allergy || "없음" }}</dd></div>
+                <div><dt>체중</dt><dd>{{ pet.weight ? `${pet.weight}kg` : "미등록" }}</dd></div>
+              </dl>
               <div class="pet-management-actions">
                 <button type="button" @click="openEditForm(pet)">수정</button>
                 <button type="button" @click="removePet(pet)">삭제</button>
@@ -190,16 +236,12 @@ onMounted(loadPets);
           <div class="pet-form-grid">
             <label>이름 *<input v-model.trim="form.name" maxlength="20" required /></label>
             <label
-              >종류 *<select v-model="form.type" required @change="handleTypeChange">
+              >종류 *<select v-model="form.type" class="pet-type-select" required>
                 <option value="DOG">강아지</option>
                 <option value="CAT">고양이</option>
               </select></label
             >
-            <label>품종 *<select v-model="form.breed" required>
-              <option disabled value="">품종을 선택해주세요</option>
-              <option v-if="form.breed && !breedOptions.includes(form.breed)" :value="form.breed">{{ form.breed }}</option>
-              <option v-for="breed in breedOptions" :key="breed" :value="breed">{{ breed }}</option>
-            </select></label>
+            <label>품종 *<input v-model.trim="form.breed" maxlength="50" required :placeholder="breedPlaceholder" /></label>
             <label>생일<input v-model="form.birth" type="date" /></label>
             <label
               >체중(kg)<input
@@ -209,8 +251,31 @@ onMounted(loadPets);
                 max="999.99"
                 step=".01"
             /></label>
-            <label>알레르기<input v-model.trim="form.allergy" /></label>
+            <div class="pet-allergy-field">
+              <span>알레르기 원료 선택</span>
+              <div class="pet-allergy-options" role="group" aria-label="알레르기 원료">
+                <label v-for="allergy in allergyOptions" :key="allergy">
+                  <input
+                    type="checkbox"
+                    :checked="form.allergies.includes(allergy)"
+                    @change="toggleAllergy(allergy)"
+                  />
+                  <span>{{ allergy }}</span>
+                </label>
+              </div>
+              <div v-if="form.allergies.length" class="pet-allergy-tags">
+                <button
+                  v-for="allergy in form.allergies"
+                  :key="allergy"
+                  type="button"
+                  @click="removeAllergy(allergy)"
+                >
+                  {{ allergy }} <span aria-hidden="true">×</span>
+                </button>
+              </div>
+            </div>
           </div>
+          <p v-if="formError" class="pet-form-error">{{ formError }}</p>
           <div class="common-modal-actions">
             <button type="button" class="secondary" @click="formOpen = false">
               취소

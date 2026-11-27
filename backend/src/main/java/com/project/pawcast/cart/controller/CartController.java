@@ -1,6 +1,7 @@
 package com.project.pawcast.cart.controller;
 
 import com.project.pawcast.cart.dto.CartAddRequest;
+import com.project.pawcast.cart.dto.CartMergeRequest;
 import com.project.pawcast.cart.dto.CartQuantityUpdateRequest;
 import com.project.pawcast.cart.dto.CartResponse;
 import com.project.pawcast.cart.service.CartService;
@@ -28,6 +29,12 @@ public class CartController {
     public CartResponse addItem(@AuthenticationPrincipal LoginMember member,
                                 @Valid @RequestBody CartAddRequest request) {
         return cartService.addItem(memberId(member), request);
+    }
+
+    @PostMapping("/merge")
+    public CartResponse mergeGuestCart(@AuthenticationPrincipal LoginMember member,
+                                       @Valid @RequestBody CartMergeRequest request) {
+        return cartService.mergeGuestCart(memberId(member), request);
     }
 
     @PatchMapping("/items/{itemId}")

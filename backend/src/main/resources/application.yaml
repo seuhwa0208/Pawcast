@@ -18,19 +18,20 @@ spring:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
-    show-sql: true
+    # 개발 콘솔 출력이 요청 스레드를 잠그지 않도록 SQL 전체 출력은 끈다.
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 petmall:
   cors:
     allowed-origins:
       - http://127.0.0.1:5174
       - http://localhost:5174
-      - http://127.0.0.1:5173
-      - http://localhost:5173
+      - https://*.trycloudflare.com
   jwt:
     # HS256 서명에는 32바이트 이상인 비밀키가 필수다.
     secret: ${JWT_SECRET}
@@ -47,9 +48,7 @@ oauth:
   google:
     client-id: ${GOOGLE_CLIENT_ID}
 
-ai:
-  base-url: ${AI_BASE_URL:http://localhost:8000}
-  internal-api-key: ${AI_INTERNAL_API_KEY:}
+# 리뷰 등록 시 감성 분석은 서버 트랜잭션에서 처리하므로 기존 AI 주소 설정을 유지한다.
 
 file:
   upload:

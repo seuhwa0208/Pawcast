@@ -42,12 +42,12 @@ public class AdminSalesService {
         // 관리자 로그인 직후 대시보드가 500으로 실패했습니다. 기간 라벨은 요청 값으로 구성합니다.
         String periodLabel = buildPeriodLabel(request, dateRange[0]);
         return results.stream().map(row -> new SalesResponse(
-                        periodLabel,
-                        decimal(row[0]),
-                        number(row[1]),
-                        decimal(row[2]),
-                        decimal(row[3])
-                )).toList();
+                periodLabel,
+                decimal(row[0]),
+                number(row[1]),
+                decimal(row[2]),
+                decimal(row[3])
+        )).toList();
     }
 
     // 일별, 월별, 분기별, 연도별 계산

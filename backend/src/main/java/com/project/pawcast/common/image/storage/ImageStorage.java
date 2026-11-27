@@ -10,10 +10,11 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 @Component
-public class ImageStorage {
+public class  ImageStorage {
 
     // 이미지 저장 경로
     private final Path uploadPath = Paths.get("uploads/images");
+    private final Path productUploadPath = Paths.get("uploads/products");
 
     // 이미지 저장
     public String save(MultipartFile file) throws IOException {
@@ -28,12 +29,27 @@ public class ImageStorage {
         // 실제 파일 저장
         Path targetPath = uploadPath.resolve(storedFilename);
         file.transferTo(targetPath);
-        return storedFilename;
+        // 리뷰 응답만으로도 브라우저가 실제 공개 리소스를 찾을 수 있도록
+        // DB에는 파일명 대신 공개 URL 경로를 저장한다.
+        return "/uploads/images/" + storedFilename;
+    }
+
+    /** 상품 대표·상세 이미지는 리뷰 파일과 분리한 공개 경로에 저장합니다. */
+    public String saveProduct(MultipartFile file) throws IOException {
+        Files.createDirectories(productUploadPath);
+        String originalFilename = file.getOriginalFilename();
+        String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        String storedFilename = UUID.randomUUID() + extension;
+        file.transferTo(productUploadPath.resolve(storedFilename));
+        return "/uploads/products/" + storedFilename;
     }
 
     // 이미지 삭제
     public void delete(String filename) throws IOException {
-        Path targetPath = uploadPath.resolve(filename).normalize();
+        String storedFilename = filename == null ? "" : filename
+                .replace('\\', '/')
+                .replaceFirst("^/uploads/images/", "");
+        Path targetPath = uploadPath.resolve(storedFilename).normalize();
         // 저장 경로 내부의 파일인지 확인
         if (!targetPath.startsWith(uploadPath.toAbsolutePath().normalize())) {throw new IllegalArgumentException("잘못된 파일 경로입니다.");}
         Files.deleteIfExists(targetPath);

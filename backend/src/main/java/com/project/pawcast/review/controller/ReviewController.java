@@ -7,6 +7,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
@@ -29,14 +32,19 @@ public class ReviewController {
 
     // 리뷰 등록
     @PostMapping("/reviews")
-    public ReviewResponse createReview(@AuthenticationPrincipal LoginMember member, @Valid @RequestBody ReviewCreateRequest request) {
-        return reviewService.createReview(member.getId(), request);
+    public ReviewResponse createReview(@AuthenticationPrincipal LoginMember member,
+            @Valid @RequestPart("request") ReviewCreateRequest request,
+                                       @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return reviewService.createReview(member.getId(), request, images);
     }
 
     // 리뷰 수정
     @PatchMapping("/reviews/{reviewId}")
-    public ReviewResponse updateReview(@AuthenticationPrincipal LoginMember member, @PathVariable Long reviewId, @Valid @RequestBody ReviewUpdateRequest request) {
-        return reviewService.updateReview(reviewId, member.getId(), request);
+    public ReviewResponse updateReview(@AuthenticationPrincipal LoginMember member,
+                                       @PathVariable Long reviewId,
+                                       @Valid @RequestPart ReviewUpdateRequest request,
+                                       @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        return reviewService.updateReview(reviewId, member.getId(), request,images);
     }
 
     // 리뷰 삭제

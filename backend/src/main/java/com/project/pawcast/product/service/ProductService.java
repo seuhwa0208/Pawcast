@@ -1,5 +1,6 @@
 package com.project.pawcast.product.service;
 
+import com.project.pawcast.common.image.service.ImageService;
 import com.project.pawcast.product.entity.Category;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
@@ -16,14 +17,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +38,7 @@ public class ProductService {
     private final MembersRepository membersRepository;
     private final AuthorizationValidator authorizationValidator;
     private final Validator validator;
+    private final ImageService imageService;
 
     // 관리자 검색
     public Product findById(Long id) {
@@ -101,7 +101,7 @@ public class ProductService {
     }
 
     @Transactional
-    public ProductDetailResponse create(Long memberId, ProductCreateRequest request) {
+    public ProductDetailResponse create(Long memberId, ProductCreateRequest request, List<MultipartFile> images) {
         validateManager(memberId);
         validateCreateRequest(request);
         Category category = categoryService.findById(request.categoryId());
@@ -116,16 +116,16 @@ public class ProductService {
         for (VariantCreateRequest variant : request.variants()) {
             addVariant(product, variant);
         }
-        replaceImages(product, request.images());
+        replaceImages(product, images);
         saveDetails(product, request.foodDetail(), request.deviceDetail());
         return response(product, true);
     }
 
+    // 상품 수정
     @Transactional
-    public ProductDetailResponse update(Long memberId, Long productId, ProductUpdateRequest request) {
+    public ProductDetailResponse update(Long memberId, Long productId, ProductUpdateRequest request,List<MultipartFile> images) {
         validateManager(memberId);
         validateRequest(request);
-        validateImages(request.images());
         Product product = findById(productId);
         validateDetailType(product.getProductType(), request.foodDetail(), request.deviceDetail(), false);
 
@@ -145,7 +145,7 @@ public class ProductService {
             product.setDescription(request.description());
         }
         if (request.images() != null) {
-            replaceImages(product, request.images());
+            replaceImages(product, images);
         }
         saveDetails(product, request.foodDetail(), request.deviceDetail());
         return response(product, true);
@@ -292,7 +292,7 @@ public class ProductService {
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_DETAIL);
         }
     }
-    
+
     private void validateImages(List<ImageCreateRequest> images) {
         if (images != null && images.stream().filter(ImageCreateRequest::main).count() > 1) {
             throw new BusinessException(ErrorCode.MULTIPLE_MAIN_IMAGES);
@@ -342,32 +342,85 @@ public class ProductService {
         }
     }
 
-    private void replaceImages(Product product, List<ImageCreateRequest> images) {
+    private void replaceImages(Product product, List<MultipartFile> images) {
         imageRepository.deleteAllByProductId(product.getId());
         imageRepository.flush();
-        imageRepository.saveAll(images.stream()
-                .map(image -> ProductImage.builder()
-                        .product(product)
-                        .imagePath(image.imagePath())
-                        .main(image.main())
-                        .sortOrder(image.sortOrder())
-                        .build())
-                .toList());
+        if (images == null || images.isEmpty()) {return;}
+
+        List<ProductImage> productImages = new ArrayList<>();
+
+        for (int i = 0; i < images.size(); i++) {
+            MultipartFile image = images.get(i);
+
+            String imagePath = imageService.uploadProduct(image);
+            productImages.add(
+                    ProductImage.builder()
+                            .product(product)
+                            .imagePath(imagePath)
+                            .main(i == 0)
+                            .sortOrder(i)
+                            .build()
+            );
+        }
+        imageRepository.saveAll(productImages);
     }
 
-    private void saveDetails(Product product, FoodDetailCreateRequest food, DeviceDetailCreateRequest device) {
+    private void saveDetails(
+            Product product,
+            FoodDetailCreateRequest food,
+            DeviceDetailCreateRequest device
+    ) {
         if (food != null) {
-            foodRepository.saveAndFlush(FoodDetail.builder()
-                    .productId(product.getId()).product(product)
-                    .foodKind(food.foodKind()).foodForm(food.foodForm())
-                    .mainIngredient(food.mainIngredient()).lifeStage(food.lifeStage())
-                    .ingredientDescription(food.ingredientDescription()).build());
+            FoodDetail detail = foodRepository.findById(product.getId())
+                    .orElse(null);
+
+            if (detail == null) {
+                // 신규: productId는 직접 넣지 않습니다.
+                detail = FoodDetail.builder()
+                        .product(product)
+                        .foodKind(food.foodKind())
+                        .foodForm(food.foodForm())
+                        .mainIngredient(food.mainIngredient())
+                        .lifeStage(food.lifeStage())
+                        .ingredientDescription(food.ingredientDescription())
+                        .build();
+
+                foodRepository.saveAndFlush(detail);
+            } else {
+                // 기존: 조회한 엔티티의 값을 변경합니다.
+                detail.update(
+                        food.foodKind(),
+                        food.foodForm(),
+                        food.mainIngredient(),
+                        food.lifeStage(),
+                        food.ingredientDescription()
+                );
+
+                foodRepository.flush();
+            }
         }
+
         if (device != null) {
-            deviceRepository.saveAndFlush(DeviceDetail.builder()
-                    .productId(product.getId()).product(product)
-                    .deviceKind(device.deviceKind()).material(device.material())
-                    .featureDescription(device.featureDescription()).build());
+            DeviceDetail detail = deviceRepository.findById(product.getId())
+                    .orElse(null);
+
+            if (detail == null) {
+                detail = DeviceDetail.builder()
+                        .product(product)
+                        .deviceKind(device.deviceKind())
+                        .material(device.material())
+                        .featureDescription(device.featureDescription())
+                        .build();
+
+                deviceRepository.saveAndFlush(detail);
+            } else {
+                // DeviceDetail에는 이미 @Setter가 있습니다.
+                detail.setDeviceKind(device.deviceKind());
+                detail.setMaterial(device.material());
+                detail.setFeatureDescription(device.featureDescription());
+
+                deviceRepository.flush();
+            }
         }
     }
 
@@ -393,9 +446,20 @@ public class ProductService {
         BigDecimal average = product.getReviewCount() == 0
                 ? BigDecimal.ZERO.setScale(1)
                 : BigDecimal.valueOf(product.getRatingSum())
-                        .divide(BigDecimal.valueOf(product.getReviewCount()), 1, RoundingMode.HALF_UP);
-        boolean soldOut = variants.stream().noneMatch(option ->
-                option.getProductVariantStatus() == ProductVariantStatus.ON_SALE && option.getStock() > 0);
+                .divide(BigDecimal.valueOf(product.getReviewCount()), 1, RoundingMode.HALF_UP);
+        boolean hasSellableVariant = variants.stream().anyMatch(option ->
+                option.getProductVariantStatus() == ProductVariantStatus.ON_SALE
+                        && option.getStock() > 0);
+        boolean allDiscontinued = !variants.isEmpty() && variants.stream().allMatch(option ->
+                option.getProductVariantStatus() == ProductVariantStatus.DISCONTINUED);
+        boolean soldOut = !hasSellableVariant;
+        String productStatus = variants.isEmpty()
+                ? null
+                : hasSellableVariant
+                        ? ProductVariantStatus.ON_SALE.name()
+                        : allDiscontinued
+                                ? ProductVariantStatus.DISCONTINUED.name()
+                                : ProductVariantStatus.SOLD_OUT.name();
         return new ProductResponse(
                 product.getId(), product.getName(), product.getBrand(),
                 product.getCategory() == null ? null : product.getCategory().getName(),
@@ -406,8 +470,62 @@ public class ProductService {
                 variant == null ? null : variant.getId(),
                 variant == null ? null : variant.getPrice(),
                 product.getSalesCount(), product.getWishCount(), product.getReviewCount(),
-                average, soldOut, null
+                average, soldOut, null,
+                variants.stream().mapToInt(ProductVariant::getStock).sum(),
+                productStatus
         );
+    }
+
+    @Transactional
+    public ProductResponse changeProductStatus(
+            Long memberId,
+            Long productId,
+            ProductVariantStatus requestedStatus
+    ) {
+        validateManager(memberId);
+
+        // 관리자 목록의 셀렉트는 상품 한 행을 제어하므로 해당 상품의 옵션을
+        // 모두 잠그고 한 트랜잭션에서 변경해 고객 목록의 판매 가능 여부와 맞춥니다.
+        Product product = productRepository.findManagementProductById(productId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_PRODUCT));
+        List<ProductVariant> variants = variantRepository.findAllByProductIdForUpdate(productId);
+        if (variants.isEmpty()) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_PRODUCT_VARIANT);
+        }
+
+        if (requestedStatus == ProductVariantStatus.ON_SALE) {
+            boolean hasStock = variants.stream().anyMatch(variant -> variant.getStock() > 0);
+            if (!hasStock) {
+                throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+            }
+
+            // 재고 없는 옵션은 판매 중으로 노출하지 않고 품절로 유지합니다.
+            // 재고가 있는 옵션만 판매 가능하게 하여 공개 조회의 재고 조건과 일치시킵니다.
+            for (ProductVariant variant : variants) {
+                variant.setProductVariantStatus(
+                        variant.getStock() > 0
+                                ? ProductVariantStatus.ON_SALE
+                                : ProductVariantStatus.SOLD_OUT
+                );
+            }
+        } else {
+            // 품절·판매 종료는 상품 전체에 적용해 다른 옵션이 상태를 우회하지 못하게 합니다.
+            for (ProductVariant variant : variants) {
+                variant.setProductVariantStatus(requestedStatus);
+            }
+        }
+
+        return managementResponse(product);
+    }
+
+    @Transactional
+    public void changeVariantStatus(Long memberId, Long variantId, ProductVariantStatus status) {
+        validateManager(memberId);
+        ProductVariant variant = lockedVariant(variantId);
+        if (status == ProductVariantStatus.ON_SALE && variant.getStock() == 0) {
+            throw new BusinessException(ErrorCode.INSUFFICIENT_STOCK);
+        }
+        variant.setProductVariantStatus(status);
     }
 
     // 베스트3 판매량 기준

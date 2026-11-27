@@ -6,6 +6,7 @@ import com.project.pawcast.member.dto.MemberResponse;
 import com.project.pawcast.member.dto.PasswordRequest;
 import com.project.pawcast.member.service.MemberService;
 import com.project.pawcast.security.LoginMember;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -38,7 +39,10 @@ public class MemberController {
 
     // 비밀번호 변경
     @PatchMapping("/me/password")
-    public void changePassword(@AuthenticationPrincipal LoginMember member, @RequestBody ChangePasswordRequest request){
+    public void changePassword(
+            @AuthenticationPrincipal LoginMember member,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
         memberService.changePassword(member.getId(), request);
     }
 

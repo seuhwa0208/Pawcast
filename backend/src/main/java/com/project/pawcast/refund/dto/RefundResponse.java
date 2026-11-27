@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public record RefundResponse (
         Long refundId,
         Long paymentId,
+        Long orderId,
+        String orderNumber,
         String providerRefundKey,
         BigDecimal refundAmount,
         String reason,
@@ -19,6 +21,8 @@ public record RefundResponse (
         return new RefundResponse(
                 refund.getId(),
                 refund.getPayment().getId(),
+                refund.getPayment().getOrder().getId(),
+                refund.getPayment().getOrder().getOrderNumber(),
                 refund.getProviderRefundKey(),
                 refund.getRefundAmount(),
                 refund.getReason(),

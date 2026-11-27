@@ -50,6 +50,8 @@ public class RefundService {
                 .refundAmount(payment.getAmount())
                 .reason(cancelReason)
                 .status(status)
+                // JPA 감사 기능 유무와 무관하게 신규 환불 요청의 생성일을 보장한다.
+                .createdAt(LocalDateTime.now())
                 .completedAt(completedAt)
                 .build();
 
@@ -73,6 +75,16 @@ public class RefundService {
         Refund refund = refundRepository.findByPaymentId(payment.getId()).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REFUND));
 
         return RefundResponse.from(refund);
+    }
+
+    // 매니저·관리자가 환불 신청 사유와 처리 상태를 확인할 수 있는 운영 목록입니다.
+    public List<RefundResponse> listRefundsForManager(Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+        return refundRepository.findAllForAdmin().stream()
+                .map(RefundResponse::from)
+                .toList();
     }
 
     // 환불 기능 - 환불 요청 기능에 가깝다
@@ -129,5 +141,21 @@ public class RefundService {
         for (OrderItem item : items) {
             productRepository.decreaseSalesCount(item.getProductVariant().getProduct().getId(), item.getQuantity());
         }
+    }
+
+    // 승인 대기 환불을 거절한다. 주문과 결제 상태는 유지해 회원이 주문 이력을 계속 확인할 수 있다.
+    @Transactional
+    public void rejectRefund(Long refundId, Long memberId) {
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        validator.validateManager(member);
+
+        Refund refund = refundRepository.findByIdForUpdate(refundId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_REFUND));
+        if (refund.getStatus() != Refund.RefundStatus.PENDING) {
+            throw new BusinessException(ErrorCode.INVALID_REFUND_STATUS);
+        }
+        refund.setStatus(Refund.RefundStatus.REJECTED);
+        refund.setCompletedAt(LocalDateTime.now());
     }
 }

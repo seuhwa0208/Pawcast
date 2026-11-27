@@ -1,0 +1,150 @@
+/* # 관리자·매니저 운영 화면에서 재사용하는 표, 검색 도구모음, QnA 답변 모달 스타일. */
+.admin-operations .toolbar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 26px 0 12px;
+}
+.admin-operations .toolbar input,
+.admin-operations .toolbar select {
+  min-height: 38px;
+  border: 1px solid #ddc9b8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 10px;
+}
+.admin-operations .toolbar button {
+  border: 1px solid #d9b898;
+  background: #fff;
+  padding: 8px 12px;
+}
+.admin-operations .toolbar .selected,
+.admin-operations .toolbar .export {
+  background: #a66b3f;
+  color: #fff;
+}
+.admin-operations .loading,
+.admin-operations .error {
+  padding: 10px 0;
+}
+.admin-operations .loading {
+  color: #806653;
+}
+.admin-operations .error {
+  color: #b34d3b;
+}
+.admin-operations .table-wrap {
+  overflow: auto;
+  border: 1px solid #e8d8ca;
+  border-radius: 14px;
+  background: #fff;
+}
+.admin-operations .table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.admin-operations .table-wrap th,
+.admin-operations .table-wrap td {
+  padding: 13px;
+  border-bottom: 1px solid #f0e7df;
+  text-align: left;
+  white-space: nowrap;
+}
+.admin-operations .table-wrap th {
+  background: #fffaf5;
+}
+.admin-operations .table-wrap select,
+.admin-operations .table-wrap td button {
+  border: 1px solid #ddc9b8;
+  border-radius: 7px;
+  background: #fff;
+  padding: 7px;
+}
+.admin-operations .cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  border: 0;
+  background: transparent;
+}
+.admin-operations .cards article {
+  display: grid;
+  gap: 8px;
+  border: 1px solid #e8d8ca;
+  border-radius: 12px;
+  background: #fff;
+  padding: 18px;
+}
+.admin-operations .cards article span {
+  color: #806653;
+}
+.admin-operations .cards article em {
+  font-style: normal;
+  color: #a66838;
+  font-weight: 800;
+}
+.admin-qna-answer-modal {
+  max-width: 680px;
+  text-align: left;
+}
+.admin-qna-answer-modal > small {
+  color: #a66838;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+.admin-qna-answer-modal label {
+  display: grid;
+  gap: 9px;
+  margin-top: 24px;
+  color: #604631;
+  font-weight: 800;
+}
+.admin-qna-answer-modal textarea {
+  min-height: 170px;
+  resize: vertical;
+  border: 1px solid #ddc9b8;
+  border-radius: 10px;
+  padding: 14px;
+  color: #3d281b;
+  font: inherit;
+  line-height: 1.6;
+}
+@media (max-width: 640px) {
+  .admin-operations .cards {
+    grid-template-columns: 1fr;
+  }
+}
+.admin-refund-requests {
+  margin-top: 34px;
+  border-top: 1px solid #e7d8cb;
+  padding-top: 28px;
+}
+.admin-refund-requests header h2 {
+  margin: 6px 0;
+  color: #432d20;
+  font-size: 22px;
+}
+.admin-refund-requests header small {
+  color: #9b633b;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+.admin-refund-requests header p {
+  margin: 0 0 18px;
+  color: #8c786a;
+  font-size: 13px;
+}
+.admin-refund-requests table button {
+  border: 0;
+  border-radius: 7px;
+  background: #95643d;
+  padding: 8px 10px;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-refund-requests .refund-reason {
+  min-width: 240px;
+  text-align: left;
+  white-space: pre-wrap;
+}

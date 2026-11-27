@@ -421,7 +421,138 @@ public interface ProductRepository
     );
 
     // 판매량 BEST 3
+    @Query(
+            value = """
+            WITH ranked_variants AS (
+                SELECT
+                    v.id,
+                    v.product_id,
+                    v.price,
+                    MAX(
+                        CASE
+                            WHEN v.product_variant_status = 'ON_SALE'
+                                 AND v.stock > 0
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) OVER (PARTITION BY v.product_id) AS has_stock,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY v.product_id
+                        ORDER BY v.price ASC, v.id ASC
+                    ) AS rn
+                FROM product_variants v
+                WHERE v.product_variant_status IN ('ON_SALE', 'SOLD_OUT')
+            )
+            SELECT
+                p.id AS "id",
+                p.name AS "name",
+                p.brand AS "brand",
+                c.name AS "categoryName",
+                p.category_id AS "categoryId",
+                p.product_type AS "productType",
+                f.main_ingredient AS "mainIngredient",
+                f.life_stage AS "lifeStage",
+                v.id AS "variantId",
+                v.price AS "price",
+                p.sales_count AS "salesCount",
+                p.wish_count AS "wishCount",
+                p.review_count AS "reviewCount",
+                CASE
+                    WHEN p.review_count = 0
+                    THEN CAST(0.0 AS numeric)
+                    ELSE ROUND(CAST(p.rating_sum AS numeric) / p.review_count, 1)
+                END AS "averageRating",
+                (v.has_stock = 0) AS "soldOut",
+                (
+                    SELECT img.image_path
+                    FROM product_images img
+                    WHERE img.product_id = p.id
+                    ORDER BY
+                        img.is_main DESC,
+                        img.sort_order ASC NULLS LAST,
+                        img.id ASC
+                    LIMIT 1
+                ) AS "imagePath"
+            FROM products p
+            JOIN ranked_variants v
+              ON v.product_id = p.id
+             AND v.rn = 1
+            LEFT JOIN categories c
+              ON c.id = p.category_id
+            LEFT JOIN food_details f
+              ON f.product_id = p.id
+            ORDER BY p.sales_count DESC, p.id DESC
+            LIMIT 3
+            """,
+            nativeQuery = true
+    )
     List<ProductListView> findTop3ByOrderBySalesCountDescIdDesc();
+
     // 판매량 WORST 3
+    @Query(
+            value = """
+            WITH ranked_variants AS (
+                SELECT
+                    v.id,
+                    v.product_id,
+                    v.price,
+                    MAX(
+                        CASE
+                            WHEN v.product_variant_status = 'ON_SALE'
+                                 AND v.stock > 0
+                            THEN 1
+                            ELSE 0
+                        END
+                    ) OVER (PARTITION BY v.product_id) AS has_stock,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY v.product_id
+                        ORDER BY v.price ASC, v.id ASC
+                    ) AS rn
+                FROM product_variants v
+                WHERE v.product_variant_status IN ('ON_SALE', 'SOLD_OUT')
+            )
+            SELECT
+                p.id AS "id",
+                p.name AS "name",
+                p.brand AS "brand",
+                c.name AS "categoryName",
+                p.category_id AS "categoryId",
+                p.product_type AS "productType",
+                f.main_ingredient AS "mainIngredient",
+                f.life_stage AS "lifeStage",
+                v.id AS "variantId",
+                v.price AS "price",
+                p.sales_count AS "salesCount",
+                p.wish_count AS "wishCount",
+                p.review_count AS "reviewCount",
+                CASE
+                    WHEN p.review_count = 0
+                    THEN CAST(0.0 AS numeric)
+                    ELSE ROUND(CAST(p.rating_sum AS numeric) / p.review_count, 1)
+                END AS "averageRating",
+                (v.has_stock = 0) AS "soldOut",
+                (
+                    SELECT img.image_path
+                    FROM product_images img
+                    WHERE img.product_id = p.id
+                    ORDER BY
+                        img.is_main DESC,
+                        img.sort_order ASC NULLS LAST,
+                        img.id ASC
+                    LIMIT 1
+                ) AS "imagePath"
+            FROM products p
+            JOIN ranked_variants v
+              ON v.product_id = p.id
+             AND v.rn = 1
+            LEFT JOIN categories c
+              ON c.id = p.category_id
+            LEFT JOIN food_details f
+              ON f.product_id = p.id
+            ORDER BY p.sales_count ASC, p.id DESC
+            LIMIT 3
+            """,
+            nativeQuery = true
+    )
     List<ProductListView> findTop3ByOrderBySalesCountAscIdDesc();
 }

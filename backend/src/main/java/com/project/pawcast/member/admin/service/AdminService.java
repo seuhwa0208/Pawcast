@@ -1,13 +1,11 @@
 package com.project.pawcast.member.admin.service;
 
-
+import com.project.pawcast.auth.repository.RefreshTokenRepository;
 import com.project.pawcast.common.exception.BusinessException;
 import com.project.pawcast.common.exception.ErrorCode;
 import com.project.pawcast.member.admin.dto.MemberRoleRequest;
-import com.project.pawcast.member.admin.dto.MemberRoleResponse;
 import com.project.pawcast.member.admin.dto.MemberStatusRequest;
 import com.project.pawcast.member.dto.MemberListResponse;
-import com.project.pawcast.member.dto.MemberResponse;
 import com.project.pawcast.member.entity.Members;
 import com.project.pawcast.member.repository.MembersRepository;
 import com.project.pawcast.pets.entity.Pets;
@@ -15,10 +13,8 @@ import com.project.pawcast.security.AuthorizationValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,32 +23,40 @@ public class AdminService {
 
     private final AuthorizationValidator validator;
     private final MembersRepository membersRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
-    //회원 전체 목록 - 반려동물 종류별로 수 까지 표현
+    // 회원 전체 목록 - 반려동물 종류별로 수 까지 표현
     public List<MemberListResponse> getMemberList(Long memberId) {
         // 권한 검사
-        Members member = membersRepository.findById(memberId).orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(memberId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateAdmin(member);
 
         return membersRepository.findAllWithPetCounts(Members.Status.DELETED, Pets.PetType.DOG, Pets.PetType.CAT);
     }
-    
+
     // 회원 역할 변경
     @Transactional
-    public void changeMemberRole(Long adminId, Long userId, MemberRoleRequest request){
+    public void changeMemberRole(Long adminId, Long userId, MemberRoleRequest request) {
         // 권한 검사
-        Members member = membersRepository.findById(adminId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members member = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateAdmin(member);
-        Members user = membersRepository.findById(userId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members user = membersRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         user.setRole(request.role());
+        // 기존 JWT에는 이전 role이 서명되어 있으므로 역할 변경 즉시 refresh 세션을 끊습니다.
+        refreshTokenRepository.revokeAllByMember(user.getId());
     }
-    
+
     // 회원 상태 변경
     @Transactional
-    public void changeMemberStatus(Long adminId, Long userId, MemberStatusRequest request){
-        Members member = membersRepository.findById(adminId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+    public void changeMemberStatus(Long adminId, Long userId, MemberStatusRequest request) {
+        Members member = membersRepository.findById(adminId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         validator.validateAdmin(member);
-        Members user = membersRepository.findById(userId).orElseThrow(()->new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
+        Members user = membersRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND_MEMBER));
         user.setStatus(request.status());
     }
 }

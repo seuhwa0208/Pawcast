@@ -1,0 +1,63 @@
+.admin-notices{min-height:100dvh;padding:34px;background:#f7f5f1;color:#3d281b}.notices-heading small{color:#a66838;font-weight:900;letter-spacing:.12em}.notices-heading h1{margin:8px 0;font-size:36px}.notices-heading p{margin:0;color:#917866}.notice-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 18px}.notice-summary article,.notice-list-panel,.notice-editor{border:1px solid #eadfd5;border-radius:18px;background:#fffdfb}.notice-summary article{min-height:110px;padding:17px}.notice-summary .accent{background:#fff8f3;border-color:#edcbb9}.notice-summary small{display:block;color:#97765e;font-weight:800}.notice-summary b{display:block;margin-top:8px;font-size:27px}.notice-summary em{margin-left:3px;font-size:14px;font-style:normal}.notice-summary p,.notice-editor header p{margin:6px 0 0;color:#a18570;font-size:12px}.notice-list-panel,.notice-editor{padding:22px}.notice-list-panel>header,.notice-editor>header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.notice-tabs{display:flex;gap:7px;flex-wrap:wrap}.notice-tabs button,.outline,.small-button,.notice-search button{border:1px solid #dfc8b4;border-radius:8px;background:#fff;padding:9px 12px;color:#68452e;font:inherit;font-weight:800;cursor:pointer}.notice-tabs button.active,.primary,.notice-editor form button[type=submit]{border:0;border-radius:8px;background:#ac6a3d;padding:10px 14px;color:#fff;font:inherit;font-weight:800;cursor:pointer}.notice-search{display:grid;grid-template-columns:1fr auto;gap:8px;margin:16px 0}.notice-search input,.notice-editor input,.notice-editor select,.notice-editor textarea{width:100%;box-sizing:border-box;border:1px solid #ddc9b8;border-radius:8px;background:#fff;padding:11px;color:#4b3425;font:inherit}.notice-table-wrap{overflow-x:auto;border:1px solid #eee2d8;border-radius:12px}.notice-table-wrap table{width:100%;min-width:760px;border-collapse:collapse}.notice-table-wrap th,.notice-table-wrap td{border-bottom:1px solid #f1e8e1;padding:13px 10px;text-align:left}.notice-table-wrap th{background:#fff9f4;color:#94755f;font-size:12px}.notice-type{border-radius:999px;padding:5px 8px;font-size:12px;font-weight:800}.notice-type.general{background:#e5f0f6;color:#50738b}.notice-type.event{background:#fff0d9;color:#a36624}.small-button{margin-right:5px;padding:6px 8px;font-size:12px}.small-button.danger{border-color:#d47b6e;color:#b64a3c}.notice-message{color:#866e5e}.empty{text-align:center!important;color:#947a66}.notice-editor{max-width:1100px}.notice-editor h2{margin:0;font-size:23px}.notice-editor form{display:grid;gap:18px;margin-top:26px}.notice-editor label{display:grid;gap:8px;color:#68452e;font-size:14px;font-weight:800}.notice-editor textarea{min-height:380px;resize:vertical}.form-row{display:grid;grid-template-columns:260px auto;align-items:end;gap:16px}.pin-toggle{display:flex!important;align-items:center;gap:8px}.pin-toggle input{width:18px!important;height:18px}.form-actions{display:flex;justify-content:flex-end;gap:8px}.form-actions button{min-width:130px}@media(max-width:900px){.notice-summary{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){.admin-notices{padding:24px 16px}.notice-summary{grid-template-columns:1fr}.notice-list-panel,.notice-editor{padding:16px}.notice-search,.form-row{grid-template-columns:1fr}.notice-list-panel>header,.notice-editor>header{flex-direction:column}.form-actions button{flex:1}}
+
+/* 공지사항 목록·등록 화면: 불필요한 우측 여백을 없애고 관리 버튼의 조작 영역을 넓힌다. */
+.notice-editor { max-width: none; width: 100%; }
+.notice-search button { border: 1px solid #dfc8b4; border-radius: 8px; background: #fff; padding: 0 18px; color: #68452e; font: inherit; font-weight: 800; cursor: pointer; }
+.notice-search button:hover { border-color: #ac6a3d; background: #fffaf6; }
+.notice-table-wrap th, .notice-table-wrap td { text-align: center !important; vertical-align: middle; }
+.notice-table-wrap th:last-child, .notice-table-wrap td:last-child { padding-left: 4px; padding-right: 4px; }
+.small-button { min-width: 54px; margin-right: 3px; padding: 9px 10px; font-size: 13px; line-height: 1.1; }
+.small-button:last-child { margin-right: 0; }
+
+/* 고객 공지 페이지의 .notice-search와 이름을 분리해 전역 스타일 충돌을 막는다. */
+.admin-notice-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 8px;
+  margin: 16px 0;
+  height: auto;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.admin-notice-search input {
+  min-width: 0;
+  height: 52px;
+  border: 1px solid #ddc9b8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 0 14px;
+  color: #4b3425;
+  font: inherit;
+}
+.admin-notice-search button {
+  appearance: none;
+  min-width: 112px;
+  height: 52px;
+  border: 1px solid #dfc8b4;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: none;
+  padding: 0 18px;
+  color: #68452e;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.admin-notice-search button::before,
+.admin-notice-search button::after { content: none !important; display: none !important; }
+.admin-notice-search button:hover { border-color: #ac6a3d; background: #fffaf6; }
+@media (max-width: 620px) { .admin-notice-search { grid-template-columns: 1fr; } .admin-notice-search button { width: 100%; } }
+
+/* 탭별 데이터 수와 무관하게 공지 표의 열 순서·폭·행 높이를 고정한다. */
+.notice-table-wrap table { table-layout: fixed; }
+.notice-col-id { width: 9%; }
+.notice-col-type { width: 12%; }
+.notice-col-pin { width: 10%; }
+.notice-col-title { width: auto; }
+.notice-col-date { width: 15%; }
+.notice-col-actions { width: 18%; }
+.notice-table-wrap th,
+.notice-table-wrap td { height: 58px; box-sizing: border-box; }
+.notice-table-wrap td:nth-child(4) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
